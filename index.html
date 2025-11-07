@@ -1,0 +1,103 @@
+<!-- ...existing code... -->
+<script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+<script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
+<script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
+
+<body style="margin:0; overflow:hidden;">
+  <!-- permission button (needed for iOS deviceorientation + geolocation) -->
+  <button id="request-perms" style="position: absolute; z-index: 999; left: 10px; top: 10px; padding: 10px;">
+    Enable Location & Motion
+  </button>
+
+  <a-scene 
+    vr-mode-ui="enabled: false" 
+    embedded>
+    
+    <!-- Example cube at a predetermined coordinate (Munich central) -->
+    <a-box
+      id="targetCube"
+      gps-entity-place="latitude: 48.137154; longitude: 11.576124;"
+      color="red"
+      scale="2 2 2">
+    </a-box>
+
+    <!-- gps-camera provides user's geolocation & will align scene objects -->
+    <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
+  </a-scene>
+
+  <script>
+    // request geolocation + deviceorientation permission (iOS requires explicit request for deviceorientation)
+    const btn = document.getElementById('request-perms');
+    btn.addEventListener('click', async () => {
+      btn.style.display = 'none';
+
+      // Request motion permission on iOS 13+ if needed
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const resp = await DeviceOrientationEvent.requestPermission();
+          console.log('DeviceOrientation permission:', resp);
+        } catch (err) {
+          console.warn('DeviceOrientation permission denied or unavailable', err);
+        }
+      }
+
+      // Request geolocation (prompts the browser)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          console.log('Initial geolocation:', pos.coords);
+        }, err => {
+          console.warn('Geolocation error:', err);
+        }, { enableHighAccuracy: true });
+      } else {
+        console.warn('Geolocation not supported');
+      }
+    });
+
+    // simple A-Frame component to read camera rotation and position
+    AFRAME.registerComponent('rotation-reader', {
+      tick: function () {
+        const cam = this.el;
+        const worldPos = new THREE.Vector3();
+        cam.object3D.getWorldPosition(worldPos);
+        const pos = cam.getAttribute('position');
+        const rot = cam.getAttribute('rotation');
+        // log (you can remove or throttle these logs in production)
+        // console.log('camera pos', pos, 'rotation', rot);
+      }
+    });
+
+    // distance helper (haversine) to compute straight-line distance between user and target coords
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      function toRad(v){ return v * Math.PI / 180; }
+      const R = 6371000; // meters
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    // Example: when the gps-entity-place is loaded we can compute distance from user
+    const target = document.getElementById('targetCube');
+    target.addEventListener('loaded', () => {
+      console.log('target loaded at', target.getAttribute('gps-entity-place'));
+    });
+
+    // Periodically compute distance using the camera's current GPS (gps-camera component stores lat/lon on the element)
+    const cam = document.querySelector('[gps-camera]');
+    setInterval(() => {
+      if (!cam) return;
+      const userLat = cam.getAttribute('gps-camera')?.currentLatitude || cam.components?.gpsCamera?.currentLatitude;
+      const userLon = cam.getAttribute('gps-camera')?.currentLongitude || cam.components?.gpsCamera?.currentLongitude;
+      const coords = target.getAttribute('gps-entity-place');
+      if (userLat && userLon && coords && coords.latitude && coords.longitude) {
+        const d = haversineDistance(userLat, userLon, parseFloat(coords.latitude), parseFloat(coords.longitude));
+        // show distance in console (replace with UI if desired)
+        console.log('Distance to target (m):', Math.round(d));
+      }
+    }, 2000);
+  </script>
+</body>
+<!-- ...existing code... -->
