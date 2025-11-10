@@ -12,14 +12,6 @@
   <a-scene 
     vr-mode-ui="enabled: false" 
     embedded>
-    
-    <!-- Example cube at a predetermined coordinate (Munich central) -->
-    <a-box
-      id="targetCube"
-      gps-entity-place="latitude: 48.137154; longitude: 11.576124;"
-      color="red"
-      scale="2 2 2">
-    </a-box>
 
     <!-- gps-camera provides user's geolocation & will align scene objects -->
     <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
@@ -56,7 +48,7 @@
       loadCityModelsFromFile();
     });
 
-    async function loadCityModelsFromFile() {
+ async function loadCityModelsFromFile() {
     try {
       const resp = await fetch('models/models.json');
       const list = await resp.json();
@@ -67,7 +59,70 @@
         ent.setAttribute('gps-entity-place', `latitude: ${m.lat}; longitude: ${m.lon};`);
         ent.setAttribute('gltf-model', `url(${m.url})`);
         ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
-        ent.addEventListener('model-loaded', () => console.log('model loaded', m.id || m.url));
+        // neuer Handler:
+        ent.addEventListener('model-loaded', () => {
+          try {
+            // mesh holen
+            const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D;
+            if (!obj) {
+              addDebugLine(m.id || m.url, 'Kein mesh gefunden');
+              return;
+            }
+            // BoundingBox-Center im lokalen Raum berechnen
+            const box = new THREE.Box3().setFromObject(obj);
+            const center = new THREE.Vector3();
+            box.getCenter(center); // center in world if box from object -> but object may be transformed
+            // center ist world in Box3 wenn gesetztFromObject, wir wollen Objekt-Local-Center:
+            // Erzeuge lokalen center: transform world center back to local
+            const localCenter = obj.worldToLocal(center.clone());
+            // Weltposition der lokalen Origin (entity)
+            const worldOrigin = new THREE.Vector3();
+            ent.object3D.getWorldPosition(worldOrigin);
+            // Weltposition des geometrie-Zentrums
+            const worldCenter = center; // center ist world-Position des MbBox-Zentrums
+            // Offset-Vektor (worldCenter minus entity origin)
+            const offsetVec = new THREE.Vector3().subVectors(worldCenter, worldOrigin);
+            // meters: three.js world units are meters in aframe-gps (gps-entity-place uses meters)
+            const eastMeters = offsetVec.x;
+            const northMeters = -offsetVec.z; // Z-Achse: negative Z ist typ. Norden in A-Frame mapping
+            const vertMeters = offsetVec.y;
+            const distanceMeters = Math.sqrt(eastMeters*eastMeters + northMeters*northMeters);
+
+            // bestimme aktuelle Kamera-Koordinate als Bezug (falls vorhanden)
+            const cam = document.querySelector('[gps-camera]');
+            const camComp = cam && (cam.components?.gpsCamera || cam.getAttribute('gps-camera'));
+            const camLat = camComp?.currentLatitude || cam.getAttribute('gps-camera')?.currentLatitude || null;
+            const refLat = camLat || parseFloat(m.lat); // Referenz-Lat für degree/meter Umrechnung
+
+            // berechne lat/lon delta für Korrektur (falls du das Modell in Blender verschoben hast)
+            const dLat = northMeters / metersPerDegLat();
+            const dLon = eastMeters / metersPerDegLon(refLat);
+            const suggestedLat = parseFloat(m.lat) + dLat;
+            const suggestedLon = parseFloat(m.lon) + dLon;
+
+            // Debug-Ausgabe
+            const html = `
+              Expected: ${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}<br>
+              Offset (m): E:${eastMeters.toFixed(2)} N:${northMeters.toFixed(2)} V:${vertMeters.toFixed(2)} <br>
+              Distance (m): ${distanceMeters.toFixed(2)}<br>
+              Suggested corrected coords: ${suggestedLat.toFixed(6)}, ${suggestedLon.toFixed(6)}<br>
+              Model URL: ${m.url}
+            `;
+            addDebugLine(m.id || m.url, html);
+
+            // optional: markiere das BoundingBox-Center sichtbar (kleine Kugel)
+            const marker = document.createElement('a-sphere');
+            marker.setAttribute('radius', '0.5');
+            marker.setAttribute('color', '#00ff00');
+            // positioniere die Kugel relativ zur Entity origin mit offsetVec
+            marker.setAttribute('position', `${offsetVec.x} ${offsetVec.y} ${offsetVec.z}`);
+            marker.setAttribute('visible', 'true');
+            ent.appendChild(marker);
+          } catch (err) {
+            addDebugLine(m.id || m.url, 'Debug error: ' + err.message);
+            console.error(err);
+          }
+        });
         scene.appendChild(ent);
       });
     } catch (e) {
@@ -75,11 +130,34 @@
     }
   }
 
-  // Desktop fallback: keine DeviceOrientation permission API -> lade sofort
+  // Desktop fallback
   if (!('requestPermission' in DeviceOrientationEvent)) {
     loadCityModelsFromFile();
   }
 
+  // Desktop fallback: keine DeviceOrientation permission API -> lade sofort
+  if (!('requestPermission' in DeviceOrientationEvent)) {
+    loadCityModelsFromFile();
+  }
+ (function createDebugPanel(){
+    const panel = document.createElement('div');
+    panel.id = 'debugPanel';
+    panel.style.cssText = 'position:fixed;right:10px;top:10px;z-index:9999;background:rgba(0,0,0,0.6);color:#fff;padding:10px;font-family:monospace;max-width:320px;max-height:60vh;overflow:auto;font-size:12px;';
+    panel.innerHTML = '<b>Model Debug</b><div id="debugList"></div>';
+    document.body.appendChild(panel);
+  })();
+
+  // Hilfsfunktionen
+  function metersPerDegLat() { return 110574; } // grobe Näherung
+  function metersPerDegLon(lat) { return 111320 * Math.cos(lat * Math.PI/180); }
+
+  function addDebugLine(id, html) {
+    const list = document.getElementById('debugList');
+    const el = document.createElement('div');
+    el.style.marginBottom = '6px';
+    el.innerHTML = `<div><b>${id}</b></div>${html}`;
+    list.appendChild(el);
+  }
     // simple A-Frame component to read camera rotation and position
     AFRAME.registerComponent('rotation-reader', {
       tick: function () {
