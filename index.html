@@ -51,7 +51,34 @@
       } else {
         console.warn('Geolocation not supported');
       }
+
+      // Load models after permissions / initial geolocation
+      loadCityModelsFromFile();
     });
+
+    async function loadCityModelsFromFile() {
+    try {
+      const resp = await fetch('models/models.json');
+      const list = await resp.json();
+      const scene = document.querySelector('a-scene');
+      list.forEach(m => {
+        if (!m.url) return;
+        const ent = document.createElement('a-entity');
+        ent.setAttribute('gps-entity-place', `latitude: ${m.lat}; longitude: ${m.lon};`);
+        ent.setAttribute('gltf-model', `url(${m.url})`);
+        ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
+        ent.addEventListener('model-loaded', () => console.log('model loaded', m.id || m.url));
+        scene.appendChild(ent);
+      });
+    } catch (e) {
+      console.error('Failed to load models.json', e);
+    }
+  }
+
+  // Desktop fallback: keine DeviceOrientation permission API -> lade sofort
+  if (!('requestPermission' in DeviceOrientationEvent)) {
+    loadCityModelsFromFile();
+  }
 
     // simple A-Frame component to read camera rotation and position
     AFRAME.registerComponent('rotation-reader', {
