@@ -8,25 +8,50 @@
   <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
   <style>
-    #deviceCoordsBox { position: fixed; left: 10px; top: 56px; z-index: 10000; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; }
+    /* Device coords box: compact and expandable */
+    #deviceCoordsBox {
+      position: fixed;
+      left: 10px;
+      top: 56px;
+      z-index: 10001;
+      background: rgba(0,0,0,0.6);
+      color:#fff;
+      padding:6px 8px;
+      border-radius:6px;
+      font-family: monospace;
+      font-size:12px;
+      max-width:260px;
+      cursor:pointer;
+    }
+    #deviceCoordsBox.collapsed { height: 28px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     #statusBox { position: fixed; left: 10px; top: 120px; z-index: 10000; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; max-width:320px; max-height:40vh; overflow:auto; }
+    /* ensure video doesn't block interactions and sits behind scene */
+    #cameraFeed { pointer-events: none; z-index:-10; }
+    a-scene { z-index:1; position:relative; }
   </style>
 </head>
 <body style="margin:0; overflow:hidden; background:transparent;">
-  <video id="cameraFeed" autoplay muted playsinline style="position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;z-index:-1;background:#000;"></video>
+  <video id="cameraFeed" autoplay muted playsinline
+         style="position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;background:#000;">
+  </video>
 
-  <button id="request-perms" style="position: absolute; z-index: 9999; left: 10px; top: 10px; padding: 10px;">Enable Location & Motion</button>
+  <button id="request-perms" style="position: absolute; z-index: 10002; left: 10px; top: 10px; padding: 10px;">
+    Enable Location & Motion
+  </button>
 
-  <div id="deviceCoordsBox">Device coords: unknown</div>
+  <div id="deviceCoordsBox" class="collapsed" title="Tap to expand/collapse">
+    Device coords: unknown (tap to expand)
+  </div>
+
   <div id="statusBox"><b>Status</b><div id="statusLines" style="margin-top:6px"></div></div>
 
-  <a-scene renderer="alpha: true" vr-mode-ui="enabled: false" embedded style="position:relative;z-index:0;">
+  <a-scene renderer="alpha: true" vr-mode-ui="enabled: false" embedded>
     <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
   </a-scene>
 
   <script>
   (function(){
-    // single scope to avoid duplicate block-declarations
+    // single scope to avoid duplicate declarations
     function statusLog(msg){
       console.log(msg);
       const list = document.getElementById('statusLines');
@@ -38,14 +63,25 @@
     function updateDeviceCoordsDisplay(pos){
       const el = document.getElementById('deviceCoordsBox');
       if(!el) return;
-      if(!pos){ el.innerHTML = 'Device coords: unavailable'; return; }
+      if(!pos){ el.innerHTML = 'Device coords: unavailable (tap to expand)'; return; }
       const lat = pos.coords.latitude; const lon = pos.coords.longitude; const acc = pos.coords.accuracy;
-      el.innerHTML = `<div><b>Device (deg)</b></div>
-        latitude: ${formatNum(lat,6)} , longitude: ${formatNum(lon,6)}<br>
-        <div style="margin-top:6px;"><b>Device (alt naming)</b></div>
-        lat: ${formatNum(lat,6)} , lon: ${formatNum(lon,6)}<br>
-        accuracy: ${formatNum(acc,1)} m`;
+      el.innerHTML =
+        `<div style="font-weight:bold">Device</div>
+         latitude: ${formatNum(lat,6)}, longitude: ${formatNum(lon,6)}<br>
+         accuracy: ${formatNum(acc,1)} m<br>
+         <small>tap to collapse</small>`;
     }
+
+    // toggle collapse on tap
+    const devBox = document.getElementById('deviceCoordsBox');
+    devBox.addEventListener('click', ()=> {
+      devBox.classList.toggle('collapsed');
+      if (devBox.classList.contains('collapsed')) {
+        devBox.innerHTML = 'Device coords: ' + (devBox.dataset.simple || 'unknown') + ' (tap to expand)';
+      } else {
+        // expanded state content will be updated by updateDeviceCoordsDisplay via watch
+      }
+    });
 
     // watch handle inside IIFE
     let geoWatchId = null;
@@ -54,7 +90,13 @@
       if(geoWatchId !== null) return;
       geoWatchId = navigator.geolocation.watchPosition(pos=>{
         statusLog(`Geolocation update: ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (acc ${pos.coords.accuracy}m)`);
-        updateDeviceCoordsDisplay(pos);
+        // keep a compact single-line text for collapsed view
+        devBox.dataset.simple = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+        if (devBox.classList.contains('collapsed')) {
+          devBox.innerHTML = 'Device coords: ' + devBox.dataset.simple + ' (tap to expand)';
+        } else {
+          updateDeviceCoordsDisplay(pos);
+        }
       }, err=>{
         statusLog('Geolocation watch error: ' + (err.message||err.code));
         updateDeviceCoordsDisplay(null);
@@ -91,6 +133,7 @@
     function getLat(m){ return (m.latitude !== undefined) ? m.latitude : (m.lat !== undefined ? m.lat : null); }
     function getLon(m){ return (m.longitude !== undefined) ? m.longitude : (m.lon !== undefined ? m.lon : null); }
 
+    // Modified loader: place simple sphere markers instead of GLB models
     async function loadCityModelsFromFile(){
       statusLog('Starting to load models JSON...');
       try{
@@ -103,25 +146,28 @@
         for(const m of list){
           const lat = getLat(m); const lon = getLon(m);
           if(lat == null || lon == null){ statusLog(`Skipping ${m.id||m.url} — missing lat/lon`); continue; }
-          if(!m.url){ statusLog(`Skipping ${m.id||lat+','+lon} — missing url`); continue; }
-          statusLog(`Preparing entity for ${m.id||m.url} -> ${m.url}`);
+          statusLog(`Adding marker for ${m.id||m.url} @ ${lat},${lon}`);
 
-          // HEAD pre-check (optional)
-          try{ const u = new URL(m.url, location.href).href; const head = await fetch(u, { method: 'HEAD' }); if(!head.ok) statusLog(`Warning: HEAD ${u} returned ${head.status}`); } catch(err){ statusLog(`Warning: HEAD check failed for ${m.url}: ${err.message}`); }
+          // create a sphere marker at GPS location
+          const marker = document.createElement('a-sphere');
+          marker.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+          // size/color can be tuned
+          marker.setAttribute('radius', (m.marker_radius || 1));
+          marker.setAttribute('color', (m.marker_color || '#ff0000'));
+          // optional label as a text entity above the sphere
+          if (m.id) {
+            const label = document.createElement('a-text');
+            label.setAttribute('value', m.id);
+            label.setAttribute('align', 'center');
+            label.setAttribute('position', `0 ${ (m.marker_radius || 1) + 0.5 } 0`);
+            label.setAttribute('look-at', '[gps-camera]');
+            marker.appendChild(label);
+          }
 
-          const ent = document.createElement('a-entity');
-          ent.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-          ent.setAttribute('gltf-model', `url(${m.url})`);
-          ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
-
-          ent.addEventListener('model-loaded', ()=>{ statusLog(`model-loaded: ${m.id||m.url}`); try{ const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D; statusLog(`Model object children: ${(obj && obj.children && obj.children.length) || 'unknown'}`); } catch(e){ statusLog('Error inspecting loaded model: ' + (e.message||e)); } }, { once:true });
-
-          ent.addEventListener('model-error', (ev)=>{ statusLog(`model-error for ${m.id||m.url}: ${ev && ev.detail ? JSON.stringify(ev.detail) : ev}`); }, { once:true });
-
-          let loaded = false; ent.addEventListener('model-loaded', ()=>{ loaded = true; }, { once:true });
-          setTimeout(()=>{ if(!loaded) statusLog(`Timeout: model not loaded within 12s for ${m.id||m.url}`); }, 12000);
-
-          scene.appendChild(ent);
+          // event listeners for debug
+          marker.addEventListener('loaded', ()=>{ statusLog(`marker-loaded: ${m.id||m.url}`); }, { once:true });
+          // append
+          scene.appendChild(marker);
         }
       }catch(e){ statusLog('Failed to load models JSON: ' + (e.message||e)); console.error(e); }
     }
@@ -133,7 +179,7 @@
       const toggle = document.createElement('button'); toggle.id='debugToggle'; toggle.textContent='Debug ▶'; toggle.style.cssText='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9;';
       wrapper.appendChild(toggle);
       const panel = document.createElement('div'); panel.id='debugPanel'; panel.style.cssText='display:none;width:320px;max-height:38vh;overflow:auto;background:rgba(0,0,0,0.75);color:#fff;padding:8px;border-radius:6px;margin-top:6px;font-size:12px;';
-      panel.innerHTML = '<b>Model Debug</b><div id="debugList" style="margin-top:6px;"></div>'; wrapper.appendChild(panel);
+      panel.innerHTML = '<b>Model Debug</b><div id="debugList" style="margin-top:6px"></div>'; wrapper.appendChild(panel);
       toggle.addEventListener('click', ()=>{ if(panel.style.display==='none'){ panel.style.display='block'; toggle.textContent='Debug ▼'; } else { panel.style.display='none'; toggle.textContent='Debug ▶'; }});
       document.body.appendChild(wrapper);
     })();
@@ -143,9 +189,6 @@
       if(list){ const el = document.createElement('div'); el.style.marginBottom='6px'; el.innerHTML = `<div><b>${id}</b></div>${html}`; list.appendChild(el); while(list.children.length>60) list.removeChild(list.firstChild); }
       statusLog((id? id+': ':'') + html.replace(/<[^>]+>/g,' '));
     }
-
-    function metersPerDegLat(){ return 110574; }
-    function metersPerDegLon(lat){ return 111320 * Math.cos(lat * Math.PI/180); }
 
     AFRAME.registerComponent('rotation-reader', { tick: function(){} });
   })();
