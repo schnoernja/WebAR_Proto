@@ -1,208 +1,219 @@
-<!-- ...existing code... -->
-<script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-<script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
-<script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
-
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WebsiteProto</title>
+  <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+  <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
+  <script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
+</head>
 <body style="margin:0; overflow:hidden;">
-  <!-- permission button (needed for iOS deviceorientation + geolocation) -->
+  <!-- permission button (needed for iOS deviceorientation + geolocation + camera) -->
   <button id="request-perms" style="position: absolute; z-index: 999; left: 10px; top: 10px; padding: 10px;">
     Enable Location & Motion
   </button>
 
-  <a-scene 
-    vr-mode-ui="enabled: false" 
-    embedded>
-
+  <a-scene vr-mode-ui="enabled: false" embedded>
     <!-- gps-camera provides user's geolocation & will align scene objects -->
     <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
   </a-scene>
 
   <script>
-    // request geolocation + deviceorientation permission (iOS requires explicit request for deviceorientation)
+    // Permissions + compact debug panel + model loading
     const btn = document.getElementById('request-perms');
-    btn.addEventListener('click', async () => {
-      btn.style.display = 'none';
 
-      // Request motion permission on iOS 13+ if needed
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = 'Requesting permissions...';
+
+      // 1) DeviceOrientation (iOS)
       if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
         try {
-          const resp = await DeviceOrientationEvent.requestPermission();
-          console.log('DeviceOrientation permission:', resp);
+          await DeviceOrientationEvent.requestPermission();
+          console.log('DeviceOrientation permission requested');
         } catch (err) {
           console.warn('DeviceOrientation permission denied or unavailable', err);
         }
       }
 
-      // Request geolocation (prompts the browser)
+      // 2) Geolocation
       if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          console.log('Initial geolocation:', pos.coords);
-        }, err => {
-          console.warn('Geolocation error:', err);
-        }, { enableHighAccuracy: true });
+        try {
+          await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
+          });
+          console.log('Geolocation permission granted');
+        } catch (err) {
+          console.warn('Geolocation permission error:', err);
+        }
       } else {
         console.warn('Geolocation not supported');
       }
 
-      // Load models after permissions / initial geolocation
+      // 3) Camera (explicit request so browser prompts)
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+          stream.getTracks().forEach(t => t.stop());
+          console.log('Camera permission granted (probe)');
+        } catch (err) {
+          console.warn('Camera permission denied or unavailable', err);
+        }
+      } else {
+        console.warn('getUserMedia not supported');
+      }
+
+      // hide button and load
+      btn.style.display = 'none';
       loadCityModelsFromFile();
     });
 
- async function loadCityModelsFromFile() {
-    try {
-      const resp = await fetch('models/models_filtered_matched_wgs84.json');
-      const list = await resp.json();
-      const scene = document.querySelector('a-scene');
-      list.forEach(m => {
-        if (!m.url) return;
-        const ent = document.createElement('a-entity');
-        ent.setAttribute('gps-entity-place', `latitude: ${m.lat}; longitude: ${m.lon};`);
-        ent.setAttribute('gltf-model', `url(${m.url})`);
-        ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
-        // neuer Handler:
-        ent.addEventListener('model-loaded', () => {
-          try {
-            // mesh holen
-            const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D;
-            if (!obj) {
-              addDebugLine(m.id || m.url, 'Kein mesh gefunden');
-              return;
+    // Helper: get lat/lon fields compatible with different JSON shapes
+    function getLat(m) { return (m.latitude !== undefined) ? m.latitude : (m.lat !== undefined ? m.lat : null); }
+    function getLon(m) { return (m.longitude !== undefined) ? m.longitude : (m.lon !== undefined ? m.lon : null); }
+
+    async function loadCityModelsFromFile() {
+      try {
+        const resp = await fetch('models/models_filtered_matched_wgs84.json');
+        const list = await resp.json();
+        const scene = document.querySelector('a-scene');
+
+        list.forEach(m => {
+          const lat = getLat(m);
+          const lon = getLon(m);
+          if (lat == null || lon == null || !m.url) return;
+
+          const ent = document.createElement('a-entity');
+          ent.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+          ent.setAttribute('gltf-model', `url(${m.url})`);
+          ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
+
+          ent.addEventListener('model-loaded', () => {
+            try {
+              // try standard mesh/model objects
+              const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D;
+              if (!obj) {
+                addDebugLine(m.id || m.url, 'No mesh found');
+                return;
+              }
+
+              // compute bounding box center (world)
+              const box = new THREE.Box3().setFromObject(obj);
+              const centerWorld = new THREE.Vector3();
+              box.getCenter(centerWorld);
+
+              // world origin of entity (entity position)
+              const worldOrigin = new THREE.Vector3();
+              ent.object3D.getWorldPosition(worldOrigin);
+
+              // offset vector from entity origin to geometry center (world coords)
+              const offsetVec = new THREE.Vector3().subVectors(centerWorld, worldOrigin);
+
+              // convert to meters: A-Frame/three units ~= meters in gps-entity-place
+              const eastMeters = offsetVec.x;
+              const northMeters = -offsetVec.z; // negative Z typical in A-Frame mapping
+              const vertMeters = offsetVec.y;
+              const distanceMeters = Math.sqrt(eastMeters*eastMeters + northMeters*northMeters);
+
+              // reference latitude for lon/deg conversion
+              const cam = document.querySelector('[gps-camera]');
+              const camComp = cam && (cam.components?.gpsCamera);
+              const camLat = camComp?.currentLatitude || null;
+              const refLat = camLat || parseFloat(lat);
+
+              const dLat = northMeters / metersPerDegLat();
+              const dLon = eastMeters / metersPerDegLon(refLat);
+              const suggestedLat = parseFloat(lat) + dLat;
+              const suggestedLon = parseFloat(lon) + dLon;
+
+              const html = `
+                Expected: ${parseFloat(lat).toFixed(6)}, ${parseFloat(lon).toFixed(6)}<br>
+                Offset (m): E:${eastMeters.toFixed(2)} N:${northMeters.toFixed(2)} V:${vertMeters.toFixed(2)}<br>
+                Distance (m): ${distanceMeters.toFixed(2)}<br>
+                Suggested corrected coords: ${suggestedLat.toFixed(6)}, ${suggestedLon.toFixed(6)}<br>
+                Model URL: ${m.url}
+              `;
+              addDebugLine(m.id || m.url, html);
+
+              // small visual marker at bounding-box center (relative to entity origin)
+              const marker = document.createElement('a-sphere');
+              marker.setAttribute('radius', '0.5');
+              marker.setAttribute('color', '#00ff00');
+              marker.setAttribute('position', `${offsetVec.x} ${offsetVec.y} ${offsetVec.z}`);
+              marker.setAttribute('visible', 'true');
+              ent.appendChild(marker);
+            } catch (err) {
+              addDebugLine(m.id || m.url, 'Debug error: ' + (err.message || err));
+              console.error(err);
             }
-            // BoundingBox-Center im lokalen Raum berechnen
-            const box = new THREE.Box3().setFromObject(obj);
-            const center = new THREE.Vector3();
-            box.getCenter(center); // center in world if box from object -> but object may be transformed
-            // center ist world in Box3 wenn gesetztFromObject, wir wollen Objekt-Local-Center:
-            // Erzeuge lokalen center: transform world center back to local
-            const localCenter = obj.worldToLocal(center.clone());
-            // Weltposition der lokalen Origin (entity)
-            const worldOrigin = new THREE.Vector3();
-            ent.object3D.getWorldPosition(worldOrigin);
-            // Weltposition des geometrie-Zentrums
-            const worldCenter = center; // center ist world-Position des MbBox-Zentrums
-            // Offset-Vektor (worldCenter minus entity origin)
-            const offsetVec = new THREE.Vector3().subVectors(worldCenter, worldOrigin);
-            // meters: three.js world units are meters in aframe-gps (gps-entity-place uses meters)
-            const eastMeters = offsetVec.x;
-            const northMeters = -offsetVec.z; // Z-Achse: negative Z ist typ. Norden in A-Frame mapping
-            const vertMeters = offsetVec.y;
-            const distanceMeters = Math.sqrt(eastMeters*eastMeters + northMeters*northMeters);
+          }, { once: true });
 
-            // bestimme aktuelle Kamera-Koordinate als Bezug (falls vorhanden)
-            const cam = document.querySelector('[gps-camera]');
-            const camComp = cam && (cam.components?.gpsCamera || cam.getAttribute('gps-camera'));
-            const camLat = camComp?.currentLatitude || cam.getAttribute('gps-camera')?.currentLatitude || null;
-            const refLat = camLat || parseFloat(m.lat); // Referenz-Lat für degree/meter Umrechnung
-
-            // berechne lat/lon delta für Korrektur (falls du das Modell in Blender verschoben hast)
-            const dLat = northMeters / metersPerDegLat();
-            const dLon = eastMeters / metersPerDegLon(refLat);
-            const suggestedLat = parseFloat(m.lat) + dLat;
-            const suggestedLon = parseFloat(m.lon) + dLon;
-
-            // Debug-Ausgabe
-            const html = `
-              Expected: ${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}<br>
-              Offset (m): E:${eastMeters.toFixed(2)} N:${northMeters.toFixed(2)} V:${vertMeters.toFixed(2)} <br>
-              Distance (m): ${distanceMeters.toFixed(2)}<br>
-              Suggested corrected coords: ${suggestedLat.toFixed(6)}, ${suggestedLon.toFixed(6)}<br>
-              Model URL: ${m.url}
-            `;
-            addDebugLine(m.id || m.url, html);
-
-            // optional: markiere das BoundingBox-Center sichtbar (kleine Kugel)
-            const marker = document.createElement('a-sphere');
-            marker.setAttribute('radius', '0.5');
-            marker.setAttribute('color', '#00ff00');
-            // positioniere die Kugel relativ zur Entity origin mit offsetVec
-            marker.setAttribute('position', `${offsetVec.x} ${offsetVec.y} ${offsetVec.z}`);
-            marker.setAttribute('visible', 'true');
-            ent.appendChild(marker);
-          } catch (err) {
-            addDebugLine(m.id || m.url, 'Debug error: ' + err.message);
-            console.error(err);
-          }
+          scene.appendChild(ent);
         });
-        scene.appendChild(ent);
-      });
-    } catch (e) {
-      console.error('Failed to load models.json', e);
+      } catch (e) {
+        console.error('Failed to load models.json', e);
+      }
     }
-  }
 
-  // Desktop fallback
-  if (!('requestPermission' in DeviceOrientationEvent)) {
-    loadCityModelsFromFile();
-  }
+    // Desktop fallback: if DeviceOrientation doesn't require permission, load immediately for easier testing
+    if (!('requestPermission' in DeviceOrientationEvent)) {
+      // do NOT hide the permission button; let user still click it to request camera if needed
+      loadCityModelsFromFile();
+    }
 
-  // Desktop fallback: keine DeviceOrientation permission API -> lade sofort
-  if (!('requestPermission' in DeviceOrientationEvent)) {
-    loadCityModelsFromFile();
-  }
- (function createDebugPanel(){
-    const panel = document.createElement('div');
-    panel.id = 'debugPanel';
-    panel.style.cssText = 'position:fixed;right:10px;top:10px;z-index:9999;background:rgba(0,0,0,0.6);color:#fff;padding:10px;font-family:monospace;max-width:320px;max-height:60vh;overflow:auto;font-size:12px;';
-    panel.innerHTML = '<b>Model Debug</b><div id="debugList"></div>';
-    document.body.appendChild(panel);
-  })();
+    // Compact debug panel (toggle)
+    (function createDebugPanel(){
+      const wrapper = document.createElement('div');
+      wrapper.id = 'debugWrapper';
+      wrapper.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:9999;font-family:monospace;';
 
-  // Hilfsfunktionen
-  function metersPerDegLat() { return 110574; } // grobe Näherung
-  function metersPerDegLon(lat) { return 111320 * Math.cos(lat * Math.PI/180); }
+      const toggle = document.createElement('button');
+      toggle.id = 'debugToggle';
+      toggle.textContent = 'Debug ▶';
+      toggle.style.cssText = 'background:#222;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9;';
+      wrapper.appendChild(toggle);
 
-  function addDebugLine(id, html) {
-    const list = document.getElementById('debugList');
-    const el = document.createElement('div');
-    el.style.marginBottom = '6px';
-    el.innerHTML = `<div><b>${id}</b></div>${html}`;
-    list.appendChild(el);
-  }
-    // simple A-Frame component to read camera rotation and position
+      const panel = document.createElement('div');
+      panel.id = 'debugPanel';
+      panel.style.cssText = 'display:none;width:320px;max-height:38vh;overflow:auto;background:rgba(0,0,0,0.75);color:#fff;padding:8px;border-radius:6px;margin-top:6px;font-size:12px;';
+      panel.innerHTML = '<b>Model Debug</b><div id="debugList" style="margin-top:6px;"></div>';
+      wrapper.appendChild(panel);
+
+      toggle.addEventListener('click', () => {
+        if (panel.style.display === 'none') {
+          panel.style.display = 'block';
+          toggle.textContent = 'Debug ▼';
+        } else {
+          panel.style.display = 'none';
+          toggle.textContent = 'Debug ▶';
+        }
+      });
+
+      document.body.appendChild(wrapper);
+    })();
+
+    // helpers
+    function metersPerDegLat() { return 110574; } // approximate
+    function metersPerDegLon(lat) { return 111320 * Math.cos(lat * Math.PI/180); }
+
+    function addDebugLine(id, html) {
+      const list = document.getElementById('debugList');
+      if (!list) return;
+      const el = document.createElement('div');
+      el.style.marginBottom = '6px';
+      el.innerHTML = `<div><b>${id}</b></div>${html}`;
+      list.appendChild(el);
+      // keep panel from growing unlimited
+      while (list.children.length > 60) list.removeChild(list.firstChild);
+    }
+
+    // simple A-Frame component to read camera rotation (debug)
     AFRAME.registerComponent('rotation-reader', {
       tick: function () {
-        const cam = this.el;
-        const worldPos = new THREE.Vector3();
-        cam.object3D.getWorldPosition(worldPos);
-        const pos = cam.getAttribute('position');
-        const rot = cam.getAttribute('rotation');
-        // log (you can remove or throttle these logs in production)
-        // console.log('camera pos', pos, 'rotation', rot);
+        // intentionally left mostly silent to avoid spam
       }
     });
-
-    // distance helper (haversine) to compute straight-line distance between user and target coords
-    function haversineDistance(lat1, lon1, lat2, lon2) {
-      function toRad(v){ return v * Math.PI / 180; }
-      const R = 6371000; // meters
-      const dLat = toRad(lat2 - lat1);
-      const dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    }
-
-    // Example: when the gps-entity-place is loaded we can compute distance from user
-    const target = document.getElementById('targetCube');
-    target.addEventListener('loaded', () => {
-      console.log('target loaded at', target.getAttribute('gps-entity-place'));
-    });
-
-    // Periodically compute distance using the camera's current GPS (gps-camera component stores lat/lon on the element)
-    const cam = document.querySelector('[gps-camera]');
-    setInterval(() => {
-      if (!cam) return;
-      const userLat = cam.getAttribute('gps-camera')?.currentLatitude || cam.components?.gpsCamera?.currentLatitude;
-      const userLon = cam.getAttribute('gps-camera')?.currentLongitude || cam.components?.gpsCamera?.currentLongitude;
-      const coords = target.getAttribute('gps-entity-place');
-      if (userLat && userLon && coords && coords.latitude && coords.longitude) {
-        const d = haversineDistance(userLat, userLon, parseFloat(coords.latitude), parseFloat(coords.longitude));
-        // show distance in console (replace with UI if desired)
-        console.log('Distance to target (m):', Math.round(d));
-      }
-    }, 2000);
   </script>
 </body>
-<!-- ...existing code... -->
+</html>
