@@ -8,20 +8,26 @@
   <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
 </head>
-<body style="margin:0; overflow:hidden;">
+<body style="margin:0; overflow:hidden; background:transparent;">
+  <!-- persistent video background -->
+  <video id="cameraFeed" autoplay muted playsinline
+         style="position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;z-index:-1;background:#000;">
+  </video>
+
   <!-- permission button (needed for iOS deviceorientation + geolocation + camera) -->
   <button id="request-perms" style="position: absolute; z-index: 999; left: 10px; top: 10px; padding: 10px;">
     Enable Location & Motion
   </button>
 
-  <a-scene vr-mode-ui="enabled: false" embedded>
-    <!-- gps-camera provides user's geolocation & will align scene objects -->
+  <!-- transparent A-Frame canvas above the video -->
+  <a-scene renderer="alpha: true" vr-mode-ui="enabled: false" embedded style="position:relative;z-index:0;">
     <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
   </a-scene>
 
   <script>
     // Permissions + compact debug panel + model loading
     const btn = document.getElementById('request-perms');
+    const videoEl = document.getElementById('cameraFeed');
 
     btn.addEventListener('click', async () => {
       btn.disabled = true;
@@ -51,12 +57,15 @@
         console.warn('Geolocation not supported');
       }
 
-      // 3) Camera (explicit request so browser prompts)
+      // 3) Camera (attach stream to persistent video element so it's visible behind the scene)
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-          stream.getTracks().forEach(t => t.stop());
-          console.log('Camera permission granted (probe)');
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          // attach stream to the persistent video element (do NOT stop tracks)
+          videoEl.srcObject = stream;
+          // ensure playsinline and play
+          await videoEl.play().catch(()=>{ /* some browsers autoplay-block; permission should allow */ });
+          console.log('Camera stream attached to background video');
         } catch (err) {
           console.warn('Camera permission denied or unavailable', err);
         }
@@ -64,7 +73,7 @@
         console.warn('getUserMedia not supported');
       }
 
-      // hide button and load
+      // hide button and load scene models
       btn.style.display = 'none';
       loadCityModelsFromFile();
     });
@@ -91,42 +100,29 @@
 
           ent.addEventListener('model-loaded', () => {
             try {
-              // try standard mesh/model objects
               const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D;
               if (!obj) {
                 addDebugLine(m.id || m.url, 'No mesh found');
                 return;
               }
-
-              // compute bounding box center (world)
               const box = new THREE.Box3().setFromObject(obj);
               const centerWorld = new THREE.Vector3();
               box.getCenter(centerWorld);
-
-              // world origin of entity (entity position)
               const worldOrigin = new THREE.Vector3();
               ent.object3D.getWorldPosition(worldOrigin);
-
-              // offset vector from entity origin to geometry center (world coords)
               const offsetVec = new THREE.Vector3().subVectors(centerWorld, worldOrigin);
-
-              // convert to meters: A-Frame/three units ~= meters in gps-entity-place
               const eastMeters = offsetVec.x;
-              const northMeters = -offsetVec.z; // negative Z typical in A-Frame mapping
+              const northMeters = -offsetVec.z;
               const vertMeters = offsetVec.y;
               const distanceMeters = Math.sqrt(eastMeters*eastMeters + northMeters*northMeters);
-
-              // reference latitude for lon/deg conversion
               const cam = document.querySelector('[gps-camera]');
               const camComp = cam && (cam.components?.gpsCamera);
               const camLat = camComp?.currentLatitude || null;
               const refLat = camLat || parseFloat(lat);
-
               const dLat = northMeters / metersPerDegLat();
               const dLon = eastMeters / metersPerDegLon(refLat);
               const suggestedLat = parseFloat(lat) + dLat;
               const suggestedLon = parseFloat(lon) + dLon;
-
               const html = `
                 Expected: ${parseFloat(lat).toFixed(6)}, ${parseFloat(lon).toFixed(6)}<br>
                 Offset (m): E:${eastMeters.toFixed(2)} N:${northMeters.toFixed(2)} V:${vertMeters.toFixed(2)}<br>
@@ -135,8 +131,6 @@
                 Model URL: ${m.url}
               `;
               addDebugLine(m.id || m.url, html);
-
-              // small visual marker at bounding-box center (relative to entity origin)
               const marker = document.createElement('a-sphere');
               marker.setAttribute('radius', '0.5');
               marker.setAttribute('color', '#00ff00');
@@ -158,7 +152,6 @@
 
     // Desktop fallback: if DeviceOrientation doesn't require permission, load immediately for easier testing
     if (!('requestPermission' in DeviceOrientationEvent)) {
-      // do NOT hide the permission button; let user still click it to request camera if needed
       loadCityModelsFromFile();
     }
 
@@ -167,34 +160,25 @@
       const wrapper = document.createElement('div');
       wrapper.id = 'debugWrapper';
       wrapper.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:9999;font-family:monospace;';
-
       const toggle = document.createElement('button');
       toggle.id = 'debugToggle';
       toggle.textContent = 'Debug ▶';
       toggle.style.cssText = 'background:#222;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9;';
       wrapper.appendChild(toggle);
-
       const panel = document.createElement('div');
       panel.id = 'debugPanel';
       panel.style.cssText = 'display:none;width:320px;max-height:38vh;overflow:auto;background:rgba(0,0,0,0.75);color:#fff;padding:8px;border-radius:6px;margin-top:6px;font-size:12px;';
       panel.innerHTML = '<b>Model Debug</b><div id="debugList" style="margin-top:6px;"></div>';
       wrapper.appendChild(panel);
-
       toggle.addEventListener('click', () => {
-        if (panel.style.display === 'none') {
-          panel.style.display = 'block';
-          toggle.textContent = 'Debug ▼';
-        } else {
-          panel.style.display = 'none';
-          toggle.textContent = 'Debug ▶';
-        }
+        if (panel.style.display === 'none') { panel.style.display = 'block'; toggle.textContent = 'Debug ▼'; }
+        else { panel.style.display = 'none'; toggle.textContent = 'Debug ▶'; }
       });
-
       document.body.appendChild(wrapper);
     })();
 
     // helpers
-    function metersPerDegLat() { return 110574; } // approximate
+    function metersPerDegLat() { return 110574; }
     function metersPerDegLon(lat) { return 111320 * Math.cos(lat * Math.PI/180); }
 
     function addDebugLine(id, html) {
@@ -204,16 +188,10 @@
       el.style.marginBottom = '6px';
       el.innerHTML = `<div><b>${id}</b></div>${html}`;
       list.appendChild(el);
-      // keep panel from growing unlimited
       while (list.children.length > 60) list.removeChild(list.firstChild);
     }
 
-    // simple A-Frame component to read camera rotation (debug)
-    AFRAME.registerComponent('rotation-reader', {
-      tick: function () {
-        // intentionally left mostly silent to avoid spam
-      }
-    });
+    AFRAME.registerComponent('rotation-reader', { tick: function () {} });
   </script>
 </body>
 </html>
