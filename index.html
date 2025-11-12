@@ -134,43 +134,80 @@
     function getLon(m){ return (m.longitude !== undefined) ? m.longitude : (m.lon !== undefined ? m.lon : null); }
 
     // Modified loader: place simple sphere markers instead of GLB models
-    async function loadCityModelsFromFile(){
-      statusLog('Starting to load models JSON...');
-      try{
-        const resp = await fetch('models/models_filtered_matched_wgs84.json');
-        if(!resp.ok){ statusLog('Failed to fetch models JSON: ' + resp.status); return; }
-        const list = await resp.json();
-        statusLog('Loaded models JSON, entries: ' + list.length);
-        const scene = document.querySelector('a-scene');
+    <!-- ...existing code... -->
+async function loadCityModelsFromFile(){
+  statusLog('Starting to load models JSON...');
+  try{
+    const resp = await fetch('models/models_filtered_matched_wgs84.json');
+    if(!resp.ok){ statusLog('Failed to fetch models JSON: ' + resp.status); return; }
+    const list = await resp.json();
+    statusLog('Loaded models JSON, entries: ' + list.length);
+    const scene = document.querySelector('a-scene');
 
-        for(const m of list){
-          const lat = getLat(m); const lon = getLon(m);
-          if(lat == null || lon == null){ statusLog(`Skipping ${m.id||m.url} — missing lat/lon`); continue; }
-          statusLog(`Adding marker for ${m.id||m.url} @ ${lat},${lon}`);
+    for(const m of list){
+      const lat = getLat(m); const lon = getLon(m);
+      if(lat == null || lon == null){ statusLog(`Skipping ${m.id||m.url} — missing lat/lon`); continue; }
+      statusLog(`Processing entry ${m.id||m.url} @ ${lat},${lon}`);
 
-          // create a sphere marker at GPS location
-          const marker = document.createElement('a-sphere');
-          marker.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-          // size/color can be tuned
-          marker.setAttribute('radius', (m.marker_radius || 1));
-          marker.setAttribute('color', (m.marker_color || '#ff0000'));
-          // optional label as a text entity above the sphere
-          if (m.id) {
-            const label = document.createElement('a-text');
-            label.setAttribute('value', m.id);
-            label.setAttribute('align', 'center');
-            label.setAttribute('position', `0 ${ (m.marker_radius || 1) + 0.5 } 0`);
-            label.setAttribute('look-at', '[gps-camera]');
-            marker.appendChild(label);
-          }
+      // build candidate urls (try original + common case variants)
+      const orig = (m.url||'').trim();
+      const candidates = [];
+      if(orig) candidates.push(orig);
+      // try swap Models <-> models
+      if(orig.match(/^Models\//)) candidates.push(orig.replace(/^Models\//, 'models/'));
+      if(orig.match(/^models\//)) candidates.push(orig.replace(/^models\//, 'Models/'));
+      // also try relative from root
+      if(orig && !orig.startsWith('/')) candidates.push('/' + orig);
 
-          // event listeners for debug
-          marker.addEventListener('loaded', ()=>{ statusLog(`marker-loaded: ${m.id||m.url}`); }, { once:true });
-          // append
-          scene.appendChild(marker);
+      // find first candidate that returns 200 on HEAD
+      let chosen = null;
+      for(const c of candidates){
+        try{
+          const head = await fetch(c, { method: 'HEAD' });
+          if(head.ok){ chosen = c; break; }
+        }catch(e){
+          // network/CORS — continue to next candidate
         }
-      }catch(e){ statusLog('Failed to load models JSON: ' + (e.message||e)); console.error(e); }
+      }
+
+      if(!chosen){
+        statusLog(`No GLB found for ${m.id||m.url} — placing marker instead`);
+        // fallback: sphere marker
+        const marker = document.createElement('a-sphere');
+        marker.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+        marker.setAttribute('radius', (m.marker_radius || 1));
+        marker.setAttribute('color', (m.marker_color || '#ff0000'));
+        if (m.id) {
+          const label = document.createElement('a-text');
+          label.setAttribute('value', m.id);
+          label.setAttribute('align', 'center');
+          label.setAttribute('position', `0 ${ (m.marker_radius || 1) + 0.5 } 0`);
+          label.setAttribute('look-at', '[gps-camera]');
+          marker.appendChild(label);
+        }
+        marker.addEventListener('loaded', ()=>{ statusLog(`marker-loaded: ${m.id||m.url}`); }, { once:true });
+        scene.appendChild(marker);
+        continue;
+      }
+
+      // create entity that loads the GLB
+      statusLog(`Loading GLB for ${m.id||m.url} from ${chosen}`);
+      const ent = document.createElement('a-entity');
+      ent.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+      ent.setAttribute('gltf-model', `url(${chosen})`);
+      ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
+
+      ent.addEventListener('model-loaded', ()=>{ statusLog(`model-loaded: ${m.id||chosen}`); }, { once:true });
+      ent.addEventListener('model-error', (ev)=>{ statusLog(`model-error for ${m.id||chosen}: ${ev && ev.detail ? JSON.stringify(ev.detail) : ev}`); }, { once:true });
+
+      // timeout notice if not loaded in time
+      let loaded = false; ent.addEventListener('model-loaded', ()=>{ loaded = true; }, { once:true });
+      setTimeout(()=>{ if(!loaded) statusLog(`Timeout: model not loaded within 12s for ${m.id||chosen}`); }, 12000);
+
+      scene.appendChild(ent);
     }
+  }catch(e){ statusLog('Failed to load models JSON: ' + (e.message||e)); console.error(e); }
+}
 
     if(!('requestPermission' in DeviceOrientationEvent)){ startDeviceWatch(); loadCityModelsFromFile(); }
 
