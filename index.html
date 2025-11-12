@@ -50,7 +50,7 @@
 
  async function loadCityModelsFromFile() {
     try {
-      const resp = await fetch('models/models.json');
+      const resp = await fetch('models/models_filtered_matched_wgs84.json');
       const list = await resp.json();
       const scene = document.querySelector('a-scene');
       list.forEach(m => {
