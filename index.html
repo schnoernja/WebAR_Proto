@@ -1,4 +1,3 @@
-<!-- ...existing code... -->
 <!doctype html>
 <html>
 <head>
@@ -8,192 +7,148 @@
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
+  <style>
+    #deviceCoordsBox { position: fixed; left: 10px; top: 56px; z-index: 10000; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; }
+    #statusBox { position: fixed; left: 10px; top: 120px; z-index: 10000; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; max-width:320px; max-height:40vh; overflow:auto; }
+  </style>
 </head>
 <body style="margin:0; overflow:hidden; background:transparent;">
-  <!-- persistent video background -->
-  <video id="cameraFeed" autoplay muted playsinline
-         style="position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;z-index:-1;background:#000;">
-  </video>
+  <video id="cameraFeed" autoplay muted playsinline style="position:fixed;left:0;top:0;width:100%;height:100%;object-fit:cover;z-index:-1;background:#000;"></video>
 
-  <!-- permission button (needed for iOS deviceorientation + geolocation + camera) -->
-  <button id="request-perms" style="position: absolute; z-index: 999; left: 10px; top: 10px; padding: 10px;">
-    Enable Location & Motion
-  </button>
+  <button id="request-perms" style="position: absolute; z-index: 9999; left: 10px; top: 10px; padding: 10px;">Enable Location & Motion</button>
 
-  <!-- transparent A-Frame canvas above the video -->
+  <div id="deviceCoordsBox">Device coords: unknown</div>
+  <div id="statusBox"><b>Status</b><div id="statusLines" style="margin-top:6px"></div></div>
+
   <a-scene renderer="alpha: true" vr-mode-ui="enabled: false" embedded style="position:relative;z-index:0;">
     <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
   </a-scene>
 
   <script>
-    // Permissions + compact debug panel + model loading
+  (function(){
+    // single scope to avoid duplicate block-declarations
+    function statusLog(msg){
+      console.log(msg);
+      const list = document.getElementById('statusLines');
+      if(!list) return;
+      const el = document.createElement('div'); el.textContent = msg; list.appendChild(el);
+      while(list.children.length > 80) list.removeChild(list.firstChild);
+    }
+    function formatNum(n, digits=6){ return (typeof n === 'number') ? n.toFixed(digits) : String(n); }
+    function updateDeviceCoordsDisplay(pos){
+      const el = document.getElementById('deviceCoordsBox');
+      if(!el) return;
+      if(!pos){ el.innerHTML = 'Device coords: unavailable'; return; }
+      const lat = pos.coords.latitude; const lon = pos.coords.longitude; const acc = pos.coords.accuracy;
+      el.innerHTML = `<div><b>Device (deg)</b></div>
+        latitude: ${formatNum(lat,6)} , longitude: ${formatNum(lon,6)}<br>
+        <div style="margin-top:6px;"><b>Device (alt naming)</b></div>
+        lat: ${formatNum(lat,6)} , lon: ${formatNum(lon,6)}<br>
+        accuracy: ${formatNum(acc,1)} m`;
+    }
+
+    // watch handle inside IIFE
+    let geoWatchId = null;
+    function startDeviceWatch(){
+      if(!navigator.geolocation){ statusLog('Geolocation not supported'); updateDeviceCoordsDisplay(null); return; }
+      if(geoWatchId !== null) return;
+      geoWatchId = navigator.geolocation.watchPosition(pos=>{
+        statusLog(`Geolocation update: ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (acc ${pos.coords.accuracy}m)`);
+        updateDeviceCoordsDisplay(pos);
+      }, err=>{
+        statusLog('Geolocation watch error: ' + (err.message||err.code));
+        updateDeviceCoordsDisplay(null);
+      }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 });
+      statusLog('Started geolocation watch (id=' + geoWatchId + ')');
+    }
+
     const btn = document.getElementById('request-perms');
     const videoEl = document.getElementById('cameraFeed');
 
-    btn.addEventListener('click', async () => {
-      btn.disabled = true;
-      btn.textContent = 'Requesting permissions...';
-
-      // 1) DeviceOrientation (iOS)
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          await DeviceOrientationEvent.requestPermission();
-          console.log('DeviceOrientation permission requested');
-        } catch (err) {
-          console.warn('DeviceOrientation permission denied or unavailable', err);
-        }
+    btn.addEventListener('click', async ()=>{
+      btn.disabled = true; btn.textContent = 'Requesting permissions...'; statusLog('Requesting device permissions...');
+      if(typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function'){
+        try{ await DeviceOrientationEvent.requestPermission(); statusLog('DeviceOrientation permission requested'); } catch(e){ statusLog('DeviceOrientation denied/unavail'); }
       }
+      if(navigator.geolocation){
+        try{ await new Promise((r,rej)=> navigator.geolocation.getCurrentPosition(r,rej,{enableHighAccuracy:true,timeout:8000})); statusLog('Geolocation permission granted (initial)'); } catch(e){ statusLog('Geolocation error/denied'); }
+      } else statusLog('Geolocation not supported');
 
-      // 2) Geolocation
-      if (navigator.geolocation) {
-        try {
-          await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
-          });
-          console.log('Geolocation permission granted');
-        } catch (err) {
-          console.warn('Geolocation permission error:', err);
-        }
-      } else {
-        console.warn('Geolocation not supported');
-      }
-
-      // 3) Camera (attach stream to persistent video element so it's visible behind the scene)
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
+      if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+        try{
           const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-          // attach stream to the persistent video element (do NOT stop tracks)
           videoEl.srcObject = stream;
-          // ensure playsinline and play
-          await videoEl.play().catch(()=>{ /* some browsers autoplay-block; permission should allow */ });
-          console.log('Camera stream attached to background video');
-        } catch (err) {
-          console.warn('Camera permission denied or unavailable', err);
-        }
-      } else {
-        console.warn('getUserMedia not supported');
-      }
+          await videoEl.play().catch(()=>{});
+          statusLog('Camera stream active');
+        } catch(err){ statusLog('Camera permission denied or error: ' + (err.message||err)); }
+      } else statusLog('getUserMedia not supported');
 
-      // hide button and load scene models
       btn.style.display = 'none';
+      startDeviceWatch();
       loadCityModelsFromFile();
     });
 
-    // Helper: get lat/lon fields compatible with different JSON shapes
-    function getLat(m) { return (m.latitude !== undefined) ? m.latitude : (m.lat !== undefined ? m.lat : null); }
-    function getLon(m) { return (m.longitude !== undefined) ? m.longitude : (m.lon !== undefined ? m.lon : null); }
+    function getLat(m){ return (m.latitude !== undefined) ? m.latitude : (m.lat !== undefined ? m.lat : null); }
+    function getLon(m){ return (m.longitude !== undefined) ? m.longitude : (m.lon !== undefined ? m.lon : null); }
 
-    async function loadCityModelsFromFile() {
-      try {
+    async function loadCityModelsFromFile(){
+      statusLog('Starting to load models JSON...');
+      try{
         const resp = await fetch('models/models_filtered_matched_wgs84.json');
+        if(!resp.ok){ statusLog('Failed to fetch models JSON: ' + resp.status); return; }
         const list = await resp.json();
+        statusLog('Loaded models JSON, entries: ' + list.length);
         const scene = document.querySelector('a-scene');
 
-        list.forEach(m => {
-          const lat = getLat(m);
-          const lon = getLon(m);
-          if (lat == null || lon == null || !m.url) return;
+        for(const m of list){
+          const lat = getLat(m); const lon = getLon(m);
+          if(lat == null || lon == null){ statusLog(`Skipping ${m.id||m.url} — missing lat/lon`); continue; }
+          if(!m.url){ statusLog(`Skipping ${m.id||lat+','+lon} — missing url`); continue; }
+          statusLog(`Preparing entity for ${m.id||m.url} -> ${m.url}`);
+
+          // HEAD pre-check (optional)
+          try{ const u = new URL(m.url, location.href).href; const head = await fetch(u, { method: 'HEAD' }); if(!head.ok) statusLog(`Warning: HEAD ${u} returned ${head.status}`); } catch(err){ statusLog(`Warning: HEAD check failed for ${m.url}: ${err.message}`); }
 
           const ent = document.createElement('a-entity');
           ent.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
           ent.setAttribute('gltf-model', `url(${m.url})`);
           ent.setAttribute('scale', `${(m.scale||1)} ${(m.scale||1)} ${(m.scale||1)}`);
 
-          ent.addEventListener('model-loaded', () => {
-            try {
-              const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D;
-              if (!obj) {
-                addDebugLine(m.id || m.url, 'No mesh found');
-                return;
-              }
-              const box = new THREE.Box3().setFromObject(obj);
-              const centerWorld = new THREE.Vector3();
-              box.getCenter(centerWorld);
-              const worldOrigin = new THREE.Vector3();
-              ent.object3D.getWorldPosition(worldOrigin);
-              const offsetVec = new THREE.Vector3().subVectors(centerWorld, worldOrigin);
-              const eastMeters = offsetVec.x;
-              const northMeters = -offsetVec.z;
-              const vertMeters = offsetVec.y;
-              const distanceMeters = Math.sqrt(eastMeters*eastMeters + northMeters*northMeters);
-              const cam = document.querySelector('[gps-camera]');
-              const camComp = cam && (cam.components?.gpsCamera);
-              const camLat = camComp?.currentLatitude || null;
-              const refLat = camLat || parseFloat(lat);
-              const dLat = northMeters / metersPerDegLat();
-              const dLon = eastMeters / metersPerDegLon(refLat);
-              const suggestedLat = parseFloat(lat) + dLat;
-              const suggestedLon = parseFloat(lon) + dLon;
-              const html = `
-                Expected: ${parseFloat(lat).toFixed(6)}, ${parseFloat(lon).toFixed(6)}<br>
-                Offset (m): E:${eastMeters.toFixed(2)} N:${northMeters.toFixed(2)} V:${vertMeters.toFixed(2)}<br>
-                Distance (m): ${distanceMeters.toFixed(2)}<br>
-                Suggested corrected coords: ${suggestedLat.toFixed(6)}, ${suggestedLon.toFixed(6)}<br>
-                Model URL: ${m.url}
-              `;
-              addDebugLine(m.id || m.url, html);
-              const marker = document.createElement('a-sphere');
-              marker.setAttribute('radius', '0.5');
-              marker.setAttribute('color', '#00ff00');
-              marker.setAttribute('position', `${offsetVec.x} ${offsetVec.y} ${offsetVec.z}`);
-              marker.setAttribute('visible', 'true');
-              ent.appendChild(marker);
-            } catch (err) {
-              addDebugLine(m.id || m.url, 'Debug error: ' + (err.message || err));
-              console.error(err);
-            }
-          }, { once: true });
+          ent.addEventListener('model-loaded', ()=>{ statusLog(`model-loaded: ${m.id||m.url}`); try{ const obj = ent.getObject3D('mesh') || ent.getObject3D('model') || ent.object3D; statusLog(`Model object children: ${(obj && obj.children && obj.children.length) || 'unknown'}`); } catch(e){ statusLog('Error inspecting loaded model: ' + (e.message||e)); } }, { once:true });
+
+          ent.addEventListener('model-error', (ev)=>{ statusLog(`model-error for ${m.id||m.url}: ${ev && ev.detail ? JSON.stringify(ev.detail) : ev}`); }, { once:true });
+
+          let loaded = false; ent.addEventListener('model-loaded', ()=>{ loaded = true; }, { once:true });
+          setTimeout(()=>{ if(!loaded) statusLog(`Timeout: model not loaded within 12s for ${m.id||m.url}`); }, 12000);
 
           scene.appendChild(ent);
-        });
-      } catch (e) {
-        console.error('Failed to load models.json', e);
-      }
+        }
+      }catch(e){ statusLog('Failed to load models JSON: ' + (e.message||e)); console.error(e); }
     }
 
-    // Desktop fallback: if DeviceOrientation doesn't require permission, load immediately for easier testing
-    if (!('requestPermission' in DeviceOrientationEvent)) {
-      loadCityModelsFromFile();
-    }
+    if(!('requestPermission' in DeviceOrientationEvent)){ startDeviceWatch(); loadCityModelsFromFile(); }
 
-    // Compact debug panel (toggle)
     (function createDebugPanel(){
-      const wrapper = document.createElement('div');
-      wrapper.id = 'debugWrapper';
-      wrapper.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:9999;font-family:monospace;';
-      const toggle = document.createElement('button');
-      toggle.id = 'debugToggle';
-      toggle.textContent = 'Debug ▶';
-      toggle.style.cssText = 'background:#222;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9;';
+      const wrapper = document.createElement('div'); wrapper.id='debugWrapper'; wrapper.style.cssText='position:fixed;right:10px;bottom:10px;z-index:9999;font-family:monospace;';
+      const toggle = document.createElement('button'); toggle.id='debugToggle'; toggle.textContent='Debug ▶'; toggle.style.cssText='background:#222;color:#fff;border:none;padding:6px 8px;border-radius:4px;cursor:pointer;opacity:0.9;';
       wrapper.appendChild(toggle);
-      const panel = document.createElement('div');
-      panel.id = 'debugPanel';
-      panel.style.cssText = 'display:none;width:320px;max-height:38vh;overflow:auto;background:rgba(0,0,0,0.75);color:#fff;padding:8px;border-radius:6px;margin-top:6px;font-size:12px;';
-      panel.innerHTML = '<b>Model Debug</b><div id="debugList" style="margin-top:6px;"></div>';
-      wrapper.appendChild(panel);
-      toggle.addEventListener('click', () => {
-        if (panel.style.display === 'none') { panel.style.display = 'block'; toggle.textContent = 'Debug ▼'; }
-        else { panel.style.display = 'none'; toggle.textContent = 'Debug ▶'; }
-      });
+      const panel = document.createElement('div'); panel.id='debugPanel'; panel.style.cssText='display:none;width:320px;max-height:38vh;overflow:auto;background:rgba(0,0,0,0.75);color:#fff;padding:8px;border-radius:6px;margin-top:6px;font-size:12px;';
+      panel.innerHTML = '<b>Model Debug</b><div id="debugList" style="margin-top:6px;"></div>'; wrapper.appendChild(panel);
+      toggle.addEventListener('click', ()=>{ if(panel.style.display==='none'){ panel.style.display='block'; toggle.textContent='Debug ▼'; } else { panel.style.display='none'; toggle.textContent='Debug ▶'; }});
       document.body.appendChild(wrapper);
     })();
 
-    // helpers
-    function metersPerDegLat() { return 110574; }
-    function metersPerDegLon(lat) { return 111320 * Math.cos(lat * Math.PI/180); }
-
-    function addDebugLine(id, html) {
+    function addDebugLine(id, html){
       const list = document.getElementById('debugList');
-      if (!list) return;
-      const el = document.createElement('div');
-      el.style.marginBottom = '6px';
-      el.innerHTML = `<div><b>${id}</b></div>${html}`;
-      list.appendChild(el);
-      while (list.children.length > 60) list.removeChild(list.firstChild);
+      if(list){ const el = document.createElement('div'); el.style.marginBottom='6px'; el.innerHTML = `<div><b>${id}</b></div>${html}`; list.appendChild(el); while(list.children.length>60) list.removeChild(list.firstChild); }
+      statusLog((id? id+': ':'') + html.replace(/<[^>]+>/g,' '));
     }
 
-    AFRAME.registerComponent('rotation-reader', { tick: function () {} });
+    function metersPerDegLat(){ return 110574; }
+    function metersPerDegLon(lat){ return 111320 * Math.cos(lat * Math.PI/180); }
+
+    AFRAME.registerComponent('rotation-reader', { tick: function(){} });
+  })();
   </script>
 </body>
 </html>
-<!-- ...existing code... -->
