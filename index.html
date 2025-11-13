@@ -181,9 +181,34 @@
       loadCityModelsFromFile();
     }
 
-    // ensure both touch and click invoke (some mobile require touchstart)
-    permButton.addEventListener('click', requestPermissionsFlow, { passive:false });
-    permButton.addEventListener('touchend', (e)=>{ e.preventDefault(); requestPermissionsFlow(); }, { passive:false });
+    // ...existing code...
+let __permInProgress = false;
+async function handlePermButtonEvent(e){
+  try {
+    if (e && e.preventDefault) e.preventDefault();
+  } catch(e){}
+  if (__permInProgress) return;
+  __permInProgress = true;
+  permButton.disabled = true;
+  setPermStatus('Starting permission flow...');
+  statusLog('Permission button pressed');
+  try {
+    await requestPermissionsFlow();
+  } catch (err) {
+    console.error('requestPermissionsFlow error', err);
+    statusLog('Permission flow error: ' + (err && err.message));
+    setPermStatus('Error: ' + (err && err.message));
+  } finally {
+    __permInProgress = false;
+    permButton.disabled = false;
+  }
+}
+
+// attach multiple input events to maximize chance of firing on mobile
+permButton.addEventListener('click', handlePermButtonEvent, { passive:false });
+permButton.addEventListener('touchend', handlePermButtonEvent, { passive:false });
+permButton.addEventListener('pointerdown', handlePermButtonEvent, { passive:false });
+// ...existing code...
 
     /* --- model loader (large test cubes) --- */
     function getLat(m){ return (m.latitude !== undefined) ? m.latitude : (m.lat !== undefined ? m.lat : null); }
