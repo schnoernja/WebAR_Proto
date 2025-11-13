@@ -57,138 +57,143 @@
   </a-scene>
 
   <script>
-  (function(){
-    const statusBox = document.getElementById('statusBox');
-    const statusHeader = document.getElementById('statusHeader');
-    const statusToggle = document.getElementById('statusToggle');
-    function setStatusExpanded(expanded){
-      if(!statusBox) return;
-      if(expanded){
-        statusBox.classList.remove('collapsed');
-        statusBox.classList.add('expanded');
-        statusBox.setAttribute('aria-expanded','true');
-        statusToggle.textContent = '▴';
-      } else {
-        statusBox.classList.remove('expanded');
-        statusBox.classList.add('collapsed');
-        statusBox.setAttribute('aria-expanded','false');
-        statusToggle.textContent = '▾';
-      }
+(function(){
+  const statusBox = document.getElementById('statusBox');
+  const statusHeader = document.getElementById('statusHeader');
+  const statusToggle = document.getElementById('statusToggle');
+  const permButton = document.getElementById('request-perms');
+  const permOverlay = document.getElementById('permOverlay');
+
+  function setStatusExpanded(expanded){
+    if(!statusBox) return;
+    if(expanded){
+      statusBox.classList.remove('collapsed');
+      statusBox.classList.add('expanded');
+      statusBox.setAttribute('aria-expanded','true');
+      statusToggle.textContent = '▴';
+    } else {
+      statusBox.classList.remove('expanded');
+      statusBox.classList.add('collapsed');
+      statusBox.setAttribute('aria-expanded','false');
+      statusToggle.textContent = '▾';
     }
-    statusHeader.addEventListener('click', ()=> setStatusExpanded(statusBox.classList.contains('collapsed')));
-    statusHeader.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStatusExpanded(statusBox.classList.contains('collapsed')); } });
-    setStatusExpanded(false);
+  }
+  statusHeader.addEventListener('click', ()=> setStatusExpanded(statusBox.classList.contains('collapsed')));
+  statusHeader.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStatusExpanded(statusBox.classList.contains('collapsed')); } });
+  setStatusExpanded(false);
 
-    function statusLog(msg){
-      console.log(msg);
-      const list = document.getElementById('statusLines');
-      if(!list) return;
-      const el = document.createElement('div'); el.textContent = msg; list.appendChild(el);
-      while(list.children.length > 80) list.removeChild(list.firstChild);
-    }
-    function setPermStatus(msg){ const p = document.getElementById('permStatus'); if(p) p.textContent = msg; }
-    function formatNum(n,d=6){ return (typeof n === 'number') ? n.toFixed(d) : String(n); }
+  function statusLog(msg){
+    console.log(msg);
+    const list = document.getElementById('statusLines');
+    if(!list) return;
+    const el = document.createElement('div');
+    el.textContent = msg;
+    list.appendChild(el);
+    while(list.children.length > 80) list.removeChild(list.firstChild);
+  }
 
-    const devBox = document.getElementById('deviceCoordsBox');
-    devBox.addEventListener('click', ()=> {
-      devBox.classList.toggle('collapsed');
-      if (devBox.classList.contains('collapsed')) {
-        devBox.innerHTML = 'Device coords: ' + (devBox.dataset.simple || 'unknown') + ' (tap to expand)';
-      }
-    });
+  // Geolocation
+  let geoWatchId = null;
+  let currentDevicePos = null;
+  function startDeviceWatch(){
+    if(!navigator.geolocation){ statusLog('Geolocation not supported'); return; }
+    if(geoWatchId !== null) return;
+    geoWatchId = navigator.geolocation.watchPosition(pos=>{
+      statusLog('Geolocation update: ' + pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6));
+      currentDevicePos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
+    }, err=>{
+      statusLog('Geolocation error: ' + (err.message||err.code));
+    }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 });
+  }
 
-    let geoWatchId = null;
-    let currentDevicePos = null;
-    function startDeviceWatch(){
-      if(!navigator.geolocation){ statusLog('Geolocation not supported'); return; }
-      if(geoWatchId !== null) return;
-      geoWatchId = navigator.geolocation.watchPosition(pos=>{
-        statusLog('Geolocation update: ' + pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6));
-        currentDevicePos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy };
-        devBox.dataset.simple = pos.coords.latitude.toFixed(6) + ', ' + pos.coords.longitude.toFixed(6);
-        if (devBox.classList.contains('collapsed')) {
-          devBox.innerHTML = 'Device coords: ' + devBox.dataset.simple + ' (tap to expand)';
-        }
-      }, err=>{
-        statusLog('Geolocation watch error: ' + (err.message||err.code));
-      }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 8000 });
-      statusLog('Started geolocation watch (id=' + geoWatchId + ')');
-    }
+  // 📸 --- FULL PERMISSION FLOW ---
+  async function requestPermissionsFlow(){
+    statusLog('Permission flow started...');
 
-    function haversine(lat1, lon1, lat2, lon2){
-      const R = 6371000; const toRad = v => v * Math.PI/180;
-      const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R * c;
-    }
-
-    const permButton = document.getElementById('request-perms');
-    const permOverlay = document.getElementById('permOverlay');
-
-    async function requestPermissionsFlow(){
-      setPermStatus('Starting permission requests...');
-      statusLog('User initiated permission flow');
-
-      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        try {
-          const res = await DeviceOrientationEvent.requestPermission();
-          statusLog('DeviceOrientation.requestPermission -> ' + res);
-        } catch (err) {
-          statusLog('DeviceOrientation permission denied/unavailable: ' + (err && err.message));
-        }
-      }
-
-      let geoOk = false;
-      if (navigator.geolocation) {
-        try {
-          await new Promise((res,rej) => navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:10000 }));
-          geoOk = true;
-          statusLog('Geolocation initial position obtained');
-        } catch (err) {
-          statusLog('Geolocation permission denied/error: ' + (err && err.message));
-        }
-      }
-
-      permOverlay.style.display = 'none';
-      startDeviceWatch();
-      loadCityModelsFromFile();
-    }
-
-    permButton.addEventListener('click', (e)=>{
-      e.preventDefault();
-      requestPermissionsFlow();
-    });
-
-    async function loadCityModelsFromFile(){
-      statusLog('Starting to load models JSON...');
+    // iOS motion permission
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
       try {
-        const resp = await fetch('models/models_filtered_matched_wgs84.json');
-        if (!resp.ok) { statusLog('Failed to fetch models JSON'); return; }
-        const list = await resp.json();
-        statusLog('Loaded models JSON, entries: ' + list.length);
-        const scene = document.querySelector('a-scene');
-        for(const m of list){
-          const lat = m.latitude ?? m.lat, lon = m.longitude ?? m.lon;
-          if(lat==null || lon==null) continue;
-          const cube = document.createElement('a-box');
-          cube.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
-          cube.setAttribute('width', 5);
-          cube.setAttribute('height', 5);
-          cube.setAttribute('depth', 5);
-          cube.setAttribute('color', '#ff0000');
-          cube.setAttribute('position', '0 1 0');
-          scene.appendChild(cube);
-        }
+        const res = await DeviceOrientationEvent.requestPermission();
+        statusLog('DeviceOrientation: ' + res);
       } catch (err) {
-        statusLog('Failed to load models JSON: ' + (err && err.message));
+        statusLog('DeviceOrientation denied: ' + err.message);
       }
     }
 
-    if (window.AFRAME && (!AFRAME.components || !AFRAME.components['rotation-reader'])) {
-      AFRAME.registerComponent('rotation-reader', { tick: function(){} });
+    // Explicitly request CAMERA permission (we don’t use the stream)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      stream.getTracks().forEach(t => t.stop());
+      statusLog('Camera permission granted ✅');
+    } catch (err) {
+      statusLog('Camera denied ❌: ' + err.message);
     }
-  })();
-  </script>
+
+    // Geolocation prompt
+    try {
+      await new Promise((res,rej)=>navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy:true, timeout:10000 }));
+      statusLog('Initial geolocation OK ✅');
+    } catch (err) {
+      statusLog('Geolocation denied ❌: ' + err.message);
+    }
+
+    permOverlay.style.display = 'none';
+    startDeviceWatch();
+    initSceneTestObjects();
+    loadCityModelsFromFile();
+  }
+
+  permButton.addEventListener('click', (e)=>{
+    e.preventDefault();
+    requestPermissionsFlow();
+  });
+
+  // 🧱 TEST OBJECT directly in front of camera
+  function initSceneTestObjects(){
+    const scene = document.querySelector('a-scene');
+    const testCube = document.createElement('a-box');
+    testCube.setAttribute('position', '0 0 -3'); // 3 meters in front of camera
+    testCube.setAttribute('width', '0.5');
+    testCube.setAttribute('height', '0.5');
+    testCube.setAttribute('depth', '0.5');
+    testCube.setAttribute('color', '#00ffcc');
+    scene.appendChild(testCube);
+    statusLog('Inserted test cube 3m in front of camera 📦');
+  }
+
+  // 🗺️ GPS-based cubes
+  async function loadCityModelsFromFile(){
+    statusLog('Loading models JSON...');
+    try {
+      const resp = await fetch('models/models_filtered_matched_wgs84.json');
+      if (!resp.ok) { statusLog('Failed to fetch models JSON'); return; }
+      const list = await resp.json();
+      const scene = document.querySelector('a-scene');
+      for(const m of list){
+        const lat = m.latitude ?? m.lat;
+        const lon = m.longitude ?? m.lon;
+        if(lat==null || lon==null) continue;
+
+        const cube = document.createElement('a-box');
+        cube.setAttribute('gps-entity-place', `latitude: ${lat}; longitude: ${lon};`);
+        cube.setAttribute('width', 5);
+        cube.setAttribute('height', 5);
+        cube.setAttribute('depth', 5);
+        cube.setAttribute('color', '#ff0000');
+        cube.setAttribute('position', '0 1 0');
+        scene.appendChild(cube);
+      }
+      statusLog('Loaded ' + list.length + ' cubes from JSON.');
+    } catch (err) {
+      statusLog('Error loading models: ' + err.message);
+    }
+  }
+
+  // A-Frame rotation reader fallback
+  if (window.AFRAME && (!AFRAME.components || !AFRAME.components['rotation-reader'])) {
+    AFRAME.registerComponent('rotation-reader', { tick: function(){} });
+  }
+})();
+</script>
 </body>
 </html>
