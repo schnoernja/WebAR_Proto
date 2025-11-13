@@ -7,6 +7,7 @@
   <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-camera/dist/aframe-gps-camera.min.js"></script>
   <script src="https://unpkg.com/aframe-gps-entity-place/dist/aframe-gps-entity-place.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ar.js@4.3.2/aframe/build/aframe-ar-nft.js"></script>
   <style>
     /* UI */
     a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
@@ -52,11 +53,11 @@
   </div>
 
   <!-- Main A-Frame AR scene -->
-  <a-scene
+<a-scene
   embedded
   vr-mode-ui="enabled: false"
   renderer="alpha: true"
-  arjs="sourceType: webcam; debugUIEnabled: false;"
+  arjs="sourceType: webcam; gpsMinDistance: 0; debugUIEnabled: false;"
 >
   <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
 </a-scene>
