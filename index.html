@@ -14,7 +14,13 @@
     a-scene { z-index:1; position:relative; }
     #deviceCoordsBox { position: fixed; left: 10px; top: 56px; z-index: 10001; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; max-width:260px; cursor:pointer; }
     #deviceCoordsBox.collapsed { height: 28px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-    #statusBox { position: fixed; left: 10px; top: 120px; z-index: 10000; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; max-width:320px; max-height:40vh; overflow:auto; }
+    /* status box is collapsible: .collapsed hides content, .expanded shows it */
+   #statusBox { position: fixed; left: 10px; top: 120px; z-index: 10000; background: rgba(0,0,0,0.6); color:#fff; padding:6px 8px; border-radius:6px; font-family: monospace; font-size:12px; max-width:320px; }
+    #statusBox .status-content { transition: max-height 220ms ease; overflow:auto; max-height: 40vh; margin-top:6px; }
+    #statusBox.collapsed .status-content { max-height: 0; padding:0; display:block; }
+    #statusBox.collapsed #statusLines { display:none; }
+    #statusBox .status-header { display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; }
+    #statusBox button.status-toggle { background:transparent; border:0; color:#fff; font-size:14px; padding:4px 6px; cursor:pointer; }
     /* big permission overlay to ensure a clear user gesture on mobile */
     #permOverlay { position: fixed; left:0; top:0; right:0; bottom:0; z-index:2147483647; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.35); }
     #permCard { background: #111; color:#fff; padding:18px; border-radius:10px; text-align:center; width:90%; max-width:420px; box-shadow:0 6px 20px rgba(0,0,0,0.6); font-family:system-ui,Segoe UI,Helvetica,Arial; }
@@ -37,7 +43,15 @@
   </div>
 
   <div id="deviceCoordsBox" class="collapsed" title="Tap to expand/collapse">Device coords: unknown (tap to expand)</div>
-  <div id="statusBox"><b>Status</b><div id="statusLines" style="margin-top:6px"></div></div>
+ <div id="statusBox" class="collapsed" aria-expanded="false" title="Tap to expand/collapse">
+   <div class="status-header" id="statusHeader" role="button" tabindex="0">
+      <div style="font-weight:bold">Status</div>
+      <button class="status-toggle" id="statusToggle" aria-label="Toggle status">▾</button>
+    </div>
+    <div class="status-content">
+      <div id="statusLines" style="margin-top:6px"></div>
+    </div>
+ </div>
 
   <a-scene renderer="alpha: true" vr-mode-ui="enabled: false" embedded>
     <a-camera gps-camera rotation-reader wasd-controls-enabled="false"></a-camera>
@@ -45,6 +59,29 @@
 
   <script>
   (function(){
+    const statusBox = document.getElementById('statusBox');
+    const statusHeader = document.getElementById('statusHeader');
+    const statusToggle = document.getElementById('statusToggle');
+    function setStatusExpanded(expanded){
+      if(!statusBox) return;
+      if(expanded){
+        statusBox.classList.remove('collapsed');
+        statusBox.classList.add('expanded');
+        statusBox.setAttribute('aria-expanded','true');
+        if(statusToggle) statusToggle.textContent = '▴';
+      } else {
+        statusBox.classList.remove('expanded');
+        statusBox.classList.add('collapsed');
+        statusBox.setAttribute('aria-expanded','false');
+        if(statusToggle) statusToggle.textContent = '▾';
+      }
+    }
+    if(statusHeader){
+      statusHeader.addEventListener('click', ()=> setStatusExpanded(statusBox.classList.contains('collapsed')));
+      statusHeader.addEventListener('keydown', (e)=>{ if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStatusExpanded(statusBox.classList.contains('collapsed')); } });
+    }
+    // ensure initial collapsed state
+   setStatusExpanded(false);
     /* --- helpers --- */
     function statusLog(msg){
       console.log(msg);
