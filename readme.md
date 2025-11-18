@@ -1,9 +1,15 @@
 # WebAR_Proto
 
-## Voraussetzungen
+**Live-Demo:**
+Du kannst die Anwendung direkt online testen unter:
+[https://webar.duckdns.org/](https://webar.duckdns.org/)
+
+## Entwicklung & Selbst-Hosting
+
+### Voraussetzungen
 - Installiere [Docker](https://www.docker.com/) und [Docker Compose](https://docs.docker.com/compose/).
 
-## Projekt starten
+### Projekt lokal starten
 
 Öffne ein Terminal im Projektordner und führe aus:
 
@@ -14,6 +20,6 @@ docker compose up -d
 
 Das Projekt ist dann unter [http://localhost:8080](http://localhost:8080) erreichbar.
 
-## Hinweise
+### Hinweise
 - Die statischen Dateien werden über einen nginx-Webserver bereitgestellt.
 - Änderungen an den Dateien werden beim nächsten `docker compose up -d` automatisch übernommen.
