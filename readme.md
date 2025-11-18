@@ -1,7 +1,6 @@
 # WebAR_Proto
 
 **Live-Demo:**
-Du kannst die Anwendung direkt online testen unter:
 [https://webar.duckdns.org/](https://webar.duckdns.org/)
 
 ## Entwicklung & Selbst-Hosting
