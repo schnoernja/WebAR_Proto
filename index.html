@@ -3,48 +3,54 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AR Cube Test</title>
+    <title>WebAR Prototype</title>
+<link rel="stylesheet" href="styles.css">
 
     <!-- A-Frame -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
     <!-- AR.js for A-Frame -->
     <script src="https://cdn.jsdelivr.net/npm/ar.js@4.3.2/aframe/build/aframe-ar-nft.js"></script>
-
-    <style>
-      body { margin: 0; overflow: hidden; }
-      #hint {
-        position: fixed;
-        left: 10px;
-        top: 10px;
-        z-index: 9999;
-        background: rgba(0,0,0,0.6);
-        color: white;
-        padding: 8px 10px;
-        border-radius: 8px;
-        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-        font-size: 14px;
-      }
-    </style>
   </head>
 
   <body>
-    <div id="hint">
-      Wenn die Kamera startet, solltest du einen roten Würfel sehen (ca. 2m vor dir).
-      <br/>Tipp: Handy langsam bewegen.
+
+    <!-- Intro / Info Overlay -->
+    <div id="introOverlay">
+      <div id="introCard">
+        <h1>Willkommen zur WebAR-Demo</h1>
+        <p>
+          Dies ist ein prototypisches browserbasiertes AR-System.
+          <br><br>
+          Platzhaltertext:  
+          Hier werden später Informationen zur Nutzung, zu Datenschutz,
+          zur Umgebung (z. B. „Bitte im Freien verwenden“) oder Hinweise
+          zur Studie angezeigt.
+        </p>
+        <button id="enterApp">Weiter</button>
+      </div>
     </div>
 
+    <!-- UI Overlay -->
+    <div id="ui">
+      <div id="panel">
+        <h2>WebAR Steuerung</h2>
+        <button id="startAR">AR starten</button>
+        <div id="status">Status: Bereit</div>
+      </div>
+    </div>
+
+    <!-- AR Scene -->
     <a-scene
+      id="arScene"
       embedded
       vr-mode-ui="enabled: false"
       renderer="alpha: true; antialias: true"
       arjs="sourceType: webcam; debugUIEnabled: false;"
     >
-      <!-- Licht ist wichtig, sonst wirkt vieles “schwarz” -->
       <a-entity light="type: ambient; intensity: 1.0"></a-entity>
       <a-entity light="type: directional; intensity: 0.8" position="1 2 1"></a-entity>
 
-      <!-- Der Würfel: 2 Meter vor der Kamera -->
       <a-box
         position="0 0 -2"
         width="0.5"
@@ -53,8 +59,28 @@
         color="red"
       ></a-box>
 
-      <!-- Kamera: AR.js steuert die Pose -->
       <a-entity camera></a-entity>
     </a-scene>
+
+    <script>
+      const introOverlay = document.getElementById('introOverlay');
+      const enterBtn = document.getElementById('enterApp');
+
+      const startBtn = document.getElementById('startAR');
+      const scene = document.getElementById('arScene');
+      const status = document.getElementById('status');
+
+      enterBtn.addEventListener('click', () => {
+        introOverlay.style.display = 'none';
+      });
+
+      startBtn.addEventListener('click', () => {
+        status.textContent = 'Status: Kamera wird gestartet...';
+        scene.style.display = 'block';
+        startBtn.disabled = true;
+        startBtn.textContent = 'AR läuft';
+      });
+    </script>
+
   </body>
 </html>
