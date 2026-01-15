@@ -1,0 +1,133 @@
+/* Base */
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  background: #111;
+  color: #fff;
+}
+
+/* ---------- Start / Info Overlay ---------- */
+#introOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+#introCard {
+  background: #161616;
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.7);
+  text-align: center;
+}
+
+#introCard h1 {
+  font-size: 18px;
+  margin: 0 0 12px 0;
+  font-weight: 600;
+}
+
+#introCard p {
+  font-size: 14px;
+  line-height: 1.5;
+  opacity: 0.9;
+}
+
+#introCard button {
+  margin-top: 16px;
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  background: #0078d4;
+  color: #fff;
+  cursor: pointer;
+}
+
+/* ---------- UI Overlay ---------- */
+#ui {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+  padding: 12px;
+  background: linear-gradient(
+    to top,
+    rgba(0,0,0,0.85),
+    rgba(0,0,0,0.4),
+    rgba(0,0,0,0)
+  );
+}
+
+#panel {
+  background: rgba(20,20,20,0.9);
+  border-radius: 14px;
+  padding: 14px;
+  max-width: 420px;
+  margin: 0 auto;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+}
+
+#panel h2 {
+  font-size: 15px;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+  text-align: center;
+}
+
+#panel button {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: none;
+  background: #0078d4;
+  color: #fff;
+  cursor: pointer;
+}
+
+#status {
+  margin-top: 10px;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0.85;
+}
+
+/* ---------- AR Scene ---------- */
+a-scene {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+/* ---------- iOS Safe Area ---------- */
+
+/* Unteres UI (Home Indicator) */
+#ui {
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  padding-left: calc(12px + env(safe-area-inset-left));
+  padding-right: calc(12px + env(safe-area-inset-right));
+}
+
+/* Intro Overlay (Notch + Ränder) */
+#introOverlay {
+  padding:
+    calc(20px + env(safe-area-inset-top))
+    calc(20px + env(safe-area-inset-right))
+    calc(20px + env(safe-area-inset-bottom))
+    calc(20px + env(safe-area-inset-left));
+}
+
