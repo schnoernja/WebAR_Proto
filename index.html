@@ -22,11 +22,13 @@
       arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
     >
       <!-- AR-Objekt an GPS-Position -->
-      <a-entity
-        gps-entity-place="latitude: 52.5200; longitude: 13.4050;"
-        gltf-model="model.glb"
-        scale="1 1 1"
-      ></a-entity>
+      <a-box
+        position="0 0 -3"
+        depth="1"
+        height="1"
+        width="1"
+        color="red"
+></a-box>
 
       <!-- Kamera mit GPS & Orientation -->
       <a-camera gps-camera rotation-reader></a-camera>
