@@ -1,74 +1,14 @@
-<!doctype html>
 <html>
   <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>WebAR Prototype</title>
-
-    <link rel="stylesheet" href="styles.css">
-
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
-
-    <!-- AR.js for A-Frame -->
-    <script src="https://cdn.jsdelivr.net/npm/ar.js@4.3.2/aframe/build/aframe-ar-nft.js"></script>
+    <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   </head>
-
   <body>
-
-    <!-- Intro / Info Overlay (liegt über AR, blockiert es aber nicht) -->
-    <div id="introOverlay">
-      <div id="introCard">
-        <h1>Willkommen zur WebAR-Demo</h1>
-        <p>
-          Dies ist ein prototypisches browserbasiertes AR-System.
-          <br><br>
-          Platzhaltertext:
-          Hier werden später Informationen zur Nutzung, zu Datenschutz,
-          zur Umgebung oder Hinweise zur Studie angezeigt.
-        </p>
-        <button id="enterApp">Weiter</button>
-      </div>
-    </div>
-
-    <!-- UI Overlay (optional, bleibt sichtbar) -->
-    <div id="ui">
-      <div id="panel">
-        <h2>WebAR Steuerung</h2>
-        <div id="status">Status: AR wird initialisiert…</div>
-      </div>
-    </div>
-
-    <!-- AR Scene: startet sofort -->
-    <a-scene
-      embedded
-      vr-mode-ui="enabled: false"
-      renderer="alpha: true; antialias: true"
-      arjs="sourceType: webcam; debugUIEnabled: false;"
-    >
-      <!-- A-Frame Beispiel-Objekte -->
+    <a-scene>
       <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
       <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
       <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
       <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
-
-      <!-- transparenter Sky -->
-      <a-sky material="opacity: 0; transparent: true"></a-sky>
-
-      <!-- Kamera (von AR.js gesteuert) -->
-      <a-entity camera></a-entity>
+      <a-sky color="#ECECEC"></a-sky>
     </a-scene>
-
-    <script>
-      const introOverlay = document.getElementById('introOverlay');
-      const enterBtn = document.getElementById('enterApp');
-      const status = document.getElementById('status');
-
-      enterBtn.addEventListener('click', () => {
-        introOverlay.style.display = 'none';
-        status.textContent = 'Status: AR läuft';
-      });
-    </script>
-
   </body>
 </html>
