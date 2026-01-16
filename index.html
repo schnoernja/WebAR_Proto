@@ -4,9 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>WebAR Prototype</title>
-<link rel="stylesheet" href="styles.css">
 
-    <!-- A-Frame -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- A-Frame (du kannst später auch 1.7.x nehmen; fürs Erste lassen wir es stabil) -->
     <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
 
     <!-- AR.js for A-Frame -->
@@ -14,7 +15,6 @@
   </head>
 
   <body>
-
     <!-- Intro / Info Overlay -->
     <div id="introOverlay">
       <div id="introCard">
@@ -22,7 +22,7 @@
         <p>
           Dies ist ein prototypisches browserbasiertes AR-System.
           <br><br>
-          Platzhaltertext:  
+          Platzhaltertext:
           Hier werden später Informationen zur Nutzung, zu Datenschutz,
           zur Umgebung (z. B. „Bitte im Freien verwenden“) oder Hinweise
           zur Studie angezeigt.
@@ -40,7 +40,7 @@
       </div>
     </div>
 
-    <!-- AR Scene -->
+    <!-- AR Scene (wird per Button sichtbar gemacht) -->
     <a-scene
       id="arScene"
       embedded
@@ -48,17 +48,16 @@
       renderer="alpha: true; antialias: true"
       arjs="sourceType: webcam; debugUIEnabled: false;"
     >
-      <a-entity light="type: ambient; intensity: 1.0"></a-entity>
-      <a-entity light="type: directional; intensity: 0.8" position="1 2 1"></a-entity>
+      <!-- A-Frame Starter Example Entities (angepasst für AR) -->
+      <a-box position="-1 0.5 -3" rotation="0 45 0" color="#4CC3D9"></a-box>
+      <a-sphere position="0 1.25 -5" radius="1.25" color="#EF2D5E"></a-sphere>
+      <a-cylinder position="1 0.75 -3" radius="0.5" height="1.5" color="#FFC65D"></a-cylinder>
+      <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
 
-      <a-box
-        position="0 0 -2"
-        width="0.5"
-        height="0.5"
-        depth="0.5"
-        color="red"
-      ></a-box>
+      <!-- Sky aus dem Beispiel: transparent, damit Kamera sichtbar bleibt -->
+      <a-sky color="#ECECEC" material="opacity: 0; transparent: true"></a-sky>
 
+      <!-- Kamera: AR.js steuert sie -->
       <a-entity camera></a-entity>
     </a-scene>
 
@@ -76,11 +75,13 @@
 
       startBtn.addEventListener('click', () => {
         status.textContent = 'Status: Kamera wird gestartet...';
+
+        // Szene sichtbar machen -> AR.js kann die Kamera initialisieren/anfragen
         scene.style.display = 'block';
+
         startBtn.disabled = true;
         startBtn.textContent = 'AR läuft';
       });
     </script>
-
   </body>
 </html>
