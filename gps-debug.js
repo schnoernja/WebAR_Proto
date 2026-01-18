@@ -15,6 +15,7 @@ const applyHeightBtn = document.getElementById("apply-height");
 const resetAheadBtn = document.getElementById("reset-ahead");
 const lockGroundInput = document.getElementById("lock-ground");
 const toggleModelBtn = document.getElementById("toggle-model");
+const toggleScaleBtn = document.getElementById("toggle-scale");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -177,6 +178,20 @@ function updateObjectVisibility() {
   );
   setDistance(`Dist: ${dist.toFixed(1)} m`);
   worldObject.setAttribute("visible", dist <= 10);
+}
+
+let scaleToggleState = false;
+function applyScale() {
+  if (!worldObject) return;
+  const scale = scaleToggleState ? 2 : 1;
+  worldObject.setAttribute("scale", `${scale} ${scale} ${scale}`);
+}
+
+if (toggleScaleBtn) {
+  toggleScaleBtn.addEventListener("click", () => {
+    scaleToggleState = !scaleToggleState;
+    applyScale();
+  });
 }
 
 if (applyTestBtn && testLatInput && testLonInput) {
