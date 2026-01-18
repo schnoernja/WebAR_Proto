@@ -9,6 +9,11 @@ const distanceEl = document.getElementById("obj-distance");
 const testLatInput = document.getElementById("test-lat");
 const testLonInput = document.getElementById("test-lon");
 const applyTestBtn = document.getElementById("apply-test-coords");
+const heightEl = document.getElementById("obj-height");
+const testHeightInput = document.getElementById("test-height");
+const applyHeightBtn = document.getElementById("apply-height");
+const resetAheadBtn = document.getElementById("reset-ahead");
+const lockGroundInput = document.getElementById("lock-ground");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -109,6 +114,7 @@ function startDeviceWatch() {
 // OBJECT COORDS (AR.js ENTITY)
 // =============================
 const worldObject = document.getElementById("world-object");
+const cameraEl = document.querySelector("[gps-camera]");
 let objectCoords = null;
 if (worldObject) {
   const gps = parseGpsAttribute(worldObject.getAttribute("gps-entity-place"));
@@ -117,6 +123,16 @@ if (worldObject) {
     if (objLatEl) objLatEl.textContent = gps.latitude.toFixed(6);
     if (objLonEl) objLonEl.textContent = gps.longitude.toFixed(6);
   }
+  const pos = worldObject.getAttribute("position");
+  if (pos && typeof pos.y === "number") {
+    if (heightEl) heightEl.textContent = pos.y.toFixed(2);
+  }
+}
+
+function setObjectHeight(heightMeters) {
+  if (!worldObject) return;
+  worldObject.setAttribute("position", `0 ${heightMeters} 0`);
+  if (heightEl) heightEl.textContent = heightMeters.toFixed(2);
 }
 
 function updateObjectCoords(lat, lon) {
@@ -150,6 +166,53 @@ if (applyTestBtn && testLatInput && testLonInput) {
     }
     updateObjectCoords(lat, lon);
   });
+}
+
+if (applyHeightBtn && testHeightInput) {
+  applyHeightBtn.addEventListener("click", () => {
+    if (lockGroundInput && lockGroundInput.checked) {
+      setObjectHeight(0);
+      return;
+    }
+    const h = toNumber(testHeightInput.value);
+    if (h === null) {
+      setStatus("invalid height");
+      return;
+    }
+    setObjectHeight(h);
+  });
+}
+
+if (lockGroundInput) {
+  lockGroundInput.addEventListener("change", () => {
+    if (lockGroundInput.checked) setObjectHeight(0);
+  });
+}
+
+function metersToLatLonOffset(meters, bearingDeg, baseLat) {
+  const R = 6371000;
+  const bearing = (bearingDeg * Math.PI) / 180;
+  const dLat = (meters * Math.cos(bearing)) / R;
+  const dLon = (meters * Math.sin(bearing)) / (R * Math.cos((baseLat * Math.PI) / 180));
+  return { dLat: (dLat * 180) / Math.PI, dLon: (dLon * 180) / Math.PI };
+}
+
+function resetObjectAhead() {
+  if (!lastDeviceCoords) {
+    setStatus("no device coords yet");
+    return;
+  }
+  let bearing = 0;
+  if (cameraEl) {
+    const rot = cameraEl.getAttribute("rotation");
+    if (rot && typeof rot.y === "number") bearing = rot.y;
+  }
+  const { dLat, dLon } = metersToLatLonOffset(2, bearing, lastDeviceCoords.latitude);
+  updateObjectCoords(lastDeviceCoords.latitude + dLat, lastDeviceCoords.longitude + dLon);
+}
+
+if (resetAheadBtn) {
+  resetAheadBtn.addEventListener("click", resetObjectAhead);
 }
 
 // =============================
