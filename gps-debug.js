@@ -5,6 +5,10 @@ const devLonEl = document.getElementById("dev-lon");
 const objLatEl = document.getElementById("obj-lat");
 const objLonEl = document.getElementById("obj-lon");
 const statusEl = document.getElementById("gps-status");
+const distanceEl = document.getElementById("obj-distance");
+const testLatInput = document.getElementById("test-lat");
+const testLonInput = document.getElementById("test-lon");
+const applyTestBtn = document.getElementById("apply-test-coords");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -22,10 +26,51 @@ function setStatus(text) {
   if (statusEl) statusEl.textContent = text;
 }
 
+function setDistance(text) {
+  if (distanceEl) distanceEl.textContent = text;
+}
+
+function toNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function parseGpsAttribute(gps) {
+  if (!gps) return null;
+  if (typeof gps === "string") {
+    const latMatch = gps.match(/latitude:\s*([-0-9.]+)/i);
+    const lonMatch = gps.match(/longitude:\s*([-0-9.]+)/i);
+    const lat = latMatch ? toNumber(latMatch[1]) : null;
+    const lon = lonMatch ? toNumber(lonMatch[1]) : null;
+    if (lat !== null && lon !== null) return { latitude: lat, longitude: lon };
+    return null;
+  }
+  const lat = toNumber(gps.latitude);
+  const lon = toNumber(gps.longitude);
+  if (lat !== null && lon !== null) return { latitude: lat, longitude: lon };
+  return null;
+}
+
+function haversineMeters(aLat, aLon, bLat, bLon) {
+  const R = 6371000;
+  const toRad = (v) => (v * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLon = toRad(bLon - aLon);
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const h =
+    sinDLat * sinDLat +
+    Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
 // =============================
 // DEVICE GEOLOCATION (BROWSER)
 // =============================
 let geoWatchId = null;
+let lastDeviceCoords = null;
 
 function startDeviceWatch() {
   if (!navigator.geolocation) {
@@ -44,6 +89,8 @@ function startDeviceWatch() {
 
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
+      lastDeviceCoords = { latitude, longitude };
+      updateObjectVisibility();
       setStatus("ok");
     },
     (err) => {
@@ -62,12 +109,47 @@ function startDeviceWatch() {
 // OBJECT COORDS (AR.js ENTITY)
 // =============================
 const worldObject = document.getElementById("world-object");
+let objectCoords = null;
 if (worldObject) {
-  const gps = worldObject.getAttribute("gps-entity-place");
+  const gps = parseGpsAttribute(worldObject.getAttribute("gps-entity-place"));
   if (gps) {
-    if (objLatEl) objLatEl.textContent = Number(gps.latitude).toFixed(6);
-    if (objLonEl) objLonEl.textContent = Number(gps.longitude).toFixed(6);
+    objectCoords = gps;
+    if (objLatEl) objLatEl.textContent = gps.latitude.toFixed(6);
+    if (objLonEl) objLonEl.textContent = gps.longitude.toFixed(6);
   }
+}
+
+function updateObjectCoords(lat, lon) {
+  if (!worldObject) return;
+  objectCoords = { latitude: lat, longitude: lon };
+  worldObject.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon};`);
+  if (objLatEl) objLatEl.textContent = lat.toFixed(6);
+  if (objLonEl) objLonEl.textContent = lon.toFixed(6);
+  updateObjectVisibility();
+}
+
+function updateObjectVisibility() {
+  if (!worldObject || !lastDeviceCoords || !objectCoords) return;
+  const dist = haversineMeters(
+    lastDeviceCoords.latitude,
+    lastDeviceCoords.longitude,
+    objectCoords.latitude,
+    objectCoords.longitude
+  );
+  setDistance(`Dist: ${dist.toFixed(1)} m`);
+  worldObject.setAttribute("visible", dist <= 10);
+}
+
+if (applyTestBtn && testLatInput && testLonInput) {
+  applyTestBtn.addEventListener("click", () => {
+    const lat = toNumber(testLatInput.value);
+    const lon = toNumber(testLonInput.value);
+    if (lat === null || lon === null) {
+      setStatus("invalid test coords");
+      return;
+    }
+    updateObjectCoords(lat, lon);
+  });
 }
 
 // =============================
