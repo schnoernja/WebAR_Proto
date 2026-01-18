@@ -1,62 +1,100 @@
-
 <!DOCTYPE html>
 <html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Location-Based WebAR</title>
 
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>Location-Based WebAR</title>
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 
-    <!-- A-Frame -->
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <!-- Look-At Component -->
+  <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
-    <!-- Look-At Component -->
-    <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+  <!-- AR.js -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
 
-    <!-- AR.js (Location-based) -->
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
 
-    <script src="gps-debug.js"></script>
+<body style="margin: 0; overflow: hidden;">
 
-    <link rel="stylesheet" href="styles.css" />
-  </head>
+<a-scene
+  embedded
+  vr-mode-ui="enabled: false"
+  arjs="sourceType: webcam; debugUIEnabled: false;"
+>
+  <a-box
+    id="world-object"
+    gps-entity-place="latitude: 50.989135; longitude: 11.022858;"
+    material="color: blue"
+    scale="2 2 2"
+    look-at="[gps-camera]"
+  ></a-box>
 
-  <body style="margin: 0; overflow: hidden;">
-  <a-scene
-    embedded
-    vr-mode-ui="enabled: false"
-    arjs="sourceType: webcam; debugUIEnabled: false;"
-  >
-    <a-box
-      id="world-object"
-      gps-entity-place="latitude: 50.989135; longitude: 11.022858;"
-      material="color: blue"
-      scale="5 5 5"
-      look-at="[gps-camera]"
-    ></a-box>
+  <a-camera gps-camera rotation-reader></a-camera>
+</a-scene>
 
-    <a-camera gps-camera rotation-reader></a-camera>
-  </a-scene>
-
-  <div id="gps-debug">
-    <div id="gps-header">
-      <span>GPS Debug</span>
-      <button id="gps-toggle">−</button>
-    </div>
-
-    <div id="gps-content">
-      <strong>Device</strong>
-      <div>Lat: <span id="dev-lat">–</span></div>
-      <div>Lon: <span id="dev-lon">–</span></div>
-
-      <hr />
-
-      <strong>Object</strong>
-      <div>Lat: <span id="obj-lat">–</span></div>
-      <div>Lon: <span id="obj-lon">–</span></div>
-    </div>
+<div id="gps-debug">
+  <div id="gps-header">
+    <span>GPS Debug</span>
+    <button id="gps-toggle">−</button>
   </div>
 
-</body>
+  <div id="gps-content">
+    <strong>Device</strong>
+    <div>Lat: <span id="dev-lat">–</span></div>
+    <div>Lon: <span id="dev-lon">–</span></div>
 
+    <hr />
+
+    <strong>Object</strong>
+    <div>Lat: <span id="obj-lat">50.989135</span></div>
+    <div>Lon: <span id="obj-lon">11.022858</span></div>
+  </div>
+</div>
+
+<!-- ===== INLINE GPS CODE (EXAKT AUS ALTEM PROJEKT) ===== -->
+<script>
+  console.log("GPS INLINE SCRIPT LOADED");
+
+  let geoWatchId = null;
+
+  function startDeviceWatch() {
+    if (!navigator.geolocation) {
+      console.error("Geolocation not supported");
+      return;
+    }
+
+    if (geoWatchId !== null) return;
+
+    geoWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        console.log(
+          "Geolocation update:",
+          pos.coords.latitude,
+          pos.coords.longitude
+        );
+
+        document.getElementById("dev-lat").textContent =
+          pos.coords.latitude.toFixed(6);
+        document.getElementById("dev-lon").textContent =
+          pos.coords.longitude.toFixed(6);
+      },
+      (err) => {
+        console.error("Geolocation error:", err.message);
+      },
+      {
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 8000
+      }
+    );
+  }
+
+  // IMPORTANT: iOS / Mobile requires user interaction
+  window.addEventListener("click", startDeviceWatch, { once: true });
+</script>
+
+</body>
 </html>

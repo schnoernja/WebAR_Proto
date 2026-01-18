@@ -1,3 +1,5 @@
+console.log("gps-debug.js LOADED");
+
 const devLatEl = document.getElementById("dev-lat");
 const devLonEl = document.getElementById("dev-lon");
 const objLatEl = document.getElementById("obj-lat");
