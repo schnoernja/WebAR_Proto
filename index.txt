@@ -1,4 +1,3 @@
-GPS Index;; draußen testen
 
 <!DOCTYPE html>
 <html lang="de">
@@ -61,3 +60,5 @@ GPS Index;; draußen testen
 </body>
 
 </html>
+
+<!-- geolocation klappt nicht so-->
