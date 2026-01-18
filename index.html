@@ -43,8 +43,9 @@
 
   <div id="gps-content">
     <strong>Device</strong>
-    <div>Lat: <span id="dev-lat">–</span></div>
-    <div>Lon: <span id="dev-lon">–</span></div>
+    <div>Lat: <span id="dev-lat">-</span></div>
+    <div>Lon: <span id="dev-lon">-</span></div>
+    <div id="gps-status">waiting for permission</div>
 
     <hr />
 
@@ -54,47 +55,7 @@
   </div>
 </div>
 
-<!-- ===== INLINE GPS CODE (EXAKT AUS ALTEM PROJEKT) ===== -->
-<script>
-  console.log("GPS INLINE SCRIPT LOADED");
-
-  let geoWatchId = null;
-
-  function startDeviceWatch() {
-    if (!navigator.geolocation) {
-      console.error("Geolocation not supported");
-      return;
-    }
-
-    if (geoWatchId !== null) return;
-
-    geoWatchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        console.log(
-          "Geolocation update:",
-          pos.coords.latitude,
-          pos.coords.longitude
-        );
-
-        document.getElementById("dev-lat").textContent =
-          pos.coords.latitude.toFixed(6);
-        document.getElementById("dev-lon").textContent =
-          pos.coords.longitude.toFixed(6);
-      },
-      (err) => {
-        console.error("Geolocation error:", err.message);
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 8000
-      }
-    );
-  }
-
-  // IMPORTANT: iOS / Mobile requires user interaction
-  window.addEventListener("click", startDeviceWatch, { once: true });
-</script>
+<script src="gps-debug.js"></script>
 
 </body>
 </html>
