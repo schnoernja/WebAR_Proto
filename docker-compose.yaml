@@ -3,4 +3,24 @@ services:
     build: .  # Bau das Docker-Image aus dem aktuellen Verzeichnis ./Dockerfile
     ports:
       - "8080:80" # 8080 ist der Port auf dem Host, 80 ist der Port im Container
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: webar
+      DB_USER: webar_user
+      DB_PASS: webar_pass
     restart: unless-stopped
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: webar
+      POSTGRES_USER: webar_user
+      POSTGRES_PASSWORD: webar_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:

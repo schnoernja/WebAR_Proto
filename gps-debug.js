@@ -14,6 +14,7 @@ const testHeightInput = document.getElementById("test-height");
 const applyHeightBtn = document.getElementById("apply-height");
 const resetAheadBtn = document.getElementById("reset-ahead");
 const lockGroundInput = document.getElementById("lock-ground");
+const toggleModelBtn = document.getElementById("toggle-model");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -144,6 +145,28 @@ function updateObjectCoords(lat, lon) {
   updateObjectVisibility();
 }
 
+function applyModelData(model) {
+  if (!model || !worldObject) return;
+  const lat = toNumber(model.lat);
+  const lon = toNumber(model.lon);
+  const height = toNumber(model.height_m);
+
+  if (typeof model.url === "string" && model.url.length > 0) {
+    worldObject.setAttribute("gltf-model", model.url);
+  }
+  if (lat !== null && lon !== null) {
+    updateObjectCoords(lat, lon);
+    if (testLatInput) testLatInput.value = lat;
+    if (testLonInput) testLonInput.value = lon;
+  }
+  if (lockGroundInput && lockGroundInput.checked) {
+    setObjectHeight(0);
+  } else if (height !== null) {
+    setObjectHeight(height);
+    if (testHeightInput) testHeightInput.value = height;
+  }
+}
+
 function updateObjectVisibility() {
   if (!worldObject || !lastDeviceCoords || !objectCoords) return;
   const dist = haversineMeters(
@@ -214,6 +237,48 @@ function resetObjectAhead() {
 if (resetAheadBtn) {
   resetAheadBtn.addEventListener("click", resetObjectAhead);
 }
+
+let loadedModels = [];
+let activeModelIndex = 0;
+
+function applyActiveModel() {
+  if (!loadedModels.length) return;
+  activeModelIndex = ((activeModelIndex % loadedModels.length) + loadedModels.length) % loadedModels.length;
+  applyModelData(loadedModels[activeModelIndex]);
+}
+
+if (toggleModelBtn) {
+  toggleModelBtn.addEventListener("click", () => {
+    if (!loadedModels.length) return;
+    activeModelIndex = (activeModelIndex + 1) % loadedModels.length;
+    applyActiveModel();
+  });
+}
+
+async function loadModels() {
+  try {
+    setStatus("loading models");
+    const res = await fetch("/api/models.php", { cache: "no-store" });
+    if (!res.ok) {
+      setStatus(`models error: ${res.status}`);
+      return;
+    }
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      setStatus("no models in db");
+      return;
+    }
+    loadedModels = data;
+    activeModelIndex = 0;
+    applyActiveModel();
+    setStatus("model loaded");
+  } catch (err) {
+    console.error("Model load error:", err);
+    setStatus("model load failed");
+  }
+}
+
+loadModels();
 
 // =============================
 // START AFTER USER GESTURE (iOS!)
