@@ -1,10 +1,10 @@
-# Nutze ein schlankes nginx Image
-FROM nginx:alpine
+# Nutze ein PHP-Apache Image fuer statische Dateien und API
+FROM php:8.2-apache
 
-# Kopiere alle Projektdateien ins nginx html Verzeichnis
-COPY . /usr/share/nginx/html
+# PostgreSQL PDO-Treiber installieren
+RUN docker-php-ext-install pdo pdo_pgsql
 
-# Exponiere Port 80
+# Projektdateien ins Webroot kopieren
+COPY . /var/www/html
+
 EXPOSE 80
-
-# Starte nginx (Standard im Image)
