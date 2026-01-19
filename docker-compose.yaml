@@ -1,14 +1,25 @@
 services:
   webar_proto:
-    build: .  # Bau das Docker-Image aus dem aktuellen Verzeichnis ./Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile.webar
     ports:
       - "8080:80" # 8080 ist der Port auf dem Host, 80 ist der Port im Container
+    restart: unless-stopped
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    ports:
+      - "8081:80"
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
       DB_NAME: webar
       DB_USER: webar_user
       DB_PASS: webar_pass
+    depends_on:
+      - postgres
     restart: unless-stopped
   postgres:
     image: postgres:16
@@ -21,6 +32,5 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
-
 volumes:
   pgdata:
