@@ -13,19 +13,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build new image
+      - name: Deploy via Compose
         run: |
-          docker build -t webar:latest -t webar:${{ github.sha }} .
-
-      - name: Stop old container if exists
-        run: |
-          docker rm -f webar || true
-
-      - name: Run new container
-        run: |
-          docker run -d --name webar -p 8080:80 webar:latest
-
-      - name: Remove previous image (if exists)
-        run: |
-          docker image rm webar:${{ github.sha }} || true
-          docker image rm webar:latest || true
+          docker compose up -d --build
