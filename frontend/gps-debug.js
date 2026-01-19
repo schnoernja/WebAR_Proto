@@ -171,6 +171,23 @@ const worldObject = document.getElementById("world-object");
 const modelEntity = document.getElementById("model-entity");
 const cameraEl = document.querySelector("[gps-camera]");
 let objectCoords = null;
+if (modelEntity) {
+  modelEntity.addEventListener("model-loaded", () => {
+    console.log("Model loaded:", modelEntity.getAttribute("gltf-model"));
+  });
+  modelEntity.addEventListener("model-error", (evt) => {
+    console.error("Model error:", evt);
+    setStatus("model load error");
+  });
+} else if (worldObject) {
+  worldObject.addEventListener("model-loaded", () => {
+    console.log("Model loaded:", worldObject.getAttribute("gltf-model"));
+  });
+  worldObject.addEventListener("model-error", (evt) => {
+    console.error("Model error:", evt);
+    setStatus("model load error");
+  });
+}
 if (worldObject) {
   const gps = parseGpsAttribute(worldObject.getAttribute("gps-entity-place"));
   if (gps) {
@@ -256,7 +273,7 @@ function updateObjectVisibility() {
     objectCoords.longitude
   );
   setDistance(`Dist: ${dist.toFixed(1)} m`);
-  worldObject.setAttribute("visible", dist <= 10);
+  worldObject.setAttribute("visible", dist <= 100);
 }
 
 async function fetchGroundHeight(lat, lon) {
