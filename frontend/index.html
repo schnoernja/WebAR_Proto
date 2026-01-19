@@ -28,8 +28,9 @@
   <a-entity
     id="world-object"
     gps-entity-place="latitude: 50.989135; longitude: 11.022858;"
-    look-at="[gps-camera]"
-  ></a-entity>
+  >
+    <a-entity id="model-entity"></a-entity>
+  </a-entity>
 
   <a-camera gps-camera rotation-reader></a-camera>
 </a-scene>
@@ -94,6 +95,36 @@
     <button id="reset-ahead">Reset 2m Ahead</button>
     <button id="toggle-model">Toggle Model</button>
     <button id="toggle-scale">Toggle Scale</button>
+
+    <hr />
+
+    <strong>Model Transform</strong>
+    <div>
+      <label for="rot-x">Rot X</label>
+      <input id="rot-x" type="number" step="1" placeholder="0" value="0" />
+    </div>
+    <div>
+      <label for="rot-y">Rot Y</label>
+      <input id="rot-y" type="number" step="1" placeholder="0" value="0" />
+    </div>
+    <div>
+      <label for="rot-z">Rot Z</label>
+      <input id="rot-z" type="number" step="1" placeholder="0" value="0" />
+    </div>
+    <div>
+      <label for="off-x">Offset X</label>
+      <input id="off-x" type="number" step="0.1" placeholder="0" value="0" />
+    </div>
+    <div>
+      <label for="off-y">Offset Y</label>
+      <input id="off-y" type="number" step="0.1" placeholder="0" value="0" />
+    </div>
+    <div>
+      <label for="off-z">Offset Z</label>
+      <input id="off-z" type="number" step="0.1" placeholder="0" value="0" />
+    </div>
+    <button id="apply-transform">Apply Transform</button>
+    <button id="reset-transform">Reset Transform</button>
   </div>
 </div>
 

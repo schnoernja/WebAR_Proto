@@ -22,6 +22,14 @@ const useDeviceAltInput = document.getElementById("use-device-alt");
 const altOffsetInput = document.getElementById("alt-offset");
 const toggleModelBtn = document.getElementById("toggle-model");
 const toggleScaleBtn = document.getElementById("toggle-scale");
+const rotXInput = document.getElementById("rot-x");
+const rotYInput = document.getElementById("rot-y");
+const rotZInput = document.getElementById("rot-z");
+const offXInput = document.getElementById("off-x");
+const offYInput = document.getElementById("off-y");
+const offZInput = document.getElementById("off-z");
+const applyTransformBtn = document.getElementById("apply-transform");
+const resetTransformBtn = document.getElementById("reset-transform");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -156,6 +164,7 @@ function startDeviceWatch() {
 // OBJECT COORDS (AR.js ENTITY)
 // =============================
 const worldObject = document.getElementById("world-object");
+const modelEntity = document.getElementById("model-entity");
 const cameraEl = document.querySelector("[gps-camera]");
 let objectCoords = null;
 if (worldObject) {
@@ -173,7 +182,11 @@ if (worldObject) {
 
 function setObjectHeight(heightMeters) {
   if (!worldObject) return;
+  const offset = getOffsetValues();
   worldObject.setAttribute("position", `0 ${heightMeters} 0`);
+  if (modelEntity) {
+    modelEntity.setAttribute("position", `${offset.x} ${offset.y} ${offset.z}`);
+  }
   if (heightEl) heightEl.textContent = heightMeters.toFixed(2);
 }
 
@@ -213,7 +226,11 @@ function applyModelData(model) {
   const height = toNumber(model.height_m);
 
   if (typeof model.url === "string" && model.url.length > 0) {
-    worldObject.setAttribute("gltf-model", model.url);
+    if (modelEntity) {
+      modelEntity.setAttribute("gltf-model", model.url);
+    } else {
+      worldObject.setAttribute("gltf-model", model.url);
+    }
   }
   if (lat !== null && lon !== null) {
     updateObjectCoords(lat, lon);
@@ -287,7 +304,11 @@ let scaleToggleState = false;
 function applyScale() {
   if (!worldObject) return;
   const scale = scaleToggleState ? 2 : 1;
-  worldObject.setAttribute("scale", `${scale} ${scale} ${scale}`);
+  if (modelEntity) {
+    modelEntity.setAttribute("scale", `${scale} ${scale} ${scale}`);
+  } else {
+    worldObject.setAttribute("scale", `${scale} ${scale} ${scale}`);
+  }
 }
 
 if (toggleScaleBtn) {
@@ -340,6 +361,56 @@ if (useDeviceAltInput) {
 if (altOffsetInput) {
   altOffsetInput.addEventListener("input", () => {
     applyGroundHeight();
+  });
+}
+
+function getOffsetValues() {
+  const x = offXInput ? (toNumber(offXInput.value) ?? 0) : 0;
+  const y = offYInput ? (toNumber(offYInput.value) ?? 0) : 0;
+  const z = offZInput ? (toNumber(offZInput.value) ?? 0) : 0;
+  return { x, y, z };
+}
+
+function getRotationValues() {
+  const x = rotXInput ? (toNumber(rotXInput.value) ?? 0) : 0;
+  const y = rotYInput ? (toNumber(rotYInput.value) ?? 0) : 0;
+  const z = rotZInput ? (toNumber(rotZInput.value) ?? 0) : 0;
+  return { x, y, z };
+}
+
+function applyModelTransform() {
+  if (!worldObject) return;
+  const rot = getRotationValues();
+  const offset = getOffsetValues();
+  const target = modelEntity || worldObject;
+  target.setAttribute("rotation", `${rot.x} ${rot.y} ${rot.z}`);
+  if (modelEntity) {
+    modelEntity.setAttribute("position", `${offset.x} ${offset.y} ${offset.z}`);
+  } else {
+    const current = worldObject.getAttribute("position") || { x: 0, y: 0, z: 0 };
+    worldObject.setAttribute("position", `${offset.x} ${current.y} ${offset.z}`);
+  }
+}
+
+function resetModelTransform() {
+  if (rotXInput) rotXInput.value = "0";
+  if (rotYInput) rotYInput.value = "0";
+  if (rotZInput) rotZInput.value = "0";
+  if (offXInput) offXInput.value = "0";
+  if (offYInput) offYInput.value = "0";
+  if (offZInput) offZInput.value = "0";
+  applyModelTransform();
+}
+
+if (applyTransformBtn) {
+  applyTransformBtn.addEventListener("click", () => {
+    applyModelTransform();
+  });
+}
+
+if (resetTransformBtn) {
+  resetTransformBtn.addEventListener("click", () => {
+    resetModelTransform();
   });
 }
 
