@@ -2,10 +2,14 @@ console.log("gps-debug.js LOADED");
 
 const devLatEl = document.getElementById("dev-lat");
 const devLonEl = document.getElementById("dev-lon");
+const devAltEl = document.getElementById("dev-alt");
+const devAltAccEl = document.getElementById("dev-alt-acc");
 const objLatEl = document.getElementById("obj-lat");
 const objLonEl = document.getElementById("obj-lon");
 const statusEl = document.getElementById("gps-status");
 const distanceEl = document.getElementById("obj-distance");
+const groundHeightEl = document.getElementById("ground-height");
+const groundTileEl = document.getElementById("ground-tile");
 const testLatInput = document.getElementById("test-lat");
 const testLonInput = document.getElementById("test-lon");
 const applyTestBtn = document.getElementById("apply-test-coords");
@@ -14,8 +18,22 @@ const testHeightInput = document.getElementById("test-height");
 const applyHeightBtn = document.getElementById("apply-height");
 const resetAheadBtn = document.getElementById("reset-ahead");
 const lockGroundInput = document.getElementById("lock-ground");
+const useDeviceAltInput = document.getElementById("use-device-alt");
+const altOffsetInput = document.getElementById("alt-offset");
 const toggleModelBtn = document.getElementById("toggle-model");
-const toggleScaleBtn = document.getElementById("toggle-scale");
+const scaleXInput = document.getElementById("scale-x");
+const scaleYInput = document.getElementById("scale-y");
+const scaleZInput = document.getElementById("scale-z");
+const applyScaleBtn = document.getElementById("apply-scale");
+const resetScaleBtn = document.getElementById("reset-scale");
+const rotXInput = document.getElementById("rot-x");
+const rotYInput = document.getElementById("rot-y");
+const rotZInput = document.getElementById("rot-z");
+const offXInput = document.getElementById("off-x");
+const offYInput = document.getElementById("off-y");
+const offZInput = document.getElementById("off-z");
+const applyTransformBtn = document.getElementById("apply-transform");
+const resetTransformBtn = document.getElementById("reset-transform");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -35,6 +53,18 @@ function setStatus(text) {
 
 function setDistance(text) {
   if (distanceEl) distanceEl.textContent = text;
+}
+
+function setGroundHeight(value) {
+  if (groundHeightEl) {
+    groundHeightEl.textContent = (value === null) ? "-" : value.toFixed(2);
+  }
+}
+
+function setGroundTile(value) {
+  if (groundTileEl) {
+    groundTileEl.textContent = value || "-";
+  }
 }
 
 function toNumber(value) {
@@ -78,6 +108,14 @@ function haversineMeters(aLat, aLon, bLat, bLon) {
 // =============================
 let geoWatchId = null;
 let lastDeviceCoords = null;
+let currentGroundHeightM = null;
+let currentGroundTileKey = null;
+let lastHeightFetchCoords = null;
+const heightCache = new Map();
+const HEIGHT_FETCH_DISTANCE_M = 5;
+let modelHeightM = 0;
+let loggedHeightPlacement = false;
+let deviceAltitudeM = null;
 
 function startDeviceWatch() {
   if (!navigator.geolocation) {
@@ -92,11 +130,25 @@ function startDeviceWatch() {
 
   geoWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const { latitude, longitude } = pos.coords;
+      const { latitude, longitude, altitude, altitudeAccuracy } = pos.coords;
 
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
+      if (Number.isFinite(altitude)) {
+        deviceAltitudeM = altitude;
+        if (devAltEl) devAltEl.textContent = altitude.toFixed(2);
+      } else {
+        deviceAltitudeM = null;
+        if (devAltEl) devAltEl.textContent = "-";
+      }
+      if (Number.isFinite(altitudeAccuracy)) {
+        if (devAltAccEl) devAltAccEl.textContent = altitudeAccuracy.toFixed(1);
+      } else if (devAltAccEl) {
+        devAltAccEl.textContent = "-";
+      }
       lastDeviceCoords = { latitude, longitude };
+      maybeUpdateGroundHeight(latitude, longitude);
+      applyGroundHeight();
       updateObjectVisibility();
       setStatus("ok");
     },
@@ -116,8 +168,26 @@ function startDeviceWatch() {
 // OBJECT COORDS (AR.js ENTITY)
 // =============================
 const worldObject = document.getElementById("world-object");
+const modelEntity = document.getElementById("model-entity");
 const cameraEl = document.querySelector("[gps-camera]");
 let objectCoords = null;
+if (modelEntity) {
+  modelEntity.addEventListener("model-loaded", () => {
+    console.log("Model loaded:", modelEntity.getAttribute("gltf-model"));
+  });
+  modelEntity.addEventListener("model-error", (evt) => {
+    console.error("Model error:", evt);
+    setStatus("model load error");
+  });
+} else if (worldObject) {
+  worldObject.addEventListener("model-loaded", () => {
+    console.log("Model loaded:", worldObject.getAttribute("gltf-model"));
+  });
+  worldObject.addEventListener("model-error", (evt) => {
+    console.error("Model error:", evt);
+    setStatus("model load error");
+  });
+}
 if (worldObject) {
   const gps = parseGpsAttribute(worldObject.getAttribute("gps-entity-place"));
   if (gps) {
@@ -133,8 +203,32 @@ if (worldObject) {
 
 function setObjectHeight(heightMeters) {
   if (!worldObject) return;
+  const offset = getOffsetValues();
   worldObject.setAttribute("position", `0 ${heightMeters} 0`);
+  if (modelEntity) {
+    modelEntity.setAttribute("position", `${offset.x} ${offset.y} ${offset.z}`);
+  }
   if (heightEl) heightEl.textContent = heightMeters.toFixed(2);
+}
+
+function applyGroundHeight() {
+  const ground = (currentGroundHeightM !== null) ? currentGroundHeightM : 0;
+  const base = (lockGroundInput && lockGroundInput.checked) ? 0 : modelHeightM;
+  const useDeviceAlt = useDeviceAltInput && useDeviceAltInput.checked && deviceAltitudeM !== null;
+  const offset = altOffsetInput ? (toNumber(altOffsetInput.value) ?? 0) : 0;
+  const device = useDeviceAlt ? deviceAltitudeM : 0;
+  const finalY = (ground - device) + base + offset;
+  setObjectHeight(finalY);
+  if (!loggedHeightPlacement) {
+    console.log("Height placement:", {
+      ground,
+      device,
+      offset,
+      modelHeightM: base,
+      finalY
+    });
+    loggedHeightPlacement = true;
+  }
 }
 
 function updateObjectCoords(lat, lon) {
@@ -153,19 +247,21 @@ function applyModelData(model) {
   const height = toNumber(model.height_m);
 
   if (typeof model.url === "string" && model.url.length > 0) {
-    worldObject.setAttribute("gltf-model", model.url);
+    if (modelEntity) {
+      modelEntity.setAttribute("gltf-model", model.url);
+    } else {
+      worldObject.setAttribute("gltf-model", model.url);
+    }
   }
   if (lat !== null && lon !== null) {
     updateObjectCoords(lat, lon);
     if (testLatInput) testLatInput.value = lat;
     if (testLonInput) testLonInput.value = lon;
   }
-  if (lockGroundInput && lockGroundInput.checked) {
-    setObjectHeight(0);
-  } else if (height !== null) {
-    setObjectHeight(height);
-    if (testHeightInput) testHeightInput.value = height;
-  }
+  modelHeightM = (height !== null) ? height : 0;
+  if (testHeightInput) testHeightInput.value = modelHeightM;
+  applyScaleForModel(model);
+  applyGroundHeight();
 }
 
 function updateObjectVisibility() {
@@ -177,20 +273,73 @@ function updateObjectVisibility() {
     objectCoords.longitude
   );
   setDistance(`Dist: ${dist.toFixed(1)} m`);
-  worldObject.setAttribute("visible", dist <= 10);
+  worldObject.setAttribute("visible", dist <= 100);
 }
 
-let scaleToggleState = false;
-function applyScale() {
-  if (!worldObject) return;
-  const scale = scaleToggleState ? 2 : 1;
-  worldObject.setAttribute("scale", `${scale} ${scale} ${scale}`);
+async function fetchGroundHeight(lat, lon) {
+  const res = await fetch(`/api/height.php?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, { cache: "no-store" });
+  if (!res.ok) {
+    return null;
+  }
+  const data = await res.json();
+  if (data && typeof data.height_m === "number" && data.tile_key) {
+    return data;
+  }
+  return null;
 }
 
-if (toggleScaleBtn) {
-  toggleScaleBtn.addEventListener("click", () => {
-    scaleToggleState = !scaleToggleState;
-    applyScale();
+async function maybeUpdateGroundHeight(lat, lon) {
+  if (lastHeightFetchCoords) {
+    const moved = haversineMeters(
+      lastHeightFetchCoords.latitude,
+      lastHeightFetchCoords.longitude,
+      lat,
+      lon
+    );
+    if (moved < HEIGHT_FETCH_DISTANCE_M && currentGroundTileKey) {
+      return;
+    }
+  }
+
+  const data = await fetchGroundHeight(lat, lon);
+  if (!data) {
+    setGroundHeight(null);
+    setGroundTile(null);
+    return;
+  }
+
+  const cached = heightCache.get(data.tile_key);
+  if (!cached) {
+    heightCache.set(data.tile_key, data.height_m);
+  }
+
+  currentGroundHeightM = data.height_m;
+  currentGroundTileKey = data.tile_key;
+  lastHeightFetchCoords = { latitude: lat, longitude: lon };
+
+  setGroundHeight(currentGroundHeightM);
+  setGroundTile(currentGroundTileKey);
+  applyGroundHeight();
+}
+
+if (applyScaleBtn) {
+  applyScaleBtn.addEventListener("click", () => {
+    const model = getActiveModel();
+    const key = getModelKey(model);
+    const scale = readScaleInputs();
+    scaleByModelKey.set(key, scale);
+    applyScaleValues(scale);
+  });
+}
+
+if (resetScaleBtn) {
+  resetScaleBtn.addEventListener("click", () => {
+    const model = getActiveModel();
+    const key = getModelKey(model);
+    const scale = { x: 1, y: 1, z: 1 };
+    scaleByModelKey.set(key, scale);
+    setScaleInputs(scale);
+    applyScaleValues(scale);
   });
 }
 
@@ -209,7 +358,7 @@ if (applyTestBtn && testLatInput && testLonInput) {
 if (applyHeightBtn && testHeightInput) {
   applyHeightBtn.addEventListener("click", () => {
     if (lockGroundInput && lockGroundInput.checked) {
-      setObjectHeight(0);
+      applyGroundHeight();
       return;
     }
     const h = toNumber(testHeightInput.value);
@@ -217,13 +366,76 @@ if (applyHeightBtn && testHeightInput) {
       setStatus("invalid height");
       return;
     }
-    setObjectHeight(h);
+    modelHeightM = h;
+    applyGroundHeight();
   });
 }
 
 if (lockGroundInput) {
   lockGroundInput.addEventListener("change", () => {
-    if (lockGroundInput.checked) setObjectHeight(0);
+    applyGroundHeight();
+  });
+}
+
+if (useDeviceAltInput) {
+  useDeviceAltInput.addEventListener("change", () => {
+    applyGroundHeight();
+  });
+}
+
+if (altOffsetInput) {
+  altOffsetInput.addEventListener("input", () => {
+    applyGroundHeight();
+  });
+}
+
+function getOffsetValues() {
+  const x = offXInput ? (toNumber(offXInput.value) ?? 0) : 0;
+  const y = offYInput ? (toNumber(offYInput.value) ?? 0) : 0;
+  const z = offZInput ? (toNumber(offZInput.value) ?? 0) : 0;
+  return { x, y, z };
+}
+
+function getRotationValues() {
+  const x = rotXInput ? (toNumber(rotXInput.value) ?? 0) : 0;
+  const y = rotYInput ? (toNumber(rotYInput.value) ?? 0) : 0;
+  const z = rotZInput ? (toNumber(rotZInput.value) ?? 0) : 0;
+  return { x, y, z };
+}
+
+function applyModelTransform() {
+  if (!worldObject) return;
+  const rot = getRotationValues();
+  const offset = getOffsetValues();
+  const target = modelEntity || worldObject;
+  target.setAttribute("rotation", `${rot.x} ${rot.y} ${rot.z}`);
+  if (modelEntity) {
+    modelEntity.setAttribute("position", `${offset.x} ${offset.y} ${offset.z}`);
+  } else {
+    const current = worldObject.getAttribute("position") || { x: 0, y: 0, z: 0 };
+    worldObject.setAttribute("position", `${offset.x} ${current.y} ${offset.z}`);
+  }
+}
+
+function resetModelTransform() {
+  if (rotXInput) rotXInput.value = "0";
+  if (rotYInput) rotYInput.value = "0";
+  if (rotZInput) rotZInput.value = "0";
+  if (offXInput) offXInput.value = "0";
+  if (offYInput) offYInput.value = "0";
+  if (offZInput) offZInput.value = "0";
+  applyModelTransform();
+}
+
+if (applyTransformBtn) {
+  applyTransformBtn.addEventListener("click", () => {
+    applyModelTransform();
+  });
+}
+
+if (resetTransformBtn) {
+  resetTransformBtn.addEventListener("click", () => {
+    resetModelTransform();
   });
 }
 
@@ -255,6 +467,45 @@ if (resetAheadBtn) {
 
 let loadedModels = [];
 let activeModelIndex = 0;
+const scaleByModelKey = new Map();
+
+function getModelKey(model) {
+  if (!model) return "default";
+  if (typeof model.url === "string" && model.url.length > 0) return model.url;
+  if (typeof model.name === "string" && model.name.length > 0) return model.name;
+  return "default";
+}
+
+function getActiveModel() {
+  if (!loadedModels.length) return null;
+  return loadedModels[activeModelIndex] || null;
+}
+
+function readScaleInputs() {
+  const x = scaleXInput ? (toNumber(scaleXInput.value) ?? 1) : 1;
+  const y = scaleYInput ? (toNumber(scaleYInput.value) ?? 1) : 1;
+  const z = scaleZInput ? (toNumber(scaleZInput.value) ?? 1) : 1;
+  return { x, y, z };
+}
+
+function setScaleInputs(scale) {
+  if (scaleXInput) scaleXInput.value = String(scale.x);
+  if (scaleYInput) scaleYInput.value = String(scale.y);
+  if (scaleZInput) scaleZInput.value = String(scale.z);
+}
+
+function applyScaleValues(scale) {
+  const target = modelEntity || worldObject;
+  if (!target) return;
+  target.setAttribute("scale", `${scale.x} ${scale.y} ${scale.z}`);
+}
+
+function applyScaleForModel(model) {
+  const key = getModelKey(model);
+  const scale = scaleByModelKey.get(key) || { x: 1, y: 1, z: 1 };
+  setScaleInputs(scale);
+  applyScaleValues(scale);
+}
 
 function applyActiveModel() {
   if (!loadedModels.length) return;
