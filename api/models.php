@@ -3,7 +3,7 @@ header("Content-Type: application/json; charset=utf-8");
 header("Access-Control-Allow-Origin: *");
 
 $dbHost = getenv("DB_HOST") ?: "postgres";
-$dbPort = getenv("DB_PORT") ?: "5432";
+$dbPort = getenv("DB_PORT") ?: "5444";
 $dbName = getenv("DB_NAME") ?: "webar";
 $dbUser = getenv("DB_USER") ?: "webar_user";
 $dbPass = getenv("DB_PASS") ?: "webar_pass";
