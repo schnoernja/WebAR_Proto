@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Location-Based WebAR</title>
+
+  <!-- A-Frame -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
+  <!-- Look-At Component -->
+  <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+
+  <!-- AR.js -->
+  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body style="margin: 0; overflow: hidden;">
+
+<a-scene
+  id="scene"
+  embedded
+  vr-mode-ui="enabled: false"
+  arjs="sourceType: webcam; debugUIEnabled: false;"
+>
+  <a-entity
+    id="world-object"
+    gps-entity-place="latitude: 50.989135; longitude: 11.022858;"
+    look-at="[gps-camera]"
+  ></a-entity>
+
+  <a-camera gps-camera rotation-reader></a-camera>
+</a-scene>
+
+<div id="gps-debug">
+  <div id="gps-header">
+    <span>GPS Debug</span>
+    <button id="gps-toggle">−</button>
+  </div>
+
+  <div id="gps-content">
+    <strong>Device</strong>
+    <div>Lat: <span id="dev-lat">-</span></div>
+    <div>Lon: <span id="dev-lon">-</span></div>
+    <div id="gps-status">waiting for permission</div>
+
+    <hr />
+
+    <strong>Object</strong>
+    <div>Lat: <span id="obj-lat">50.989135</span></div>
+    <div>Lon: <span id="obj-lon">11.022858</span></div>
+    <div id="obj-distance">Dist: -</div>
+
+    <hr />
+
+    <strong>Test Coordinates</strong>
+    <div>
+      <label for="test-lat">Lat</label>
+      <input id="test-lat" type="number" step="0.000001" placeholder="50.989135" />
+    </div>
+    <div>
+      <label for="test-lon">Lon</label>
+      <input id="test-lon" type="number" step="0.000001" placeholder="11.022858" />
+    </div>
+    <button id="apply-test-coords">Apply</button>
+
+    <hr />
+
+    <strong>Height</strong>
+    <div>Y: <span id="obj-height">0.00</span> m</div>
+    <div>
+      <label for="test-height">Height (m)</label>
+      <input id="test-height" type="number" step="0.1" placeholder="0" />
+    </div>
+    <div>
+      <label for="lock-ground">Lock to ground</label>
+      <input id="lock-ground" type="checkbox" checked />
+    </div>
+    <button id="apply-height">Apply Height</button>
+    <button id="reset-ahead">Reset 2m Ahead</button>
+    <button id="toggle-model">Toggle Model</button>
+    <button id="toggle-scale">Toggle Scale</button>
+  </div>
+</div>
+
+<script src="gps-debug.js"></script>
+
+</body>
+</html>
