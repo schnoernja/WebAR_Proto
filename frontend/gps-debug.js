@@ -21,7 +21,11 @@ const lockGroundInput = document.getElementById("lock-ground");
 const useDeviceAltInput = document.getElementById("use-device-alt");
 const altOffsetInput = document.getElementById("alt-offset");
 const toggleModelBtn = document.getElementById("toggle-model");
-const toggleScaleBtn = document.getElementById("toggle-scale");
+const scaleXInput = document.getElementById("scale-x");
+const scaleYInput = document.getElementById("scale-y");
+const scaleZInput = document.getElementById("scale-z");
+const applyScaleBtn = document.getElementById("apply-scale");
+const resetScaleBtn = document.getElementById("reset-scale");
 const rotXInput = document.getElementById("rot-x");
 const rotYInput = document.getElementById("rot-y");
 const rotZInput = document.getElementById("rot-z");
@@ -239,6 +243,7 @@ function applyModelData(model) {
   }
   modelHeightM = (height !== null) ? height : 0;
   if (testHeightInput) testHeightInput.value = modelHeightM;
+  applyScaleForModel(model);
   applyGroundHeight();
 }
 
@@ -300,21 +305,24 @@ async function maybeUpdateGroundHeight(lat, lon) {
   applyGroundHeight();
 }
 
-let scaleToggleState = false;
-function applyScale() {
-  if (!worldObject) return;
-  const scale = scaleToggleState ? 2 : 1;
-  if (modelEntity) {
-    modelEntity.setAttribute("scale", `${scale} ${scale} ${scale}`);
-  } else {
-    worldObject.setAttribute("scale", `${scale} ${scale} ${scale}`);
-  }
+if (applyScaleBtn) {
+  applyScaleBtn.addEventListener("click", () => {
+    const model = getActiveModel();
+    const key = getModelKey(model);
+    const scale = readScaleInputs();
+    scaleByModelKey.set(key, scale);
+    applyScaleValues(scale);
+  });
 }
 
-if (toggleScaleBtn) {
-  toggleScaleBtn.addEventListener("click", () => {
-    scaleToggleState = !scaleToggleState;
-    applyScale();
+if (resetScaleBtn) {
+  resetScaleBtn.addEventListener("click", () => {
+    const model = getActiveModel();
+    const key = getModelKey(model);
+    const scale = { x: 1, y: 1, z: 1 };
+    scaleByModelKey.set(key, scale);
+    setScaleInputs(scale);
+    applyScaleValues(scale);
   });
 }
 
@@ -442,6 +450,45 @@ if (resetAheadBtn) {
 
 let loadedModels = [];
 let activeModelIndex = 0;
+const scaleByModelKey = new Map();
+
+function getModelKey(model) {
+  if (!model) return "default";
+  if (typeof model.url === "string" && model.url.length > 0) return model.url;
+  if (typeof model.name === "string" && model.name.length > 0) return model.name;
+  return "default";
+}
+
+function getActiveModel() {
+  if (!loadedModels.length) return null;
+  return loadedModels[activeModelIndex] || null;
+}
+
+function readScaleInputs() {
+  const x = scaleXInput ? (toNumber(scaleXInput.value) ?? 1) : 1;
+  const y = scaleYInput ? (toNumber(scaleYInput.value) ?? 1) : 1;
+  const z = scaleZInput ? (toNumber(scaleZInput.value) ?? 1) : 1;
+  return { x, y, z };
+}
+
+function setScaleInputs(scale) {
+  if (scaleXInput) scaleXInput.value = String(scale.x);
+  if (scaleYInput) scaleYInput.value = String(scale.y);
+  if (scaleZInput) scaleZInput.value = String(scale.z);
+}
+
+function applyScaleValues(scale) {
+  const target = modelEntity || worldObject;
+  if (!target) return;
+  target.setAttribute("scale", `${scale.x} ${scale.y} ${scale.z}`);
+}
+
+function applyScaleForModel(model) {
+  const key = getModelKey(model);
+  const scale = scaleByModelKey.get(key) || { x: 1, y: 1, z: 1 };
+  setScaleInputs(scale);
+  applyScaleValues(scale);
+}
 
 function applyActiveModel() {
   if (!loadedModels.length) return;
