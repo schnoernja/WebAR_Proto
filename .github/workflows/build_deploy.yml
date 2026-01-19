@@ -15,4 +15,12 @@ jobs:
 
       - name: Deploy via Compose
         run: |
+          set -e
           docker compose up -d --build
+          running=$(docker compose ps --services --filter "status=running" | wc -l)
+          total=$(docker compose ps --services | wc -l)
+          if [ "$running" -ne "$total" ]; then
+            echo "One or more services are not running:"
+            docker compose ps
+            exit 1
+          fi
