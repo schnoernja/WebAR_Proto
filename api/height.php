@@ -56,6 +56,9 @@ try {
     $maxLon = (float)$row["max_lon"];
 
     $compressed = $row["heights"];
+    if (is_resource($compressed)) {
+        $compressed = stream_get_contents($compressed);
+    }
     $decompressed = @gzuncompress($compressed);
     if ($decompressed === false) {
         respond(["error" => "height_decode_failed"], 500);

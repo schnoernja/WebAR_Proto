@@ -229,6 +229,9 @@ def parse_epsg(srs_name):
     if not srs_name:
         return None
     s = srs_name.upper()
+    if "ETRS89_UTM32" in s:
+        # Common CityGML CRS tag without explicit EPSG; treat as ETRS89 / UTM zone 32N.
+        return "EPSG:25832"
     if "EPSG" in s:
         for token in s.replace("/", ":").split(":"):
             if token.isdigit() and 4 <= len(token) <= 6:
