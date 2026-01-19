@@ -44,6 +44,8 @@
     <strong>Device</strong>
     <div>Lat: <span id="dev-lat">-</span></div>
     <div>Lon: <span id="dev-lon">-</span></div>
+    <div>Device altitude (m): <span id="dev-alt">-</span></div>
+    <div>Altitude accuracy (m): <span id="dev-alt-acc">-</span></div>
     <div>Ground height (m): <span id="ground-height">-</span></div>
     <div>Height tile: <span id="ground-tile">-</span></div>
     <div id="gps-status">waiting for permission</div>
@@ -79,6 +81,14 @@
     <div>
       <label for="lock-ground">Lock to ground</label>
       <input id="lock-ground" type="checkbox" checked />
+    </div>
+    <div>
+      <label for="use-device-alt">Use device altitude</label>
+      <input id="use-device-alt" type="checkbox" checked />
+    </div>
+    <div>
+      <label for="alt-offset">Altitude offset (m)</label>
+      <input id="alt-offset" type="number" step="0.1" placeholder="0" value="0" />
     </div>
     <button id="apply-height">Apply Height</button>
     <button id="reset-ahead">Reset 2m Ahead</button>

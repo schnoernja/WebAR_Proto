@@ -2,6 +2,8 @@ console.log("gps-debug.js LOADED");
 
 const devLatEl = document.getElementById("dev-lat");
 const devLonEl = document.getElementById("dev-lon");
+const devAltEl = document.getElementById("dev-alt");
+const devAltAccEl = document.getElementById("dev-alt-acc");
 const objLatEl = document.getElementById("obj-lat");
 const objLonEl = document.getElementById("obj-lon");
 const statusEl = document.getElementById("gps-status");
@@ -16,6 +18,8 @@ const testHeightInput = document.getElementById("test-height");
 const applyHeightBtn = document.getElementById("apply-height");
 const resetAheadBtn = document.getElementById("reset-ahead");
 const lockGroundInput = document.getElementById("lock-ground");
+const useDeviceAltInput = document.getElementById("use-device-alt");
+const altOffsetInput = document.getElementById("alt-offset");
 const toggleModelBtn = document.getElementById("toggle-model");
 const toggleScaleBtn = document.getElementById("toggle-scale");
 
@@ -99,6 +103,7 @@ const heightCache = new Map();
 const HEIGHT_FETCH_DISTANCE_M = 30;
 let modelHeightM = 0;
 let loggedHeightPlacement = false;
+let deviceAltitudeM = null;
 
 function startDeviceWatch() {
   if (!navigator.geolocation) {
@@ -113,12 +118,25 @@ function startDeviceWatch() {
 
   geoWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const { latitude, longitude } = pos.coords;
+      const { latitude, longitude, altitude, altitudeAccuracy } = pos.coords;
 
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
+      if (Number.isFinite(altitude)) {
+        deviceAltitudeM = altitude;
+        if (devAltEl) devAltEl.textContent = altitude.toFixed(2);
+      } else {
+        deviceAltitudeM = null;
+        if (devAltEl) devAltEl.textContent = "-";
+      }
+      if (Number.isFinite(altitudeAccuracy)) {
+        if (devAltAccEl) devAltAccEl.textContent = altitudeAccuracy.toFixed(1);
+      } else if (devAltAccEl) {
+        devAltAccEl.textContent = "-";
+      }
       lastDeviceCoords = { latitude, longitude };
       maybeUpdateGroundHeight(latitude, longitude);
+      applyGroundHeight();
       updateObjectVisibility();
       setStatus("ok");
     },
@@ -162,11 +180,16 @@ function setObjectHeight(heightMeters) {
 function applyGroundHeight() {
   const ground = (currentGroundHeightM !== null) ? currentGroundHeightM : 0;
   const base = (lockGroundInput && lockGroundInput.checked) ? 0 : modelHeightM;
-  const finalY = ground + base;
+  const useDeviceAlt = useDeviceAltInput && useDeviceAltInput.checked && deviceAltitudeM !== null;
+  const offset = altOffsetInput ? (toNumber(altOffsetInput.value) ?? 0) : 0;
+  const device = useDeviceAlt ? deviceAltitudeM : 0;
+  const finalY = (ground - device) + base + offset;
   setObjectHeight(finalY);
   if (!loggedHeightPlacement) {
     console.log("Height placement:", {
       ground,
+      device,
+      offset,
       modelHeightM: base,
       finalY
     });
@@ -304,6 +327,18 @@ if (applyHeightBtn && testHeightInput) {
 
 if (lockGroundInput) {
   lockGroundInput.addEventListener("change", () => {
+    applyGroundHeight();
+  });
+}
+
+if (useDeviceAltInput) {
+  useDeviceAltInput.addEventListener("change", () => {
+    applyGroundHeight();
+  });
+}
+
+if (altOffsetInput) {
+  altOffsetInput.addEventListener("input", () => {
     applyGroundHeight();
   });
 }
