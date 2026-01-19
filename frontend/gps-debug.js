@@ -4,10 +4,13 @@ const devLatEl = document.getElementById("dev-lat");
 const devLonEl = document.getElementById("dev-lon");
 const devAltEl = document.getElementById("dev-alt");
 const devAltAccEl = document.getElementById("dev-alt-acc");
+const deviceHeadingEl = document.getElementById("device-heading");
 const objLatEl = document.getElementById("obj-lat");
 const objLonEl = document.getElementById("obj-lon");
 const statusEl = document.getElementById("gps-status");
 const distanceEl = document.getElementById("obj-distance");
+const webxrDistanceEl = document.getElementById("webxr-distance");
+const webxrBearingEl = document.getElementById("webxr-bearing");
 const groundHeightEl = document.getElementById("ground-height");
 const groundTileEl = document.getElementById("ground-tile");
 const testLatInput = document.getElementById("test-lat");
@@ -163,6 +166,9 @@ function handleDeviceOrientation(evt) {
   // Convert alpha (clockwise from north) to compass heading.
   const heading = (360 - evt.alpha) % 360;
   smoothedHeadingDeg = smoothAngleDeg(smoothedHeadingDeg, heading, HEADING_SMOOTHING_ALPHA);
+  if (deviceHeadingEl) {
+    deviceHeadingEl.textContent = smoothedHeadingDeg.toFixed(1);
+  }
   updateWebXRPlacement();
 }
 
@@ -215,6 +221,9 @@ function startDeviceWatch() {
       smoothedDeviceCoords = smoothCoord(smoothedDeviceCoords, lastDeviceCoords, COORD_SMOOTHING_ALPHA);
       if (Number.isFinite(heading)) {
         smoothedHeadingDeg = smoothAngleDeg(smoothedHeadingDeg, heading, HEADING_SMOOTHING_ALPHA);
+      }
+      if (deviceHeadingEl && Number.isFinite(smoothedHeadingDeg)) {
+        deviceHeadingEl.textContent = smoothedHeadingDeg.toFixed(1);
       }
       maybeUpdateGroundHeight(latitude, longitude);
       applyGroundHeight();
@@ -317,6 +326,8 @@ function updateWebXRPlacement() {
     objectCoords.latitude,
     objectCoords.longitude
   );
+  if (webxrDistanceEl) webxrDistanceEl.textContent = dist.toFixed(1);
+  if (webxrBearingEl) webxrBearingEl.textContent = bearing.toFixed(1);
   const heading = Number.isFinite(smoothedHeadingDeg) ? smoothedHeadingDeg : 0;
   const relativeBearing = (bearing - heading + 360) % 360;
   const rad = (relativeBearing * Math.PI) / 180;
