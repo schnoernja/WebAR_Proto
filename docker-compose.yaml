@@ -14,7 +14,7 @@ services:
       - "8081:80"
     environment:
       DB_HOST: postgres
-      DB_PORT: 5432
+      DB_PORT: 5444
       DB_NAME: webar
       DB_USER: webar_user
       DB_PASS: webar_pass
@@ -28,7 +28,7 @@ services:
       POSTGRES_USER: webar_user
       POSTGRES_PASSWORD: webar_pass
     ports:
-      - "5432:5432"
+      - "5444:5444"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
