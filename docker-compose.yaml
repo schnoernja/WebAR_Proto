@@ -28,7 +28,7 @@ services:
       POSTGRES_USER: webar_user
       POSTGRES_PASSWORD: webar_pass
     ports:
-      - "5444:5444"
+      - "5444:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
