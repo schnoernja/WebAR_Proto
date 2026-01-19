@@ -72,6 +72,10 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
+function hasGpsComponent() {
+  return window.AFRAME && window.AFRAME.components && window.AFRAME.components["gps-entity-place"];
+}
+
 function parseGpsAttribute(gps) {
   if (!gps) return null;
   if (typeof gps === "string") {
@@ -103,6 +107,19 @@ function haversineMeters(aLat, aLon, bLat, bLon) {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+function bearingDeg(aLat, aLon, bLat, bLon) {
+  const toRad = (v) => (v * Math.PI) / 180;
+  const toDeg = (v) => (v * 180) / Math.PI;
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+  const dLon = toRad(bLon - aLon);
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x =
+    Math.cos(lat1) * Math.sin(lat2) -
+    Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return (toDeg(Math.atan2(y, x)) + 360) % 360;
+}
+
 // =============================
 // DEVICE GEOLOCATION (BROWSER)
 // =============================
@@ -116,6 +133,54 @@ const HEIGHT_FETCH_DISTANCE_M = 5;
 let modelHeightM = 0;
 let loggedHeightPlacement = false;
 let deviceAltitudeM = null;
+let smoothedDeviceCoords = null;
+let smoothedHeadingDeg = null;
+let modelGroundHeightM = null;
+const modelGroundCache = new Map();
+const COORD_SMOOTHING_ALPHA = 0.2;
+const HEADING_SMOOTHING_ALPHA = 0.2;
+
+function isWebXRActive() {
+  return sceneEl && sceneEl.is && sceneEl.is("vr-mode");
+}
+
+function smoothCoord(prev, next, alpha) {
+  if (!prev) return { ...next };
+  return {
+    latitude: prev.latitude + (next.latitude - prev.latitude) * alpha,
+    longitude: prev.longitude + (next.longitude - prev.longitude) * alpha
+  };
+}
+
+function smoothAngleDeg(prev, next, alpha) {
+  if (prev === null || prev === undefined) return next;
+  const delta = ((next - prev + 540) % 360) - 180;
+  return (prev + delta * alpha + 360) % 360;
+}
+
+function handleDeviceOrientation(evt) {
+  if (!evt || typeof evt.alpha !== "number") return;
+  // Convert alpha (clockwise from north) to compass heading.
+  const heading = (360 - evt.alpha) % 360;
+  smoothedHeadingDeg = smoothAngleDeg(smoothedHeadingDeg, heading, HEADING_SMOOTHING_ALPHA);
+  updateWebXRPlacement();
+}
+
+function startHeadingWatch() {
+  if (typeof window === "undefined" || typeof DeviceOrientationEvent === "undefined") return;
+  if (typeof DeviceOrientationEvent.requestPermission === "function") {
+    DeviceOrientationEvent.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+      }
+    }).catch(() => {
+      // Ignore permission errors; heading will rely on geolocation if available.
+    });
+    return;
+  }
+  window.addEventListener("deviceorientationabsolute", handleDeviceOrientation, true);
+  window.addEventListener("deviceorientation", handleDeviceOrientation, true);
+}
 
 function startDeviceWatch() {
   if (!navigator.geolocation) {
@@ -130,7 +195,7 @@ function startDeviceWatch() {
 
   geoWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const { latitude, longitude, altitude, altitudeAccuracy } = pos.coords;
+      const { latitude, longitude, altitude, altitudeAccuracy, heading } = pos.coords;
 
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
@@ -147,6 +212,10 @@ function startDeviceWatch() {
         devAltAccEl.textContent = "-";
       }
       lastDeviceCoords = { latitude, longitude };
+      smoothedDeviceCoords = smoothCoord(smoothedDeviceCoords, lastDeviceCoords, COORD_SMOOTHING_ALPHA);
+      if (Number.isFinite(heading)) {
+        smoothedHeadingDeg = smoothAngleDeg(smoothedHeadingDeg, heading, HEADING_SMOOTHING_ALPHA);
+      }
       maybeUpdateGroundHeight(latitude, longitude);
       applyGroundHeight();
       updateObjectVisibility();
@@ -170,6 +239,8 @@ function startDeviceWatch() {
 const worldObject = document.getElementById("world-object");
 const modelEntity = document.getElementById("model-entity");
 const cameraEl = document.querySelector("[gps-camera]");
+const xrCameraEl = document.getElementById("camera") || document.querySelector("[camera]");
+const sceneEl = document.querySelector("a-scene");
 let objectCoords = null;
 if (modelEntity) {
   modelEntity.addEventListener("model-loaded", () => {
@@ -186,6 +257,11 @@ if (modelEntity) {
   worldObject.addEventListener("model-error", (evt) => {
     console.error("Model error:", evt);
     setStatus("model load error");
+  });
+}
+if (sceneEl) {
+  sceneEl.addEventListener("enter-vr", () => {
+    updateWebXRPlacement();
   });
 }
 if (worldObject) {
@@ -211,7 +287,60 @@ function setObjectHeight(heightMeters) {
   if (heightEl) heightEl.textContent = heightMeters.toFixed(2);
 }
 
+function getDeviceCoordsForPlacement() {
+  return smoothedDeviceCoords || lastDeviceCoords;
+}
+
+function computeWebXRHeight() {
+  const base = (lockGroundInput && lockGroundInput.checked) ? 0 : modelHeightM;
+  const offset = altOffsetInput ? (toNumber(altOffsetInput.value) ?? 0) : 0;
+  if (currentGroundHeightM !== null && modelGroundHeightM !== null) {
+    return (modelGroundHeightM - currentGroundHeightM) + base + offset;
+  }
+  return base + offset;
+}
+
+function updateWebXRPlacement() {
+  if (!isWebXRActive() || !xrCameraEl || !worldObject || !objectCoords || !window.THREE) return;
+  const deviceCoords = getDeviceCoordsForPlacement();
+  if (!deviceCoords) return;
+
+  const dist = haversineMeters(
+    deviceCoords.latitude,
+    deviceCoords.longitude,
+    objectCoords.latitude,
+    objectCoords.longitude
+  );
+  const bearing = bearingDeg(
+    deviceCoords.latitude,
+    deviceCoords.longitude,
+    objectCoords.latitude,
+    objectCoords.longitude
+  );
+  const heading = Number.isFinite(smoothedHeadingDeg) ? smoothedHeadingDeg : 0;
+  const relativeBearing = (bearing - heading + 360) % 360;
+  const rad = (relativeBearing * Math.PI) / 180;
+  const x = Math.sin(rad) * dist;
+  const z = -Math.cos(rad) * dist;
+  const y = computeWebXRHeight();
+
+  const camObj = xrCameraEl.object3D;
+  if (!camObj) return;
+  const worldPos = new THREE.Vector3();
+  const offset = new THREE.Vector3(x, y, z);
+  camObj.getWorldPosition(worldPos);
+  offset.applyQuaternion(camObj.quaternion);
+  worldObject.object3D.position.copy(worldPos.add(offset));
+}
+
 function applyGroundHeight() {
+  if (isWebXRActive()) {
+    const finalY = computeWebXRHeight();
+    if (heightEl) heightEl.textContent = finalY.toFixed(2);
+    updateWebXRPlacement();
+    return;
+  }
+
   const ground = (currentGroundHeightM !== null) ? currentGroundHeightM : 0;
   const base = (lockGroundInput && lockGroundInput.checked) ? 0 : modelHeightM;
   const useDeviceAlt = useDeviceAltInput && useDeviceAltInput.checked && deviceAltitudeM !== null;
@@ -234,10 +363,13 @@ function applyGroundHeight() {
 function updateObjectCoords(lat, lon) {
   if (!worldObject) return;
   objectCoords = { latitude: lat, longitude: lon };
-  worldObject.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon};`);
+  if (hasGpsComponent()) {
+    worldObject.setAttribute("gps-entity-place", `latitude: ${lat}; longitude: ${lon};`);
+  }
   if (objLatEl) objLatEl.textContent = lat.toFixed(6);
   if (objLonEl) objLonEl.textContent = lon.toFixed(6);
   updateObjectVisibility();
+  updateWebXRPlacement();
 }
 
 function applyModelData(model) {
@@ -262,13 +394,18 @@ function applyModelData(model) {
   if (testHeightInput) testHeightInput.value = modelHeightM;
   applyScaleForModel(model);
   applyGroundHeight();
+  updateModelGroundHeight(model).then(() => {
+    applyGroundHeight();
+    updateWebXRPlacement();
+  });
 }
 
 function updateObjectVisibility() {
-  if (!worldObject || !lastDeviceCoords || !objectCoords) return;
+  const deviceCoords = getDeviceCoordsForPlacement();
+  if (!worldObject || !deviceCoords || !objectCoords) return;
   const dist = haversineMeters(
-    lastDeviceCoords.latitude,
-    lastDeviceCoords.longitude,
+    deviceCoords.latitude,
+    deviceCoords.longitude,
     objectCoords.latitude,
     objectCoords.longitude
   );
@@ -286,6 +423,28 @@ async function fetchGroundHeight(lat, lon) {
     return data;
   }
   return null;
+}
+
+async function updateModelGroundHeight(model) {
+  const lat = toNumber(model.lat);
+  const lon = toNumber(model.lon);
+  if (lat === null || lon === null) {
+    modelGroundHeightM = null;
+    return;
+  }
+  const key = getModelKey(model);
+  const cached = modelGroundCache.get(key);
+  if (cached && cached.lat === lat && cached.lon === lon) {
+    modelGroundHeightM = cached.height;
+    return;
+  }
+  const data = await fetchGroundHeight(lat, lon);
+  if (!data) {
+    modelGroundHeightM = null;
+    return;
+  }
+  modelGroundHeightM = data.height_m;
+  modelGroundCache.set(key, { lat, lon, height: data.height_m, tile_key: data.tile_key });
 }
 
 async function maybeUpdateGroundHeight(lat, lon) {
@@ -549,7 +708,11 @@ loadModels();
 // =============================
 // START AFTER USER GESTURE (iOS!)
 // =============================
-const startOnGesture = () => startDeviceWatch();
+// GPS watch is used for both AR.js and WebXR placement.
+const startOnGesture = () => {
+  startDeviceWatch();
+  startHeadingWatch();
+};
 document.addEventListener("pointerdown", startOnGesture, { once: true, passive: true });
 document.addEventListener("touchstart", startOnGesture, { once: true, passive: true });
 document.addEventListener("click", startOnGesture, { once: true });

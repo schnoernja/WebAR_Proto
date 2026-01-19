@@ -11,28 +11,32 @@
   <!-- Look-At Component -->
   <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
-  <!-- AR.js -->
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+  <!-- AR.js (GPS) - commented out for WebXR testing -->
+  <!-- <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script> -->
 
   <link rel="stylesheet" href="styles.css" />
 </head>
 
 <body style="margin: 0; overflow: hidden;">
 
+<!-- arjs="sourceType: webcam; debugUIEnabled: false;" -->
 <a-scene
   id="scene"
   embedded
   vr-mode-ui="enabled: false"
-  arjs="sourceType: webcam; debugUIEnabled: false;"
+  xr-mode-ui="enabled: true"
+  webxr="optionalFeatures: local-floor"
 >
   <a-entity
     id="world-object"
-    gps-entity-place="latitude: 50.989135; longitude: 11.022858;"
+    position="0 0 -2"
   >
     <a-entity id="model-entity"></a-entity>
   </a-entity>
 
-  <a-camera gps-camera rotation-reader></a-camera>
+  <!-- gps-entity-place="latitude: 50.989135; longitude: 11.022858;" -->
+  <!-- <a-camera gps-camera rotation-reader></a-camera> -->
+  <a-camera id="camera"></a-camera>
 </a-scene>
 
 <div id="gps-debug">
@@ -143,6 +147,7 @@
 </div>
 
 <script src="gps-debug.js"></script>
+<script src="webxr.js"></script>
 
 </body>
 </html>
