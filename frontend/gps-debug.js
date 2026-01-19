@@ -6,6 +6,8 @@ const objLatEl = document.getElementById("obj-lat");
 const objLonEl = document.getElementById("obj-lon");
 const statusEl = document.getElementById("gps-status");
 const distanceEl = document.getElementById("obj-distance");
+const groundHeightEl = document.getElementById("ground-height");
+const groundTileEl = document.getElementById("ground-tile");
 const testLatInput = document.getElementById("test-lat");
 const testLonInput = document.getElementById("test-lon");
 const applyTestBtn = document.getElementById("apply-test-coords");
@@ -35,6 +37,18 @@ function setStatus(text) {
 
 function setDistance(text) {
   if (distanceEl) distanceEl.textContent = text;
+}
+
+function setGroundHeight(value) {
+  if (groundHeightEl) {
+    groundHeightEl.textContent = (value === null) ? "-" : value.toFixed(2);
+  }
+}
+
+function setGroundTile(value) {
+  if (groundTileEl) {
+    groundTileEl.textContent = value || "-";
+  }
 }
 
 function toNumber(value) {
@@ -78,6 +92,13 @@ function haversineMeters(aLat, aLon, bLat, bLon) {
 // =============================
 let geoWatchId = null;
 let lastDeviceCoords = null;
+let currentGroundHeightM = null;
+let currentGroundTileKey = null;
+let lastHeightFetchCoords = null;
+const heightCache = new Map();
+const HEIGHT_FETCH_DISTANCE_M = 30;
+let modelHeightM = 0;
+let loggedHeightPlacement = false;
 
 function startDeviceWatch() {
   if (!navigator.geolocation) {
@@ -97,6 +118,7 @@ function startDeviceWatch() {
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
       lastDeviceCoords = { latitude, longitude };
+      maybeUpdateGroundHeight(latitude, longitude);
       updateObjectVisibility();
       setStatus("ok");
     },
@@ -137,6 +159,21 @@ function setObjectHeight(heightMeters) {
   if (heightEl) heightEl.textContent = heightMeters.toFixed(2);
 }
 
+function applyGroundHeight() {
+  const ground = (currentGroundHeightM !== null) ? currentGroundHeightM : 0;
+  const base = (lockGroundInput && lockGroundInput.checked) ? 0 : modelHeightM;
+  const finalY = ground + base;
+  setObjectHeight(finalY);
+  if (!loggedHeightPlacement) {
+    console.log("Height placement:", {
+      ground,
+      modelHeightM: base,
+      finalY
+    });
+    loggedHeightPlacement = true;
+  }
+}
+
 function updateObjectCoords(lat, lon) {
   if (!worldObject) return;
   objectCoords = { latitude: lat, longitude: lon };
@@ -160,12 +197,9 @@ function applyModelData(model) {
     if (testLatInput) testLatInput.value = lat;
     if (testLonInput) testLonInput.value = lon;
   }
-  if (lockGroundInput && lockGroundInput.checked) {
-    setObjectHeight(0);
-  } else if (height !== null) {
-    setObjectHeight(height);
-    if (testHeightInput) testHeightInput.value = height;
-  }
+  modelHeightM = (height !== null) ? height : 0;
+  if (testHeightInput) testHeightInput.value = modelHeightM;
+  applyGroundHeight();
 }
 
 function updateObjectVisibility() {
@@ -178,6 +212,52 @@ function updateObjectVisibility() {
   );
   setDistance(`Dist: ${dist.toFixed(1)} m`);
   worldObject.setAttribute("visible", dist <= 10);
+}
+
+async function fetchGroundHeight(lat, lon) {
+  const res = await fetch(`/api/height.php?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, { cache: "no-store" });
+  if (!res.ok) {
+    return null;
+  }
+  const data = await res.json();
+  if (data && typeof data.height_m === "number" && data.tile_key) {
+    return data;
+  }
+  return null;
+}
+
+async function maybeUpdateGroundHeight(lat, lon) {
+  if (lastHeightFetchCoords) {
+    const moved = haversineMeters(
+      lastHeightFetchCoords.latitude,
+      lastHeightFetchCoords.longitude,
+      lat,
+      lon
+    );
+    if (moved < HEIGHT_FETCH_DISTANCE_M && currentGroundTileKey) {
+      return;
+    }
+  }
+
+  const data = await fetchGroundHeight(lat, lon);
+  if (!data) {
+    setGroundHeight(null);
+    setGroundTile(null);
+    return;
+  }
+
+  const cached = heightCache.get(data.tile_key);
+  if (!cached) {
+    heightCache.set(data.tile_key, data.height_m);
+  }
+
+  currentGroundHeightM = data.height_m;
+  currentGroundTileKey = data.tile_key;
+  lastHeightFetchCoords = { latitude: lat, longitude: lon };
+
+  setGroundHeight(currentGroundHeightM);
+  setGroundTile(currentGroundTileKey);
+  applyGroundHeight();
 }
 
 let scaleToggleState = false;
@@ -209,7 +289,7 @@ if (applyTestBtn && testLatInput && testLonInput) {
 if (applyHeightBtn && testHeightInput) {
   applyHeightBtn.addEventListener("click", () => {
     if (lockGroundInput && lockGroundInput.checked) {
-      setObjectHeight(0);
+      applyGroundHeight();
       return;
     }
     const h = toNumber(testHeightInput.value);
@@ -217,13 +297,14 @@ if (applyHeightBtn && testHeightInput) {
       setStatus("invalid height");
       return;
     }
-    setObjectHeight(h);
+    modelHeightM = h;
+    applyGroundHeight();
   });
 }
 
 if (lockGroundInput) {
   lockGroundInput.addEventListener("change", () => {
-    if (lockGroundInput.checked) setObjectHeight(0);
+    applyGroundHeight();
   });
 }
 
