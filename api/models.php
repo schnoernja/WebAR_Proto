@@ -1,5 +1,6 @@
 <?php
 header("Content-Type: application/json; charset=utf-8");
+header("Access-Control-Allow-Origin: *");
 
 $dbHost = getenv("DB_HOST") ?: "postgres";
 $dbPort = getenv("DB_PORT") ?: "5432";
