@@ -103,6 +103,23 @@
     </details>
 
     <details class="debug-section" open>
+      <summary>Stabilization</summary>
+      <div>
+        <label for="freeze-placement">Freeze placement (WebXR)</label>
+        <input id="freeze-placement" type="checkbox" checked />
+      </div>
+      <div>
+        <label for="min-move">Update threshold (m)</label>
+        <input id="min-move" type="number" min="0" step="0.5" value="2" />
+      </div>
+      <div>
+        <label for="max-acc">Max GPS accuracy (m)</label>
+        <input id="max-acc" type="number" min="1" step="1" value="12" />
+      </div>
+      <button id="unfreeze-now">Recalc now</button>
+    </details>
+
+    <details class="debug-section" open>
       <summary>Placement Offset (m)</summary>
       <div>
         <label for="place-x-range">Offset X</label>

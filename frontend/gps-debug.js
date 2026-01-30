@@ -42,6 +42,10 @@ const placeXNumber = document.getElementById("place-x-number");
 const placeZRange = document.getElementById("place-z-range");
 const placeZNumber = document.getElementById("place-z-number");
 const resetPlacementBtn = document.getElementById("reset-placement");
+const freezePlacementInput = document.getElementById("freeze-placement");
+const minMoveInput = document.getElementById("min-move");
+const maxAccInput = document.getElementById("max-acc");
+const unfreezeNowBtn = document.getElementById("unfreeze-now");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -147,9 +151,17 @@ let modelGroundHeightM = null;
 const modelGroundCache = new Map();
 const COORD_SMOOTHING_ALPHA = 0.2;
 const HEADING_SMOOTHING_ALPHA = 0.2;
+let lastStablePlacementCoords = null;
+let lastPlacementWorldPos = null;
+let lastPlacementQuaternion = null;
+let lastDeviceAccuracyM = null;
 
 function isWebXRActive() {
   return sceneEl && sceneEl.is && sceneEl.is("vr-mode");
+}
+
+function isArjsActive() {
+  return sceneEl && sceneEl.hasAttribute("arjs") && !isWebXRActive();
 }
 
 function smoothCoord(prev, next, alpha) {
@@ -206,7 +218,7 @@ function startDeviceWatch() {
 
   geoWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const { latitude, longitude, altitude, altitudeAccuracy, heading } = pos.coords;
+      const { latitude, longitude, altitude, altitudeAccuracy, heading, accuracy } = pos.coords;
 
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
@@ -222,6 +234,7 @@ function startDeviceWatch() {
       } else if (devAltAccEl) {
         devAltAccEl.textContent = "-";
       }
+      lastDeviceAccuracyM = Number.isFinite(accuracy) ? accuracy : null;
       lastDeviceCoords = { latitude, longitude };
       smoothedDeviceCoords = smoothCoord(smoothedDeviceCoords, lastDeviceCoords, COORD_SMOOTHING_ALPHA);
       if (Number.isFinite(heading)) {
@@ -306,6 +319,46 @@ function getDeviceCoordsForPlacement() {
   return smoothedDeviceCoords || lastDeviceCoords;
 }
 
+function getMaxAccuracyThreshold() {
+  return maxAccInput ? (toNumber(maxAccInput.value) ?? 12) : 12;
+}
+
+function getMinMoveThreshold() {
+  return minMoveInput ? (toNumber(minMoveInput.value) ?? 2) : 2;
+}
+
+function applyArjsStabilization() {
+  if (!sceneEl || !isArjsActive()) return;
+  const minDist = (freezePlacementInput && freezePlacementInput.checked) ? getMinMoveThreshold() : 0;
+  const maxAcc = getMaxAccuracyThreshold();
+  sceneEl.setAttribute(
+    "arjs",
+    `sourceType: webcam; debugUIEnabled: false; gpsMinDistance: ${minDist}; gpsMinAccuracy: ${maxAcc};`
+  );
+}
+
+function shouldUpdatePlacement(deviceCoords) {
+  if (!deviceCoords) return false;
+  const maxAcc = getMaxAccuracyThreshold();
+  if (lastDeviceAccuracyM !== null && lastDeviceAccuracyM > maxAcc) return false;
+  if (!lastStablePlacementCoords) return true;
+  const moved = haversineMeters(
+    lastStablePlacementCoords.latitude,
+    lastStablePlacementCoords.longitude,
+    deviceCoords.latitude,
+    deviceCoords.longitude
+  );
+  return moved >= getMinMoveThreshold();
+}
+
+function rememberPlacementAnchor(camObj) {
+  if (!camObj) return;
+  const worldPos = new THREE.Vector3();
+  camObj.getWorldPosition(worldPos);
+  lastPlacementWorldPos = worldPos.clone();
+  lastPlacementQuaternion = camObj.quaternion.clone();
+}
+
 function computeWebXRHeight() {
   const base = (lockGroundInput && lockGroundInput.checked) ? 0 : modelHeightM;
   const offset = altOffsetInput ? (toNumber(altOffsetInput.value) ?? 0) : 0;
@@ -319,6 +372,18 @@ function updateWebXRPlacement() {
   if (!isWebXRActive() || !xrCameraEl || !worldObject || !objectCoords || !window.THREE) return;
   const deviceCoords = getDeviceCoordsForPlacement();
   if (!deviceCoords) return;
+  const freeze = freezePlacementInput && freezePlacementInput.checked;
+  if (freeze && lastPlacementWorldPos && lastPlacementQuaternion) {
+    const placement = getPlacementOffsetValues();
+    const y = computeWebXRHeight();
+    const offset = new THREE.Vector3(placement.x, y, placement.z);
+    offset.applyQuaternion(lastPlacementQuaternion);
+    worldObject.object3D.position.copy(lastPlacementWorldPos.clone().add(offset));
+    return;
+  }
+  if (freeze && !shouldUpdatePlacement(deviceCoords)) {
+    return;
+  }
 
   const dist = haversineMeters(
     deviceCoords.latitude,
@@ -349,6 +414,8 @@ function updateWebXRPlacement() {
   camObj.getWorldPosition(worldPos);
   offset.applyQuaternion(camObj.quaternion);
   worldObject.object3D.position.copy(worldPos.add(offset));
+  lastStablePlacementCoords = { ...deviceCoords };
+  rememberPlacementAnchor(camObj);
 }
 
 function applyGroundHeight() {
@@ -566,6 +633,15 @@ if (altOffsetInput) {
   });
 }
 
+function applyStabilization() {
+  applyArjsStabilization();
+  updateWebXRPlacement();
+}
+
+if (typeof window !== "undefined") {
+  window.applyArjsStabilization = applyArjsStabilization;
+}
+
 function bindRangeAndNumber(rangeEl, numberEl, onChange) {
   if (!rangeEl || !numberEl) return;
   const syncFromRange = () => {
@@ -588,6 +664,25 @@ if (resetPlacementBtn) {
     setPlacementOffsetValues({ x: 0, z: 0 });
     applyPlacementOffset();
   });
+}
+
+if (unfreezeNowBtn) {
+  unfreezeNowBtn.addEventListener("click", () => {
+    lastPlacementWorldPos = null;
+    lastPlacementQuaternion = null;
+    lastStablePlacementCoords = null;
+    updateWebXRPlacement();
+  });
+}
+
+if (freezePlacementInput) {
+  freezePlacementInput.addEventListener("change", applyStabilization);
+}
+if (minMoveInput) {
+  minMoveInput.addEventListener("input", applyStabilization);
+}
+if (maxAccInput) {
+  maxAccInput.addEventListener("input", applyStabilization);
 }
 
 function getOffsetValues() {
