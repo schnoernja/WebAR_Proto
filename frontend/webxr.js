@@ -49,6 +49,9 @@ function enableArjsFallback() {
     cameraEl.setAttribute("gps-camera", "");
     cameraEl.setAttribute("rotation-reader", "");
   }
+  if (typeof window !== "undefined" && typeof window.applyArjsStabilization === "function") {
+    window.applyArjsStabilization();
+  }
 }
 
 async function initXRMode() {
@@ -83,6 +86,9 @@ if (sceneEl) {
     window.webarWebXRActive = false;
     setStatus("webxr exited");
     setArMode("ar.js");
+    if (typeof window !== "undefined" && typeof window.applyArjsStabilization === "function") {
+      window.applyArjsStabilization();
+    }
   });
 }
 

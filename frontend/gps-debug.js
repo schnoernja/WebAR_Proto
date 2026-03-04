@@ -37,6 +37,15 @@ const offYInput = document.getElementById("off-y");
 const offZInput = document.getElementById("off-z");
 const applyTransformBtn = document.getElementById("apply-transform");
 const resetTransformBtn = document.getElementById("reset-transform");
+const placeXRange = document.getElementById("place-x-range");
+const placeXNumber = document.getElementById("place-x-number");
+const placeZRange = document.getElementById("place-z-range");
+const placeZNumber = document.getElementById("place-z-number");
+const resetPlacementBtn = document.getElementById("reset-placement");
+const freezePlacementInput = document.getElementById("freeze-placement");
+const minMoveInput = document.getElementById("min-move");
+const maxAccInput = document.getElementById("max-acc");
+const unfreezeNowBtn = document.getElementById("unfreeze-now");
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -142,9 +151,17 @@ let modelGroundHeightM = null;
 const modelGroundCache = new Map();
 const COORD_SMOOTHING_ALPHA = 0.2;
 const HEADING_SMOOTHING_ALPHA = 0.2;
+let lastStablePlacementCoords = null;
+let lastPlacementWorldPos = null;
+let lastPlacementQuaternion = null;
+let lastDeviceAccuracyM = null;
 
 function isWebXRActive() {
   return sceneEl && sceneEl.is && sceneEl.is("vr-mode");
+}
+
+function isArjsActive() {
+  return sceneEl && sceneEl.hasAttribute("arjs") && !isWebXRActive();
 }
 
 function smoothCoord(prev, next, alpha) {
@@ -201,7 +218,7 @@ function startDeviceWatch() {
 
   geoWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const { latitude, longitude, altitude, altitudeAccuracy, heading } = pos.coords;
+      const { latitude, longitude, altitude, altitudeAccuracy, heading, accuracy } = pos.coords;
 
       if (devLatEl) devLatEl.textContent = latitude.toFixed(6);
       if (devLonEl) devLonEl.textContent = longitude.toFixed(6);
@@ -217,6 +234,7 @@ function startDeviceWatch() {
       } else if (devAltAccEl) {
         devAltAccEl.textContent = "-";
       }
+      lastDeviceAccuracyM = Number.isFinite(accuracy) ? accuracy : null;
       lastDeviceCoords = { latitude, longitude };
       smoothedDeviceCoords = smoothCoord(smoothedDeviceCoords, lastDeviceCoords, COORD_SMOOTHING_ALPHA);
       if (Number.isFinite(heading)) {
@@ -289,7 +307,8 @@ if (worldObject) {
 function setObjectHeight(heightMeters) {
   if (!worldObject) return;
   const offset = getOffsetValues();
-  worldObject.setAttribute("position", `0 ${heightMeters} 0`);
+  const placement = getPlacementOffsetValues();
+  worldObject.setAttribute("position", `${placement.x} ${heightMeters} ${placement.z}`);
   if (modelEntity) {
     modelEntity.setAttribute("position", `${offset.x} ${offset.y} ${offset.z}`);
   }
@@ -298,6 +317,46 @@ function setObjectHeight(heightMeters) {
 
 function getDeviceCoordsForPlacement() {
   return smoothedDeviceCoords || lastDeviceCoords;
+}
+
+function getMaxAccuracyThreshold() {
+  return maxAccInput ? (toNumber(maxAccInput.value) ?? 12) : 12;
+}
+
+function getMinMoveThreshold() {
+  return minMoveInput ? (toNumber(minMoveInput.value) ?? 2) : 2;
+}
+
+function applyArjsStabilization() {
+  if (!sceneEl || !isArjsActive()) return;
+  const minDist = (freezePlacementInput && freezePlacementInput.checked) ? getMinMoveThreshold() : 0;
+  const maxAcc = getMaxAccuracyThreshold();
+  sceneEl.setAttribute(
+    "arjs",
+    `sourceType: webcam; debugUIEnabled: false; gpsMinDistance: ${minDist}; gpsMinAccuracy: ${maxAcc};`
+  );
+}
+
+function shouldUpdatePlacement(deviceCoords) {
+  if (!deviceCoords) return false;
+  const maxAcc = getMaxAccuracyThreshold();
+  if (lastDeviceAccuracyM !== null && lastDeviceAccuracyM > maxAcc) return false;
+  if (!lastStablePlacementCoords) return true;
+  const moved = haversineMeters(
+    lastStablePlacementCoords.latitude,
+    lastStablePlacementCoords.longitude,
+    deviceCoords.latitude,
+    deviceCoords.longitude
+  );
+  return moved >= getMinMoveThreshold();
+}
+
+function rememberPlacementAnchor(camObj) {
+  if (!camObj) return;
+  const worldPos = new THREE.Vector3();
+  camObj.getWorldPosition(worldPos);
+  lastPlacementWorldPos = worldPos.clone();
+  lastPlacementQuaternion = camObj.quaternion.clone();
 }
 
 function computeWebXRHeight() {
@@ -313,6 +372,18 @@ function updateWebXRPlacement() {
   if (!isWebXRActive() || !xrCameraEl || !worldObject || !objectCoords || !window.THREE) return;
   const deviceCoords = getDeviceCoordsForPlacement();
   if (!deviceCoords) return;
+  const freeze = freezePlacementInput && freezePlacementInput.checked;
+  if (freeze && lastPlacementWorldPos && lastPlacementQuaternion) {
+    const placement = getPlacementOffsetValues();
+    const y = computeWebXRHeight();
+    const offset = new THREE.Vector3(placement.x, y, placement.z);
+    offset.applyQuaternion(lastPlacementQuaternion);
+    worldObject.object3D.position.copy(lastPlacementWorldPos.clone().add(offset));
+    return;
+  }
+  if (freeze && !shouldUpdatePlacement(deviceCoords)) {
+    return;
+  }
 
   const dist = haversineMeters(
     deviceCoords.latitude,
@@ -334,14 +405,17 @@ function updateWebXRPlacement() {
   const x = Math.sin(rad) * dist;
   const z = -Math.cos(rad) * dist;
   const y = computeWebXRHeight();
+  const placement = getPlacementOffsetValues();
 
   const camObj = xrCameraEl.object3D;
   if (!camObj) return;
   const worldPos = new THREE.Vector3();
-  const offset = new THREE.Vector3(x, y, z);
+  const offset = new THREE.Vector3(x + placement.x, y, z + placement.z);
   camObj.getWorldPosition(worldPos);
   offset.applyQuaternion(camObj.quaternion);
   worldObject.object3D.position.copy(worldPos.add(offset));
+  lastStablePlacementCoords = { ...deviceCoords };
+  rememberPlacementAnchor(camObj);
 }
 
 function applyGroundHeight() {
@@ -559,11 +633,88 @@ if (altOffsetInput) {
   });
 }
 
+function applyStabilization() {
+  applyArjsStabilization();
+  updateWebXRPlacement();
+}
+
+if (typeof window !== "undefined") {
+  window.applyArjsStabilization = applyArjsStabilization;
+}
+
+function bindRangeAndNumber(rangeEl, numberEl, onChange) {
+  if (!rangeEl || !numberEl) return;
+  const syncFromRange = () => {
+    numberEl.value = rangeEl.value;
+    onChange();
+  };
+  const syncFromNumber = () => {
+    rangeEl.value = numberEl.value;
+    onChange();
+  };
+  rangeEl.addEventListener("input", syncFromRange);
+  numberEl.addEventListener("input", syncFromNumber);
+}
+
+bindRangeAndNumber(placeXRange, placeXNumber, applyPlacementOffset);
+bindRangeAndNumber(placeZRange, placeZNumber, applyPlacementOffset);
+
+if (resetPlacementBtn) {
+  resetPlacementBtn.addEventListener("click", () => {
+    setPlacementOffsetValues({ x: 0, z: 0 });
+    applyPlacementOffset();
+  });
+}
+
+if (unfreezeNowBtn) {
+  unfreezeNowBtn.addEventListener("click", () => {
+    lastPlacementWorldPos = null;
+    lastPlacementQuaternion = null;
+    lastStablePlacementCoords = null;
+    updateWebXRPlacement();
+  });
+}
+
+if (freezePlacementInput) {
+  freezePlacementInput.addEventListener("change", applyStabilization);
+}
+if (minMoveInput) {
+  minMoveInput.addEventListener("input", applyStabilization);
+}
+if (maxAccInput) {
+  maxAccInput.addEventListener("input", applyStabilization);
+}
+
 function getOffsetValues() {
   const x = offXInput ? (toNumber(offXInput.value) ?? 0) : 0;
   const y = offYInput ? (toNumber(offYInput.value) ?? 0) : 0;
   const z = offZInput ? (toNumber(offZInput.value) ?? 0) : 0;
   return { x, y, z };
+}
+
+function getPlacementOffsetValues() {
+  const x = placeXNumber ? (toNumber(placeXNumber.value) ?? 0) : 0;
+  const z = placeZNumber ? (toNumber(placeZNumber.value) ?? 0) : 0;
+  return { x, z };
+}
+
+function setPlacementOffsetValues(values) {
+  if (placeXRange) placeXRange.value = String(values.x);
+  if (placeXNumber) placeXNumber.value = String(values.x);
+  if (placeZRange) placeZRange.value = String(values.z);
+  if (placeZNumber) placeZNumber.value = String(values.z);
+}
+
+function applyPlacementOffset() {
+  if (!worldObject) return;
+  const { x, z } = getPlacementOffsetValues();
+  if (isWebXRActive()) {
+    updateWebXRPlacement();
+    return;
+  }
+  const current = worldObject.getAttribute("position") || { x: 0, y: 0, z: 0 };
+  worldObject.setAttribute("position", `${x} ${current.y} ${z}`);
+  updateObjectVisibility();
 }
 
 function getRotationValues() {
