@@ -4,6 +4,7 @@ import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController } from "./PlacementController.js";
 import { UIController } from "./UIController.js";
+import { GeoLocationService } from "./GeoLocationService.js";
 
 function toMessage(error, fallbackMessage = "unbekannter Fehler") {
   if (error instanceof Error && error.message) {
@@ -23,13 +24,13 @@ export class ARApp {
     });
     this.hitTestManager = new HitTestManager();
     this.poseStabilizer = new PoseStabilizer();
+    this.geoLocationService = new GeoLocationService();
     this.placementController = null;
     this.arSessionManager = null;
     this.lastFrameTimeMs = 0;
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
-    this.handleSelect = this.handleSelect.bind(this);
   }
 
   async init() {
@@ -42,26 +43,29 @@ export class ARApp {
     const assetInfo = await this.sceneManager.createPlacementAsset();
     this.placementController.setAsset(assetInfo.object);
     this.ui.setAssetLabel(assetInfo.label);
+    this.ui.setTargetCoordInputs(this.placementController.getTargetCoordinate());
+    this.ui.bindGeoLocationService(this.geoLocationService);
 
     if (assetInfo.usedPlaceholder) {
-      this.ui.setHint("Modell konnte nicht geladen werden. Platzhalter aktiv.");
+      this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
     } else {
-      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im AR-Modus eine stabile Flaeche ruhig anvisieren.");
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. In AR wird tree.glb automatisch relativ zur Referenzflaeche gesetzt.");
     }
 
     this.arSessionManager = new ARSessionManager({
       renderer: this.sceneManager.getRenderer(),
       overlayRoot: this.document.getElementById("hud"),
-      onSessionEnded: this.handleSessionEnded,
-      onSelect: this.handleSelect
+      onSessionEnded: this.handleSessionEnded
     });
 
     this.ui.bindActions({
       onStartAR: () => this.startAR(),
-      onPlace: () => this.placeObject(),
       onResetPlacement: () => this.resetPlacement(),
-      onStopAR: () => this.stopAR()
+      onStopAR: () => this.stopAR(),
+      onApplyTargetCoord: (coord) => this.applyTargetCoord(coord)
     });
+
+    this.geoLocationService.start();
 
     const support = await this.arSessionManager.checkSupport();
     this.ui.setSupportState(support.available, support.message);
@@ -101,13 +105,14 @@ export class ARApp {
     }
 
     this.poseStabilizer.reset();
+    this.arSessionManager.clearOriginPose();
     this.placementController.enterARMode();
     this.sceneManager.setARMode(true);
     this.ui.setSessionState(true, result.message);
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
-    this.ui.setHint("Bewege das Geraet langsam ueber Boden oder Tisch, bis der Reticle stabil wird.");
+    this.ui.setHint("Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.");
   }
 
   async stopAR() {
@@ -149,58 +154,93 @@ export class ARApp {
 
       this.placementController.updateSurfaceState(surfaceState);
       this.ui.setSurfaceState(surfaceState.surfaceDetected, surfaceState.isStable);
+
+      if (tracking) {
+        this.maybePlaceAtTargetCoordinate(surfaceState);
+      }
+
       this.ui.setPlacementState(this.placementController.isPlaced());
 
-      if (!this.placementController.isPlaced()) {
-        if (surfaceState.isStable) {
-          this.ui.setHint("Flaeche stabil. Tippen oder 'Objekt setzen' druecken.");
-        } else if (surfaceState.surfaceDetected) {
-          this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.");
-        } else {
-          this.ui.setHint("Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.");
-        }
+      if (this.placementController.isPlaced()) {
+        this.ui.setHint("Baum fixiert. 'Neu platzieren' setzt Referenzflaeche und Zielpunkt neu.");
+      } else if (surfaceState.isStable) {
+        this.ui.setHint("Stabile Referenzflaeche erkannt. Zielkoordinate wird automatisch gesetzt.");
+      } else if (surfaceState.surfaceDetected) {
+        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.");
       } else {
-        this.ui.setHint("Objekt fixiert. 'Neu platzieren' hebt den Placement-Lock wieder auf.");
+        this.ui.setHint("Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.");
       }
     }
 
     this.sceneManager.render();
   }
 
-  handleSelect() {
-    this.placeObject();
+  maybePlaceAtTargetCoordinate(surfaceState) {
+    if (!surfaceState.isStable || this.placementController.isPlaced()) {
+      return;
+    }
+
+    if (!this.arSessionManager.hasOriginPose()) {
+      this.arSessionManager.setOriginPose(surfaceState.stablePose);
+    }
+
+    const originPose = this.arSessionManager.getOriginPose();
+    if (!originPose) {
+      return;
+    }
+
+    const placed = this.placementController.placeAtTargetCoordinate(originPose);
+    if (!placed) {
+      return;
+    }
+
+    const target = this.placementController.getTargetCoordinate();
+    this.ui.setMessage(
+      `tree.glb wurde automatisch auf die Zielkoordinate (${target.x.toFixed(1)}, ${target.y.toFixed(1)}, ${target.z.toFixed(1)}) gesetzt.`
+    );
   }
 
-  placeObject() {
-    if (!this.arSessionManager || !this.arSessionManager.isActive()) {
-      return;
+  applyTargetCoord(coord) {
+    if (!this.placementController) {
+      return false;
     }
 
-    const placed = this.placementController.placeCurrent();
-    if (placed) {
-      this.ui.setPlacementState(true);
-      this.ui.setMessage("Objekt stabil im Raum fixiert.");
-      this.ui.setHint("Placement-Lock aktiv. Neu platzieren nur auf expliziten Befehl.");
-      return;
+    const accepted = this.placementController.setTargetCoord(coord);
+    if (!accepted) {
+      this.ui.setMessage("Zielkoordinate konnte nicht uebernommen werden.");
+      return false;
     }
 
-    this.ui.setMessage("Noch keine stabile Flaeche fuer die Platzierung.");
+    const target = this.placementController.getTargetCoordinate();
+    this.ui.setTargetCoordInputs(target);
+    this.ui.setMessage(
+      `Zielkoordinate uebernommen: (${target.x.toFixed(1)}, ${target.y.toFixed(1)}, ${target.z.toFixed(1)}).`
+    );
+
+    if (this.placementController.isPlaced()) {
+      this.ui.setHint("Aktuelles Placement bleibt unveraendert. Neue Werte greifen nach Reset.");
+    } else {
+      this.ui.setHint("Neue Zielkoordinate gespeichert. Sie wird bei der naechsten Platzierung verwendet.");
+    }
+
+    return true;
   }
 
   resetPlacement() {
     this.lastFrameTimeMs = 0;
     this.poseStabilizer.reset();
+    this.arSessionManager.clearOriginPose();
     this.placementController.resetPlacement();
     this.ui.setPlacementState(false);
     this.ui.setSurfaceState(false, false);
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
-      this.ui.setMessage("Placement-Lock geloest.");
-      this.ui.setHint("Neu platzieren aktiv. Flaeche erneut ruhig anvisieren.");
+      this.ui.setMessage("Referenzflaeche und Zielplatzierung wurden zurueckgesetzt.");
+      this.ui.setHint("Suche eine neue stabile Referenzflaeche. Der Baum wird danach wieder automatisch gesetzt.");
       return;
     }
 
-    this.ui.setMessage("Objekt auf die Fallback-Buehne zurueckgesetzt.");
+    this.ui.setMessage("Baum auf die Fallback-Buehne zurueckgesetzt.");
     this.ui.setHint("Fallback-3D-Ansicht aktiv.");
   }
 
@@ -222,6 +262,7 @@ export class ARApp {
 
     this.hitTestManager.dispose();
     this.poseStabilizer.reset();
+    this.geoLocationService.stop();
 
     if (this.placementController) {
       this.placementController.dispose();

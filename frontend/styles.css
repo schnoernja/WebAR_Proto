@@ -95,12 +95,15 @@ body.ar-active {
 .hud {
   position: relative;
   z-index: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
   width: min(420px, calc(100% - 20px));
   margin: 14px;
   pointer-events: none;
+}
+
+.hud-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .panel {
@@ -118,9 +121,130 @@ body.ar-active .panel {
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
 }
 
+.hud-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 999px;
+}
+
+.hud-toolbar-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-caption {
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--warm);
+}
+
+.hud-mini-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mini-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  background: rgba(255, 255, 255, 0.52);
+  padding: 5px 10px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+body.ar-active .mini-pill {
+  border-color: rgba(244, 241, 231, 0.1);
+  background: rgba(244, 241, 231, 0.08);
+  color: #f4f1e7;
+}
+
+.mini-pill[data-status="ok"],
+.mini-pill[data-status="active"],
+.mini-pill[data-status="done"] {
+  border-color: rgba(25, 129, 92, 0.22);
+  background: rgba(25, 129, 92, 0.12);
+}
+
+.mini-pill[data-status="warning"] {
+  border-color: rgba(182, 120, 32, 0.22);
+  background: rgba(182, 120, 32, 0.12);
+}
+
+.mini-pill[data-status="error"] {
+  border-color: rgba(178, 72, 63, 0.22);
+  background: rgba(178, 72, 63, 0.12);
+}
+
+.hud-toggle {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(19, 35, 38, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+body.ar-active .hud-toggle {
+  border-color: rgba(244, 241, 231, 0.14);
+  background: rgba(244, 241, 231, 0.08);
+  color: #f4f1e7;
+}
+
+.hud-toggle:hover,
+.hud-toggle:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(14, 124, 116, 0.4);
+  outline: none;
+}
+
+.hud-toggle-icon {
+  display: inline-block;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.hud-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 130px);
+  overflow: hidden;
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease,
+    transform 220ms ease;
+}
+
+.hud.is-collapsed .hud-body {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
 .hero-panel,
+.coord-panel,
 .state-panel,
-.note-panel {
+.note-panel,
+.geo-panel {
   padding: 18px 18px 16px;
 }
 
@@ -150,6 +274,7 @@ h2 {
   letter-spacing: 0.08em;
 }
 
+.panel-intro,
 .status-message,
 .hint-text {
   margin: 12px 0 0;
@@ -158,6 +283,42 @@ h2 {
   color: var(--ink-soft);
 }
 
+.panel-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(19, 35, 38, 0.06);
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+body.ar-active .panel-tag {
+  background: rgba(244, 241, 231, 0.08);
+  color: rgba(244, 241, 231, 0.76);
+}
+
+.panel-tag[data-status="ok"],
+.panel-tag[data-status="active"],
+.panel-tag[data-status="done"] {
+  background: rgba(25, 129, 92, 0.12);
+  color: var(--ok);
+}
+
+.panel-tag[data-status="warning"] {
+  background: rgba(182, 120, 32, 0.12);
+  color: var(--warn);
+}
+
+.panel-tag[data-status="error"] {
+  background: rgba(178, 72, 63, 0.12);
+  color: var(--error);
+}
+
+body.ar-active .panel-intro,
 body.ar-active .status-message,
 body.ar-active .hint-text,
 body.ar-active .state-label {
@@ -216,6 +377,80 @@ body.ar-active .button {
 
 .button-ghost {
   background: transparent;
+}
+
+.coord-grid,
+.geo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label,
+.geo-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+body.ar-active .field-label,
+body.ar-active .geo-label {
+  color: rgba(244, 241, 231, 0.76);
+}
+
+.field-input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(19, 35, 38, 0.12);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.58);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 10px 12px;
+}
+
+.field-input:focus-visible {
+  outline: none;
+  border-color: rgba(14, 124, 116, 0.4);
+  box-shadow: 0 0 0 3px rgba(14, 124, 116, 0.12);
+}
+
+body.ar-active .field-input {
+  border-color: rgba(244, 241, 231, 0.16);
+  background: rgba(244, 241, 231, 0.08);
+  color: #f4f1e7;
+}
+
+.coord-actions {
+  margin-top: 14px;
+}
+
+.geo-item {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  background: rgba(255, 255, 255, 0.42);
+  padding: 12px 14px;
+}
+
+body.ar-active .geo-item {
+  border-color: rgba(244, 241, 231, 0.12);
+  background: rgba(244, 241, 231, 0.06);
+}
+
+.geo-value {
+  display: block;
+  margin-top: 8px;
+  font-size: 1rem;
+  line-height: 1.2;
 }
 
 .section-header {
@@ -323,12 +558,17 @@ body.ar-active .state-item {
   .hud {
     width: calc(100% - 18px);
     margin: 9px;
-    gap: 10px;
+  }
+
+  .hud-toolbar {
+    align-items: flex-start;
   }
 
   .hero-panel,
+  .coord-panel,
   .state-panel,
-  .note-panel {
+  .note-panel,
+  .geo-panel {
     padding: 16px 14px 14px;
   }
 
@@ -348,7 +588,25 @@ body.ar-active .state-item {
 }
 
 @media (max-width: 520px) {
+  .hud-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hud-toolbar-main {
+    gap: 8px;
+  }
+
+  .hud-toggle {
+    align-self: flex-end;
+  }
+
   .state-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .coord-grid,
+  .geo-grid {
     grid-template-columns: 1fr;
   }
 

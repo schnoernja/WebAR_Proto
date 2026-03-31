@@ -1,4 +1,5 @@
 import { APP_CONFIG } from "./config.js";
+import { clonePose } from "./utils.js";
 
 function toMessage(error, fallbackMessage) {
   if (error instanceof Error && error.message) {
@@ -9,14 +10,13 @@ function toMessage(error, fallbackMessage) {
 }
 
 export class ARSessionManager {
-  constructor({ renderer, overlayRoot, onSessionEnded, onSelect }) {
+  constructor({ renderer, overlayRoot, onSessionEnded }) {
     this.renderer = renderer;
     this.overlayRoot = overlayRoot;
     this.onSessionEnded = onSessionEnded;
-    this.onSelect = onSelect;
     this.session = null;
+    this.originPose = null;
     this.handleSessionEnd = this.handleSessionEnd.bind(this);
-    this.handleSelect = this.handleSelect.bind(this);
   }
 
   async checkSupport() {
@@ -96,15 +96,14 @@ export class ARSessionManager {
     }
 
     this.session = session;
+    this.originPose = null;
     this.session.addEventListener("end", this.handleSessionEnd);
-    this.session.addEventListener("select", this.handleSelect);
 
     try {
       this.renderer.xr.setReferenceSpaceType(APP_CONFIG.ar.referenceSpaceType);
       await this.renderer.xr.setSession(this.session);
     } catch (error) {
       this.session.removeEventListener("end", this.handleSessionEnd);
-      this.session.removeEventListener("select", this.handleSelect);
 
       try {
         await this.session.end();
@@ -113,6 +112,7 @@ export class ARSessionManager {
       }
 
       this.session = null;
+      this.originPose = null;
 
       return {
         started: false,
@@ -153,19 +153,34 @@ export class ARSessionManager {
     return this.session;
   }
 
-  handleSelect(event) {
-    if (typeof this.onSelect === "function") {
-      this.onSelect(event);
+  hasOriginPose() {
+    return this.originPose !== null;
+  }
+
+  setOriginPose(pose) {
+    if (!pose || this.originPose) {
+      return false;
     }
+
+    this.originPose = clonePose(pose);
+    return true;
+  }
+
+  getOriginPose() {
+    return this.originPose ? clonePose(this.originPose) : null;
+  }
+
+  clearOriginPose() {
+    this.originPose = null;
   }
 
   handleSessionEnd() {
     if (this.session) {
       this.session.removeEventListener("end", this.handleSessionEnd);
-      this.session.removeEventListener("select", this.handleSelect);
     }
 
     this.session = null;
+    this.originPose = null;
 
     if (typeof this.onSessionEnded === "function") {
       this.onSessionEnded();

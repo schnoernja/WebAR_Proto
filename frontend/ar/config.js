@@ -1,8 +1,15 @@
 export const APP_CONFIG = Object.freeze({
   model: {
-    primaryUrl: "./models/Erfurt_FH_Umkreis_Haus11Markiert.glb",
+    primaryUrl: "./models/tree.glb",
     fallbackUrl: "./models/fountain.glb",
-    targetMaxDimensionMeters: 0.55
+    targetHeightMeters: 2.4
+  },
+  placement: {
+    targetCoordinate: {
+      x: 2.5,
+      y: 0,
+      z: -3.0
+    }
   },
   renderer: {
     pixelRatioCap: 2,

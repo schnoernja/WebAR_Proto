@@ -1,12 +1,17 @@
 import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
-import { applyPose, clonePose, disposeObject3D } from "./utils.js";
+import { applyPose, disposeObject3D } from "./utils.js";
 
 export class PlacementController {
   constructor({ scene }) {
     this.scene = scene;
     this.objectRoot = new THREE.Group();
     this.objectRoot.visible = true;
+    this.targetCoordinate = new THREE.Vector3(
+      APP_CONFIG.placement.targetCoordinate.x,
+      APP_CONFIG.placement.targetCoordinate.y,
+      APP_CONFIG.placement.targetCoordinate.z
+    );
 
     this.reticle = this.createReticle();
     this.reticle.visible = false;
@@ -16,7 +21,6 @@ export class PlacementController {
 
     this.asset = null;
     this.currentSurfaceState = null;
-    this.placeablePose = null;
     this.inARMode = false;
     this.placed = false;
 
@@ -81,11 +85,8 @@ export class PlacementController {
 
   updateSurfaceState(surfaceState) {
     this.currentSurfaceState = surfaceState;
-    this.placeablePose = surfaceState.canPlace && surfaceState.stablePose
-      ? clonePose(surfaceState.stablePose)
-      : null;
 
-    if (!this.inARMode || this.placed || !surfaceState.displayPose) {
+    if (!this.inARMode || !surfaceState.displayPose) {
       this.reticle.visible = false;
       return;
     }
@@ -103,21 +104,24 @@ export class PlacementController {
     }
   }
 
-  placeCurrent() {
-    if (!this.inARMode || !this.placeablePose) {
+  placeAtTargetCoordinate(originPose) {
+    if (!this.inARMode || this.placed || !originPose) {
       return false;
     }
 
-    applyPose(this.objectRoot, this.placeablePose);
+    const placementPose = {
+      position: originPose.position.clone().add(this.targetCoordinate),
+      quaternion: originPose.quaternion.clone()
+    };
+
+    applyPose(this.objectRoot, placementPose);
     this.objectRoot.visible = true;
-    this.reticle.visible = false;
     this.placed = true;
     return true;
   }
 
   resetPlacement() {
     this.placed = false;
-    this.placeablePose = null;
     this.currentSurfaceState = null;
     this.reticle.visible = false;
 
@@ -130,9 +134,32 @@ export class PlacementController {
   }
 
   showFallbackPreview() {
+    this.reticle.visible = false;
     this.objectRoot.visible = true;
     this.objectRoot.position.set(0, 0, 0);
     this.objectRoot.quaternion.identity();
+  }
+
+  getTargetCoordinate() {
+    return {
+      x: this.targetCoordinate.x,
+      y: this.targetCoordinate.y,
+      z: this.targetCoordinate.z
+    };
+  }
+
+  setTargetCoord(coord) {
+    if (
+      !coord ||
+      !Number.isFinite(coord.x) ||
+      !Number.isFinite(coord.y) ||
+      !Number.isFinite(coord.z)
+    ) {
+      return false;
+    }
+
+    this.targetCoordinate.set(coord.x, coord.y, coord.z);
+    return true;
   }
 
   isPlaced() {

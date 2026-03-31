@@ -135,7 +135,7 @@ export class SceneManager {
     const candidates = [
       {
         url: APP_CONFIG.model.primaryUrl,
-        label: "Bestandsmodell"
+        label: "tree.glb"
       },
       {
         url: APP_CONFIG.model.fallbackUrl,
@@ -185,8 +185,8 @@ export class SceneManager {
     assetRoot.updateMatrixWorld(true);
     const rawBox = new THREE.Box3().setFromObject(assetRoot);
     const rawSize = rawBox.getSize(new THREE.Vector3());
-    const maxDimension = Math.max(rawSize.x, rawSize.y, rawSize.z, 0.0001);
-    const uniformScale = APP_CONFIG.model.targetMaxDimensionMeters / maxDimension;
+    const measuredHeight = Math.max(rawSize.y, 0.0001);
+    const uniformScale = APP_CONFIG.model.targetHeightMeters / measuredHeight;
 
     assetRoot.scale.multiplyScalar(uniformScale);
     assetRoot.updateMatrixWorld(true);
@@ -207,38 +207,27 @@ export class SceneManager {
     const group = new THREE.Group();
     group.name = "procedural-placeholder";
 
-    const base = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.22, 0.06, 24),
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.08, 0.11, 1.05, 18),
       new THREE.MeshStandardMaterial({
-        color: 0x364d5a,
-        roughness: 0.82,
-        metalness: 0.12
+        color: 0x6d4a2f,
+        roughness: 0.92,
+        metalness: 0.02
       })
     );
-    base.position.y = 0.03;
-    group.add(base);
+    trunk.position.y = 0.525;
+    group.add(trunk);
 
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.28, 0.32, 0.2),
+    const canopy = new THREE.Mesh(
+      new THREE.ConeGeometry(0.72, 1.6, 24),
       new THREE.MeshStandardMaterial({
-        color: 0xd7c46a,
-        roughness: 0.66,
-        metalness: 0.08
+        color: 0x2d7a43,
+        roughness: 0.86,
+        metalness: 0.02
       })
     );
-    body.position.y = 0.22;
-    group.add(body);
-
-    const accent = new THREE.Mesh(
-      new THREE.BoxGeometry(0.12, 0.12, 0.24),
-      new THREE.MeshStandardMaterial({
-        color: 0x0e7c74,
-        roughness: 0.46,
-        metalness: 0.12
-      })
-    );
-    accent.position.set(0, 0.44, 0);
-    group.add(accent);
+    canopy.position.y = 1.48;
+    group.add(canopy);
 
     return group;
   }
