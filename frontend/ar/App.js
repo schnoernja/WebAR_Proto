@@ -67,6 +67,8 @@ export class ARApp {
     this.activeSurfaceState = null;
     this.isUIInteracting = false;
     this.isUIFocused = false;
+    this.isUIActive = false;
+    this.canvasInputCleanup = [];
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -111,7 +113,8 @@ export class ARApp {
       onRequestGeolocation: () => this.requestGeoLocation(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onHudCollapsedChange: (isCollapsed) => this.handleHudCollapsedChange(isCollapsed),
-      onUIFocusChange: (isFocused) => this.handleUIFocusChange(isFocused)
+      onUIFocusChange: (isFocused) => this.handleUIFocusChange(isFocused),
+      onUIActiveChange: (isActive) => this.handleUIActiveChange(isActive)
     });
 
     const support = await this.arSessionManager.checkSupport();
@@ -121,6 +124,7 @@ export class ARApp {
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
     this.syncDebugPanels();
+    this.bindCanvasInputGuards();
 
     this.sceneManager.setAnimationLoop(this.handleFrame);
   }
@@ -241,12 +245,12 @@ export class ARApp {
   }
 
   handleSelect() {
-    if (this.isUIInteracting || this.isUIFocused) {
+    if (this.isUIActive || this.isUIInteracting || this.isUIFocused) {
       return;
     }
 
     if (this.placementController.getMode() === PlacementMode.FREE) {
-      this.placeFreeObject();
+      this.placeFreeObject("xr");
     }
   }
 
@@ -302,8 +306,12 @@ export class ARApp {
     return this.geoLocationService.requestPermissionAndStart();
   }
 
-  placeFreeObject() {
+  placeFreeObject(source = "ui") {
     if (!this.arSessionManager || !this.arSessionManager.isActive()) {
+      return false;
+    }
+
+    if (source !== "ui" && this.isUIActive) {
       return false;
     }
 
@@ -378,12 +386,36 @@ export class ARApp {
     this.isUIInteracting = isInteracting;
   }
 
-  handleHudCollapsedChange(isCollapsed) {
-    this.sceneManager.setCanvasPointerEvents(isCollapsed ? "auto" : "none");
-  }
+  handleHudCollapsedChange() {}
 
   handleUIFocusChange(isFocused) {
     this.isUIFocused = isFocused;
+  }
+
+  handleUIActiveChange(isActive) {
+    this.isUIActive = isActive;
+  }
+
+  bindCanvasInputGuards() {
+    const canvas = this.sceneManager.getCanvasElement();
+    if (!canvas) {
+      return;
+    }
+
+    const suppressCanvasInput = (event) => {
+      if (!this.isUIActive) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    canvas.addEventListener("pointerdown", suppressCanvasInput);
+    canvas.addEventListener("touchstart", suppressCanvasInput, { passive: false });
+
+    this.canvasInputCleanup.push(() => canvas.removeEventListener("pointerdown", suppressCanvasInput));
+    this.canvasInputCleanup.push(() => canvas.removeEventListener("touchstart", suppressCanvasInput));
   }
 
   syncDebugPanels(surfaceState = null, cameraState = null) {
@@ -530,6 +562,11 @@ export class ARApp {
     if (this.placementController) {
       this.placementController.dispose();
     }
+
+    for (const cleanup of this.canvasInputCleanup) {
+      cleanup();
+    }
+    this.canvasInputCleanup.length = 0;
 
     this.ui.dispose();
     this.sceneManager.dispose();

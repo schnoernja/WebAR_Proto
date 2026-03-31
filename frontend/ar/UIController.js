@@ -93,6 +93,7 @@ function formatDebugBoolean(value) {
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
+    this.uiContainer = this.document.getElementById("ui-container");
     this.hudRoot = this.document.getElementById("hud");
     this.hudBody = this.document.getElementById("hud-body");
     this.toggleButton = this.document.getElementById("hud-toggle-button");
@@ -183,6 +184,9 @@ export class UIController {
     this.uiInteractionChangeHandler = null;
     this.hudCollapsedChangeHandler = null;
     this.uiFocusChangeHandler = null;
+    this.uiActiveChangeHandler = null;
+    this.uiActive = false;
+    this.focusBlurTimeoutId = null;
 
     this.cleanupCallbacks = [];
 
@@ -217,11 +221,13 @@ export class UIController {
     onRequestGeolocation,
     onUIInteractionChange,
     onHudCollapsedChange,
-    onUIFocusChange
+    onUIFocusChange,
+    onUIActiveChange
   }) {
     this.uiInteractionChangeHandler = typeof onUIInteractionChange === "function" ? onUIInteractionChange : null;
     this.hudCollapsedChangeHandler = typeof onHudCollapsedChange === "function" ? onHudCollapsedChange : null;
     this.uiFocusChangeHandler = typeof onUIFocusChange === "function" ? onUIFocusChange : null;
+    this.uiActiveChangeHandler = typeof onUIActiveChange === "function" ? onUIActiveChange : null;
 
     this.bindButton(this.startButton, onStartAR);
     this.bindButton(this.placeButton, onPlace);
@@ -295,6 +301,7 @@ export class UIController {
 
     const handlePointerDown = (event) => {
       event.stopPropagation();
+      this.activateUILock();
       this.setUIInteracting(true);
     };
     const handlePointerUp = (event) => {
@@ -303,6 +310,11 @@ export class UIController {
     };
     const handleClick = (event) => {
       event.stopPropagation();
+      this.activateUILock();
+    };
+    const handleTouchStart = (event) => {
+      event.stopPropagation();
+      this.activateUILock();
     };
     const handleWindowPointerEnd = () => {
       this.setUIInteracting(false);
@@ -312,6 +324,7 @@ export class UIController {
     this.hudRoot.addEventListener("pointerup", handlePointerUp);
     this.hudRoot.addEventListener("pointercancel", handlePointerUp);
     this.hudRoot.addEventListener("click", handleClick);
+    this.hudRoot.addEventListener("touchstart", handleTouchStart, { passive: false });
     window.addEventListener("pointerup", handleWindowPointerEnd);
     window.addEventListener("pointercancel", handleWindowPointerEnd);
 
@@ -319,6 +332,7 @@ export class UIController {
     this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("pointerup", handlePointerUp));
     this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("pointercancel", handlePointerUp));
     this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("click", handleClick));
+    this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("touchstart", handleTouchStart));
     this.cleanupCallbacks.push(() => window.removeEventListener("pointerup", handleWindowPointerEnd));
     this.cleanupCallbacks.push(() => window.removeEventListener("pointercancel", handleWindowPointerEnd));
   }
@@ -345,14 +359,20 @@ export class UIController {
 
     for (const field of focusableFields) {
       const handleFocus = () => {
+        this.activateUILock();
+        this.clearPendingBlurFocusReset();
         if (this.uiFocusChangeHandler) {
           this.uiFocusChangeHandler(true);
         }
       };
       const handleBlur = () => {
-        if (this.uiFocusChangeHandler) {
-          this.uiFocusChangeHandler(false);
-        }
+        this.clearPendingBlurFocusReset();
+        this.focusBlurTimeoutId = window.setTimeout(() => {
+          this.focusBlurTimeoutId = null;
+          if (this.uiFocusChangeHandler) {
+            this.uiFocusChangeHandler(false);
+          }
+        }, 300);
       };
 
       field.addEventListener("focus", handleFocus);
@@ -716,6 +736,12 @@ export class UIController {
     this.uiState.hudCollapsed = !this.uiState.hudCollapsed;
     this.persistCollapsedState();
     this.applyHudCollapsedState();
+    this.setUIInteracting(false);
+    this.clearPendingBlurFocusReset();
+    if (this.uiFocusChangeHandler) {
+      this.uiFocusChangeHandler(false);
+    }
+    this.setUIActive(!this.uiState.hudCollapsed);
     this.notifyHudCollapsedChange();
   }
 
@@ -777,9 +803,32 @@ export class UIController {
       return false;
     }
 
+    this.activateUILock();
     this.setGeoTargetInputs(this.latestGeoPosition);
     this.setGeoTargetFeedback("Aktuelle Geraetekoordinaten uebernommen.");
     return true;
+  }
+
+  activateUILock() {
+    this.setUIActive(true);
+  }
+
+  setUIActive(active) {
+    if (this.uiActive === active) {
+      return;
+    }
+
+    this.uiActive = active;
+    if (this.uiActiveChangeHandler) {
+      this.uiActiveChangeHandler(active);
+    }
+  }
+
+  clearPendingBlurFocusReset() {
+    if (this.focusBlurTimeoutId !== null) {
+      window.clearTimeout(this.focusBlurTimeoutId);
+      this.focusBlurTimeoutId = null;
+    }
   }
 
   notifyHudCollapsedChange() {
@@ -793,6 +842,7 @@ export class UIController {
   }
 
   dispose() {
+    this.clearPendingBlurFocusReset();
     for (const cleanup of this.cleanupCallbacks) {
       cleanup();
     }

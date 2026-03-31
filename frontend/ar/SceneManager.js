@@ -44,6 +44,7 @@ export class SceneManager {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, APP_CONFIG.renderer.pixelRatioCap));
+    this.renderer.domElement.id = "ar-canvas";
     this.renderer.domElement.setAttribute("aria-hidden", "true");
     this.container.appendChild(this.renderer.domElement);
 
@@ -272,6 +273,10 @@ export class SceneManager {
 
   getRenderer() {
     return this.renderer;
+  }
+
+  getCanvasElement() {
+    return this.renderer ? this.renderer.domElement : null;
   }
 
   setCanvasPointerEvents(pointerEvents) {
