@@ -1,100 +1,16 @@
-console.log("webxr.js LOADED");
+import { ARApp } from "./ar/App.js";
 
-const sceneEl = document.querySelector("a-scene");
-const cameraEl = document.getElementById("camera") || document.querySelector("[camera]");
-const statusEl = document.getElementById("gps-status");
-const arModeEl = document.getElementById("ar-mode");
-const enterXrBtn = document.getElementById("enter-xr");
+const app = new ARApp();
 
-function setStatus(text) {
-  if (statusEl) statusEl.textContent = text;
-}
-
-function setArMode(text) {
-  if (arModeEl) arModeEl.textContent = text;
-}
-
-function setEnterXrVisible(visible) {
-  if (!enterXrBtn) return;
-  enterXrBtn.style.display = visible ? "inline-block" : "none";
-  enterXrBtn.disabled = !visible;
-}
-
-async function supportsWebXR() {
-  if (!navigator.xr || !navigator.xr.isSessionSupported) return false;
-  try {
-    return await navigator.xr.isSessionSupported("immersive-ar");
-  } catch {
-    return false;
+app.init().catch((error) => {
+  const statusMessage = document.getElementById("status-message");
+  if (statusMessage) {
+    const message = error instanceof Error ? error.message : "Unbekannter Initialisierungsfehler";
+    statusMessage.textContent = `Initialisierung fehlgeschlagen: ${message}`;
   }
-}
+  console.error("AR app init failed:", error);
+});
 
-function enableWebXR() {
-  if (!sceneEl) return;
-  sceneEl.setAttribute("webxr", "optionalFeatures: local-floor");
-  sceneEl.setAttribute("xr-mode-ui", "enabled: true");
-  sceneEl.removeAttribute("arjs");
-  if (cameraEl) {
-    cameraEl.removeAttribute("gps-camera");
-    cameraEl.removeAttribute("rotation-reader");
-  }
-}
-
-function enableArjsFallback() {
-  if (!sceneEl) return;
-  sceneEl.setAttribute("arjs", "sourceType: webcam; debugUIEnabled: false;");
-  sceneEl.setAttribute("xr-mode-ui", "enabled: false");
-  sceneEl.removeAttribute("webxr");
-  if (cameraEl) {
-    cameraEl.setAttribute("gps-camera", "");
-    cameraEl.setAttribute("rotation-reader", "");
-  }
-  if (typeof window !== "undefined" && typeof window.applyArjsStabilization === "function") {
-    window.applyArjsStabilization();
-  }
-}
-
-async function initXRMode() {
-  const canWebXR = await supportsWebXR();
-  if (canWebXR) {
-    console.log("WebXR supported, enabling immersive AR.");
-    enableWebXR();
-    setStatus("webxr ready");
-    setArMode("webxr");
-    setEnterXrVisible(true);
-  } else {
-    console.warn("WebXR not supported, falling back to AR.js.");
-    enableArjsFallback();
-    setStatus("webxr unsupported, using ar.js");
-    setArMode("ar.js");
-    setEnterXrVisible(false);
-  }
-}
-
-if (sceneEl) {
-  if (sceneEl.hasLoaded) {
-    initXRMode();
-  } else {
-    sceneEl.addEventListener("loaded", () => initXRMode(), { once: true });
-  }
-  sceneEl.addEventListener("enter-vr", () => {
-    window.webarWebXRActive = true;
-    setStatus("webxr active");
-    setArMode("webxr active");
-  });
-  sceneEl.addEventListener("exit-vr", () => {
-    window.webarWebXRActive = false;
-    setStatus("webxr exited");
-    setArMode("ar.js");
-    if (typeof window !== "undefined" && typeof window.applyArjsStabilization === "function") {
-      window.applyArjsStabilization();
-    }
-  });
-}
-
-if (enterXrBtn) {
-  enterXrBtn.addEventListener("click", () => {
-    if (!sceneEl) return;
-    sceneEl.enterVR();
-  });
-}
+window.addEventListener("beforeunload", () => {
+  app.dispose();
+});

@@ -2,190 +2,98 @@
 <html lang="de">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-  <title>Location-Based WebAR</title>
-
-  <!-- A-Frame -->
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-
-  <!-- Look-At Component -->
-  <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
-
-  <!-- AR.js (GPS) -->
-  <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
-
-  <link rel="stylesheet" href="styles.css" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
+  />
+  <title>Stable WebXR AR Placement</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+      }
+    }
+  </script>
 </head>
+<body>
+  <div id="app-shell">
+    <div id="render-root" aria-label="3D viewport"></div>
 
-<body style="margin: 0; overflow: hidden;">
+    <div id="hud" class="hud" aria-live="polite">
+      <section class="panel hero-panel">
+        <p class="eyebrow">Markerlose WebXR AR</p>
+        <h1>Stable Surface Placement</h1>
+        <p id="status-message" class="status-message">
+          Browser und WebXR-Support werden geprueft.
+        </p>
 
-<a-scene
-  id="scene"
-  embedded
-  vr-mode-ui="enabled: false"
-  xr-mode-ui="enabled: false"
->
-  <a-entity
-    id="world-object"
-    position="0 0 -2"
-  >
-    <a-entity id="model-entity"></a-entity>
-  </a-entity>
+        <div class="button-row">
+          <button id="start-ar-button" class="button button-primary" type="button">
+            AR starten
+          </button>
+          <button id="place-button" class="button" type="button">
+            Objekt setzen
+          </button>
+          <button id="reset-button" class="button" type="button">
+            Neu platzieren
+          </button>
+          <button id="stop-ar-button" class="button button-ghost" type="button">
+            AR beenden
+          </button>
+        </div>
+      </section>
 
-  <a-camera id="camera"></a-camera>
-</a-scene>
+      <section class="panel state-panel">
+        <div class="section-header">
+          <h2>Status</h2>
+          <span id="asset-name" class="asset-badge">Modell laedt</span>
+        </div>
 
-<div id="gps-debug">
-  <div id="gps-header">
-    <span>GPS Debug</span>
-    <button id="gps-toggle">−</button>
+        <div class="state-grid">
+          <article class="state-item" data-state="support" data-status="idle">
+            <span class="state-label">WebXR</span>
+            <strong id="state-support" class="state-value">Pruefung</strong>
+          </article>
+          <article class="state-item" data-state="session" data-status="idle">
+            <span class="state-label">AR aktiv</span>
+            <strong id="state-session" class="state-value">Nein</strong>
+          </article>
+          <article class="state-item" data-state="tracking" data-status="idle">
+            <span class="state-label">Tracking</span>
+            <strong id="state-tracking" class="state-value">Wartet</strong>
+          </article>
+          <article class="state-item" data-state="surface" data-status="idle">
+            <span class="state-label">Flaeche</span>
+            <strong id="state-surface" class="state-value">Suche</strong>
+          </article>
+          <article class="state-item" data-state="stability" data-status="idle">
+            <span class="state-label">Stabilitaet</span>
+            <strong id="state-stability" class="state-value">Wartet</strong>
+          </article>
+          <article class="state-item" data-state="placement" data-status="idle">
+            <span class="state-label">Objekt</span>
+            <strong id="state-placement" class="state-value">Nicht platziert</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel note-panel">
+        <h2>Ablauf</h2>
+        <p id="interaction-hint" class="hint-text">
+          Fallback-3D-Ansicht aktiv. Im AR-Modus eine horizontale Flaeche ruhig anvisieren.
+        </p>
+      </section>
+    </div>
   </div>
 
-  <div id="gps-content">
-    <details class="debug-section" open>
-      <summary>Device</summary>
-      <div>Lat: <span id="dev-lat">-</span></div>
-      <div>Lon: <span id="dev-lon">-</span></div>
-      <div>Heading: <span id="device-heading">-</span></div>
-      <div>Device altitude (m): <span id="dev-alt">-</span></div>
-      <div>Altitude accuracy (m): <span id="dev-alt-acc">-</span></div>
-      <div>Ground height (m): <span id="ground-height">-</span></div>
-      <div>Height tile: <span id="ground-tile">-</span></div>
-      <div>AR Mode: <span id="ar-mode">-</span></div>
-      <button id="enter-xr">Enter AR</button>
-      <div id="gps-status">waiting for permission</div>
-    </details>
+  <noscript>
+    <div class="noscript-banner">
+      Diese Anwendung benoetigt JavaScript fuer Three.js und WebXR.
+    </div>
+  </noscript>
 
-    <details class="debug-section" open>
-      <summary>Object</summary>
-      <div>Lat: <span id="obj-lat">50.989135</span></div>
-      <div>Lon: <span id="obj-lon">11.022858</span></div>
-      <div id="obj-distance">Dist: -</div>
-      <div>WebXR dist (m): <span id="webxr-distance">-</span></div>
-      <div>WebXR bearing (deg): <span id="webxr-bearing">-</span></div>
-    </details>
-
-    <details class="debug-section">
-      <summary>Test Coordinates</summary>
-      <div>
-        <label for="test-lat">Lat</label>
-        <input id="test-lat" type="number" step="0.000001" placeholder="50.989135" />
-      </div>
-      <div>
-        <label for="test-lon">Lon</label>
-        <input id="test-lon" type="number" step="0.000001" placeholder="11.022858" />
-      </div>
-      <button id="apply-test-coords">Apply</button>
-    </details>
-
-    <details class="debug-section" open>
-      <summary>Height</summary>
-      <div>Y: <span id="obj-height">0.00</span> m</div>
-      <div>
-        <label for="test-height">Height (m)</label>
-        <input id="test-height" type="number" step="0.1" placeholder="0" />
-      </div>
-      <div>
-        <label for="lock-ground">Lock to ground</label>
-        <input id="lock-ground" type="checkbox" checked />
-      </div>
-      <div>
-        <label for="use-device-alt">Use device altitude</label>
-        <input id="use-device-alt" type="checkbox" checked />
-      </div>
-      <div>
-        <label for="alt-offset">Altitude offset (m)</label>
-        <input id="alt-offset" type="number" step="0.1" placeholder="0" value="0" />
-      </div>
-      <button id="apply-height">Apply Height</button>
-      <button id="reset-ahead">Reset 2m Ahead</button>
-      <button id="toggle-model">Toggle Model</button>
-    </details>
-
-    <details class="debug-section" open>
-      <summary>Stabilization</summary>
-      <div>
-        <label for="freeze-placement">Freeze placement (WebXR)</label>
-        <input id="freeze-placement" type="checkbox" checked />
-      </div>
-      <div>
-        <label for="min-move">Update threshold (m)</label>
-        <input id="min-move" type="number" min="0" step="0.5" value="2" />
-      </div>
-      <div>
-        <label for="max-acc">Max GPS accuracy (m)</label>
-        <input id="max-acc" type="number" min="1" step="1" value="12" />
-      </div>
-      <button id="unfreeze-now">Recalc now</button>
-    </details>
-
-    <details class="debug-section" open>
-      <summary>Placement Offset (m)</summary>
-      <div>
-        <label for="place-x-range">Offset X</label>
-        <input id="place-x-range" type="range" min="-10" max="10" step="0.1" value="0" />
-        <input id="place-x-number" type="number" min="-10" max="10" step="0.1" value="0" />
-      </div>
-      <div>
-        <label for="place-z-range">Offset Z</label>
-        <input id="place-z-range" type="range" min="-10" max="10" step="0.1" value="0" />
-        <input id="place-z-number" type="number" min="-10" max="10" step="0.1" value="0" />
-      </div>
-      <button id="reset-placement">Reset Offset</button>
-    </details>
-
-    <details class="debug-section">
-      <summary>Scale</summary>
-      <div>
-        <label for="scale-x">Scale X</label>
-        <input id="scale-x" type="number" step="0.1" placeholder="1" value="1" />
-      </div>
-      <div>
-        <label for="scale-y">Scale Y</label>
-        <input id="scale-y" type="number" step="0.1" placeholder="1" value="1" />
-      </div>
-      <div>
-        <label for="scale-z">Scale Z</label>
-        <input id="scale-z" type="number" step="0.1" placeholder="1" value="1" />
-      </div>
-      <button id="apply-scale">Apply Scale</button>
-      <button id="reset-scale">Reset Scale</button>
-    </details>
-
-    <details class="debug-section">
-      <summary>Model Transform</summary>
-      <div>
-        <label for="rot-x">Rot X</label>
-        <input id="rot-x" type="number" step="1" placeholder="0" value="0" />
-      </div>
-      <div>
-        <label for="rot-y">Rot Y</label>
-        <input id="rot-y" type="number" step="1" placeholder="0" value="0" />
-      </div>
-      <div>
-        <label for="rot-z">Rot Z</label>
-        <input id="rot-z" type="number" step="1" placeholder="0" value="0" />
-      </div>
-      <div>
-        <label for="off-x">Offset X</label>
-        <input id="off-x" type="number" step="0.1" placeholder="0" value="0" />
-      </div>
-      <div>
-        <label for="off-y">Offset Y</label>
-        <input id="off-y" type="number" step="0.1" placeholder="0" value="0" />
-      </div>
-      <div>
-        <label for="off-z">Offset Z</label>
-        <input id="off-z" type="number" step="0.1" placeholder="0" value="0" />
-      </div>
-      <button id="apply-transform">Apply Transform</button>
-      <button id="reset-transform">Reset Transform</button>
-    </details>
-  </div>
-</div>
-
-<script src="gps-debug.js"></script>
-<script src="webxr.js"></script>
-
+  <script type="module" src="./webxr.js"></script>
 </body>
 </html>

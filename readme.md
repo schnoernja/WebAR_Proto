@@ -41,6 +41,7 @@ Das Projekt ist dann unter http://localhost:8080 erreichbar.
 - Debug-UI ist in klappbare Sektionen unterteilt (Device/Object/Height/Scale/Transform/Test).
 - AR-Mode-Anzeige + "Enter AR"-Button zeigt WebXR vs. AR.js; Button nur bei WebXR-Verfuegbarkeit.
 - WebXR-GPS-Bridge: WebXR liefert stabiles Tracking, GPS liefert reale Position; Platzierung ueber Distanz/Bearing + Heading.
+- Neue Stabilisierungsschalter: Freeze‑Placement, Update‑Threshold, GPS‑Accuracy, optionaler XR‑Anchor (falls Plattform unterstützt) und einstellbarer World‑Position‑Smoothing‑Faktor, um ein „Baumobjekt“ ohne Wackeln im Raum zu behalten.
 - Height-Berechnung funktioniert: Ground-Height aus `/api/height.php`, Objekt-Y wird korrekt gesetzt; optional Device-Altitude + Offset.
 - Sichtbarkeitsgrenze aktuell bei 100 m fuer Debug/Tests.
 - Modell-Tools erweitert: Rotation/Offset, individuelle Scale-Werte pro Modell, Model-Switch, "2 m voraus" Reset.

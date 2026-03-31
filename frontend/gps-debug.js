@@ -43,9 +43,18 @@ const placeZRange = document.getElementById("place-z-range");
 const placeZNumber = document.getElementById("place-z-number");
 const resetPlacementBtn = document.getElementById("reset-placement");
 const freezePlacementInput = document.getElementById("freeze-placement");
+const useXrAnchorInput = document.getElementById("use-xr-anchor");
 const minMoveInput = document.getElementById("min-move");
 const maxAccInput = document.getElementById("max-acc");
+const worldSmoothAlphaInput = document.getElementById("world-smooth-alpha");
 const unfreezeNowBtn = document.getElementById("unfreeze-now");
+
+// world smoothing / anchor support globals
+let xrRefSpace = null;
+let xrAnchor = null;
+let anchorSupported = false;
+let lastWorldPosSmoothed = null;
+const DEFAULT_WORLD_SMOOTH_ALPHA = 0.1;
 
 const toggleBtn = document.getElementById("gps-toggle");
 const debugBox = document.getElementById("gps-debug");
@@ -178,6 +187,17 @@ function smoothAngleDeg(prev, next, alpha) {
   return (prev + delta * alpha + 360) % 360;
 }
 
+// simple exponential smoothing for world space vectors
+function smoothWorldPos(target, alpha) {
+  if (!window.THREE) return target.clone();
+  if (!lastWorldPosSmoothed) {
+    lastWorldPosSmoothed = target.clone();
+    return target.clone();
+  }
+  lastWorldPosSmoothed.lerp(target, alpha);
+  return lastWorldPosSmoothed.clone();
+}
+
 function handleDeviceOrientation(evt) {
   if (!evt || typeof evt.alpha !== "number") return;
   // Convert alpha (clockwise from north) to compass heading.
@@ -288,7 +308,46 @@ if (modelEntity) {
 }
 if (sceneEl) {
   sceneEl.addEventListener("enter-vr", () => {
-    updateWebXRPlacement();
+    const session = sceneEl.renderer.xr.getSession();
+    anchorSupported = !!(session && typeof session.requestAnchor === "function");
+    if (anchorSupported) {
+      xrRefSpace = sceneEl.renderer.xr.getReferenceSpace();
+      console.log("XR anchors available");
+    } else {
+      xrAnchor = null;
+    }
+
+    // try to get geospatial reference space (Android/Chrome flag currently)
+    if (session && typeof session.requestReferenceSpace === "function") {
+      session
+        .requestReferenceSpace("geospatial")
+        .then((geo) => {
+          console.log("geospatial reference space active");
+          // in the future we could convert lat/lon directly via geo.pose
+          // for now we just keep the space around if needed
+          xrGeoRefSpace = geo;
+        })
+        .catch(() => {
+          // not supported or permission denied
+        });
+    }
+
+    // animation loop to keep placement / anchor updated every frame
+    if (session) {
+      const onXRFrame = (time, frame) => {
+        updateWebXRPlacement(frame);
+        session.requestAnimationFrame(onXRFrame);
+      };
+      session.requestAnimationFrame(onXRFrame);
+    } else {
+      // fallback: one-off placement
+      updateWebXRPlacement();
+    }
+  });
+  sceneEl.addEventListener("exit-vr", () => {
+    // clear any existing anchor when session ends
+    xrAnchor = null;
+    anchorSupported = false;
   });
 }
 if (worldObject) {
@@ -368,16 +427,61 @@ function computeWebXRHeight() {
   return base + offset;
 }
 
-function updateWebXRPlacement() {
+function updateWebXRPlacement(frame) {
+  // frame is optional; provided by XR animation callback
   if (!isWebXRActive() || !xrCameraEl || !worldObject || !objectCoords || !window.THREE) return;
   const deviceCoords = getDeviceCoordsForPlacement();
   if (!deviceCoords) return;
+
+  // if user requested an XR anchor and the platform supports it, attempt to use it
+  if (useXrAnchorInput && useXrAnchorInput.checked && anchorSupported) {
+    if (!xrAnchor && frame) {
+      // compute a transform from current camera/world position & create anchor once
+      const camObj = xrCameraEl.object3D;
+      const worldPos = new THREE.Vector3();
+      camObj.getWorldPosition(worldPos);
+      const placement = getPlacementOffsetValues();
+      const y = computeWebXRHeight();
+      const offset = new THREE.Vector3(placement.x, y, placement.z);
+      offset.applyQuaternion(camObj.quaternion);
+      worldPos.add(offset);
+      const quat = new THREE.Quaternion();
+      camObj.getWorldQuaternion(quat);
+      const transform = new XRRigidTransform(
+        { x: worldPos.x, y: worldPos.y, z: worldPos.z },
+        { x: quat.x, y: quat.y, z: quat.z, w: quat.w }
+      );
+      try {
+        xrAnchor = frame.session.requestAnchor(transform, xrRefSpace);
+        console.log("created XR anchor at", worldPos);
+      } catch (err) {
+        console.warn("failed to request XR anchor", err);
+        xrAnchor = null;
+      }
+    }
+
+    if (xrAnchor && frame) {
+      const pose = frame.getPose(xrAnchor.anchorSpace, xrRefSpace);
+      if (pose) {
+        const p = pose.transform.position;
+        worldObject.object3D.position.set(p.x, p.y, p.z);
+        if (pose.transform.orientation) {
+          const o = pose.transform.orientation;
+          worldObject.object3D.quaternion.set(o.x, o.y, o.z, o.w);
+        }
+      }
+    }
+    return;
+  }
+
+  // normal placement path (with optional freeze & smoothing)
   const freeze = freezePlacementInput && freezePlacementInput.checked;
   if (freeze && lastPlacementWorldPos && lastPlacementQuaternion) {
     const placement = getPlacementOffsetValues();
     const y = computeWebXRHeight();
     const offset = new THREE.Vector3(placement.x, y, placement.z);
     offset.applyQuaternion(lastPlacementQuaternion);
+    // do not smooth when frozen
     worldObject.object3D.position.copy(lastPlacementWorldPos.clone().add(offset));
     return;
   }
@@ -413,9 +517,19 @@ function updateWebXRPlacement() {
   const offset = new THREE.Vector3(x + placement.x, y, z + placement.z);
   camObj.getWorldPosition(worldPos);
   offset.applyQuaternion(camObj.quaternion);
-  worldObject.object3D.position.copy(worldPos.add(offset));
-  lastStablePlacementCoords = { ...deviceCoords };
-  rememberPlacementAnchor(camObj);
+  let desiredPos = worldPos.add(offset);
+  if (!freeze) {
+    const alpha = worldSmoothAlphaInput
+      ? parseFloat(worldSmoothAlphaInput.value) || DEFAULT_WORLD_SMOOTH_ALPHA
+      : DEFAULT_WORLD_SMOOTH_ALPHA;
+    desiredPos = smoothWorldPos(desiredPos, alpha);
+  }
+  worldObject.object3D.position.copy(desiredPos);
+
+  if (!freeze) {
+    lastStablePlacementCoords = { ...deviceCoords };
+    rememberPlacementAnchor(camObj);
+  }
 }
 
 function applyGroundHeight() {
@@ -678,11 +792,24 @@ if (unfreezeNowBtn) {
 if (freezePlacementInput) {
   freezePlacementInput.addEventListener("change", applyStabilization);
 }
+if (useXrAnchorInput) {
+  useXrAnchorInput.addEventListener("change", () => {
+    // if anchor feature is toggled off, drop any existing anchor so it can
+    // be recreated later when toggled back on (or when entering XR again).
+    if (!useXrAnchorInput.checked) {
+      xrAnchor = null;
+    }
+    applyStabilization();
+  });
+}
 if (minMoveInput) {
   minMoveInput.addEventListener("input", applyStabilization);
 }
 if (maxAccInput) {
   maxAccInput.addEventListener("input", applyStabilization);
+}
+if (worldSmoothAlphaInput) {
+  worldSmoothAlphaInput.addEventListener("input", applyStabilization);
 }
 
 function getOffsetValues() {
