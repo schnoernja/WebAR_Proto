@@ -6,33 +6,75 @@ function toEditableValue(value, fractionDigits = 6) {
 
 function toBadgeStatus(status) {
   switch (status) {
-    case "ready":
+    case "granted":
       return "ok";
     case "waiting":
       return "warning";
-    case "blocked":
-    case "unsupported":
-    case "error":
+    case "denied":
       return "error";
     default:
       return "idle";
   }
 }
 
-function toGeoBadgeLabel(status) {
-  switch (status) {
-    case "ready":
-      return "Live";
+function toGeoSeverity(snapshot) {
+  if (!snapshot) {
+    return "idle";
+  }
+
+  if (snapshot.issue === "https-required" || snapshot.issue === "unsupported") {
+    return "error";
+  }
+
+  if (snapshot.status === "denied") {
+    return "error";
+  }
+
+  return toBadgeStatus(snapshot.status);
+}
+
+function toGeoBadgeLabel(snapshot) {
+  if (!snapshot) {
+    return "Pruefung";
+  }
+
+  if (snapshot.issue === "https-required") {
+    return "HTTPS";
+  }
+
+  if (snapshot.issue === "unsupported") {
+    return "Kein GPS";
+  }
+
+  switch (snapshot.status) {
+    case "granted":
+      return "Granted";
     case "waiting":
       return "Wartet";
-    case "blocked":
-      return "Blockiert";
-    case "unsupported":
-      return "Kein GPS";
-    case "error":
-      return "Fehler";
+    case "denied":
+      return "Denied";
+    case "not-requested":
+      return "Bereit";
     default:
       return "Pruefung";
+  }
+}
+
+function toGeoStatusText(snapshot) {
+  if (!snapshot) {
+    return "Not requested";
+  }
+
+  switch (snapshot.status) {
+    case "granted":
+      return "Granted";
+    case "waiting":
+      return "Waiting for permission";
+    case "denied":
+      return "Denied";
+    case "not-requested":
+    default:
+      return "Not requested";
   }
 }
 
@@ -59,6 +101,7 @@ export class UIController {
     this.resetButton = this.document.getElementById("reset-button");
     this.stopButton = this.document.getElementById("stop-ar-button");
     this.applyGeoTargetButton = this.document.getElementById("apply-geo-target-button");
+    this.activateGeoButton = this.document.getElementById("activate-geolocation-button");
 
     this.modeSelect = this.document.getElementById("placement-mode-select");
     this.geoTargetInputs = {
@@ -68,10 +111,12 @@ export class UIController {
 
     this.geoRefs = {
       statusBadge: this.document.getElementById("geo-status-badge"),
+      statusText: this.document.getElementById("geo-status-text"),
       latitude: this.document.getElementById("geo-latitude"),
       longitude: this.document.getElementById("geo-longitude"),
       accuracy: this.document.getElementById("geo-accuracy"),
-      message: this.document.getElementById("geo-message")
+      message: this.document.getElementById("geo-message"),
+      help: this.document.getElementById("geo-help")
     };
 
     this.miniRefs = {
@@ -96,7 +141,9 @@ export class UIController {
       stableSurface: false,
       placed: false,
       placementMode: "free",
-      hudCollapsed: this.readStoredCollapsedState()
+      hudCollapsed: this.readStoredCollapsedState(),
+      geoStatus: "not-requested",
+      geoWatchActive: false
     };
 
     this.geoTargetDraft = {
@@ -110,8 +157,10 @@ export class UIController {
     this.setPlacementMode(this.uiState.placementMode);
     this.refreshMiniSummary();
     this.renderGeoSnapshot({
-      status: "idle",
-      message: "Geolocation wird initialisiert.",
+      status: "not-requested",
+      issue: null,
+      message: "Standort noch nicht angefordert.",
+      helpText: "Tippe auf 'Standort aktivieren', damit der Browser die Freigabe anfragt.",
       position: null
     });
   }
@@ -123,13 +172,22 @@ export class UIController {
     };
   }
 
-  bindActions({ onStartAR, onPlace, onResetPlacement, onStopAR, onApplyGeoTarget, onModeChange }) {
+  bindActions({
+    onStartAR,
+    onPlace,
+    onResetPlacement,
+    onStopAR,
+    onApplyGeoTarget,
+    onModeChange,
+    onRequestGeolocation
+  }) {
     this.bindButton(this.startButton, onStartAR);
     this.bindButton(this.placeButton, onPlace);
     this.bindButton(this.resetButton, onResetPlacement);
     this.bindButton(this.stopButton, onStopAR);
     this.bindButton(this.toggleButton, () => this.toggleCollapsed());
     this.bindButton(this.applyGeoTargetButton, () => this.handleApplyGeoTarget(onApplyGeoTarget));
+    this.bindButton(this.activateGeoButton, onRequestGeolocation);
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
@@ -421,12 +479,21 @@ export class UIController {
 
   renderGeoSnapshot(snapshot) {
     const position = snapshot && snapshot.position ? snapshot.position : null;
-    const status = snapshot && snapshot.status ? snapshot.status : "idle";
-    const message = snapshot && snapshot.message ? snapshot.message : "Geolocation wird initialisiert.";
+    const message = snapshot && snapshot.message ? snapshot.message : "Standort noch nicht angefordert.";
+    const helpText = snapshot && snapshot.helpText ? snapshot.helpText : "";
+    const severity = toGeoSeverity(snapshot);
+    const statusText = toGeoStatusText(snapshot);
+
+    this.uiState.geoStatus = snapshot && snapshot.status ? snapshot.status : "not-requested";
+    this.uiState.geoWatchActive = Boolean(snapshot && snapshot.watchActive);
 
     if (this.geoRefs.statusBadge) {
-      this.geoRefs.statusBadge.textContent = toGeoBadgeLabel(status);
-      this.geoRefs.statusBadge.dataset.status = toBadgeStatus(status);
+      this.geoRefs.statusBadge.textContent = toGeoBadgeLabel(snapshot);
+      this.geoRefs.statusBadge.dataset.status = severity;
+    }
+
+    if (this.geoRefs.statusText) {
+      this.geoRefs.statusText.textContent = statusText;
     }
 
     if (this.geoRefs.latitude) {
@@ -443,6 +510,18 @@ export class UIController {
 
     if (this.geoRefs.message) {
       this.geoRefs.message.textContent = message;
+    }
+
+    if (this.geoRefs.help) {
+      this.geoRefs.help.textContent = helpText;
+      this.geoRefs.help.hidden = !helpText;
+    }
+
+    if (this.activateGeoButton) {
+      this.activateGeoButton.disabled =
+        this.uiState.geoStatus === "waiting" ||
+        this.uiState.geoWatchActive ||
+        (snapshot && (snapshot.issue === "https-required" || snapshot.issue === "unsupported"));
     }
   }
 

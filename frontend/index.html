@@ -151,11 +151,21 @@
 
           <section class="panel geo-panel">
             <div class="section-header">
-              <h2>Device Position</h2>
-              <span id="geo-status-badge" class="panel-tag">Wartet</span>
+              <h2>Geolocation</h2>
+              <span id="geo-status-badge" class="panel-tag">Bereit</span>
+            </div>
+
+            <div class="geo-actions">
+              <button id="activate-geolocation-button" class="button" type="button">
+                Standort aktivieren
+              </button>
             </div>
 
             <div class="geo-grid">
+              <article class="geo-item geo-item-wide">
+                <span class="geo-label">Status</span>
+                <strong id="geo-status-text" class="geo-value">Not requested</strong>
+              </article>
               <article class="geo-item">
                 <span class="geo-label">Lat</span>
                 <strong id="geo-latitude" class="geo-value">-</strong>
@@ -171,7 +181,10 @@
             </div>
 
             <p id="geo-message" class="hint-text">
-              Geolocation wird initialisiert.
+              Standort noch nicht angefordert.
+            </p>
+            <p id="geo-help" class="hint-text geo-help">
+              Tippe auf "Standort aktivieren", damit der Browser die Freigabe anfragt.
             </p>
           </section>
         </div>

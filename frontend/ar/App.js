@@ -80,10 +80,9 @@ export class ARApp {
       onResetPlacement: () => this.resetPlacement(),
       onStopAR: () => this.stopAR(),
       onApplyGeoTarget: (coord) => this.applyGeoTarget(coord),
-      onModeChange: (mode) => this.applyPlacementMode(mode)
+      onModeChange: (mode) => this.applyPlacementMode(mode),
+      onRequestGeolocation: () => this.requestGeoLocation()
     });
-
-    this.geoLocationService.start();
 
     const support = await this.arSessionManager.checkSupport();
     this.ui.setSupportState(support.available, support.message);
@@ -253,6 +252,10 @@ export class ARApp {
     return true;
   }
 
+  requestGeoLocation() {
+    return this.geoLocationService.requestPermissionAndStart();
+  }
+
   placeFreeObject() {
     if (!this.arSessionManager || !this.arSessionManager.isActive()) {
       return false;
@@ -344,7 +347,11 @@ export class ARApp {
     }
 
     if (!this.placementController.hasGeoOrigin()) {
-      this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.");
+      if (this.geoLocationService.getStatus() !== "granted") {
+        this.ui.setHint("Koordinaten-Modus aktiv. Aktiviere zuerst den Standort ueber 'Standort aktivieren'.");
+      } else {
+        this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.");
+      }
       return;
     }
 

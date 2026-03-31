@@ -449,11 +449,19 @@ body.ar-active .field-input {
   margin-top: 14px;
 }
 
+.geo-actions {
+  margin-top: 14px;
+}
+
 .geo-item {
   border-radius: var(--radius-md);
   border: 1px solid rgba(19, 35, 38, 0.08);
   background: rgba(255, 255, 255, 0.42);
   padding: 12px 14px;
+}
+
+.geo-item-wide {
+  grid-column: 1 / -1;
 }
 
 body.ar-active .geo-item {
@@ -466,6 +474,10 @@ body.ar-active .geo-item {
   margin-top: 8px;
   font-size: 1rem;
   line-height: 1.2;
+}
+
+.geo-help[hidden] {
+  display: none;
 }
 
 .section-header {
