@@ -182,6 +182,7 @@ export class UIController {
     this.uiInteracting = false;
     this.uiInteractionChangeHandler = null;
     this.hudCollapsedChangeHandler = null;
+    this.uiFocusChangeHandler = null;
 
     this.cleanupCallbacks = [];
 
@@ -215,10 +216,12 @@ export class UIController {
     onModeChange,
     onRequestGeolocation,
     onUIInteractionChange,
-    onHudCollapsedChange
+    onHudCollapsedChange,
+    onUIFocusChange
   }) {
     this.uiInteractionChangeHandler = typeof onUIInteractionChange === "function" ? onUIInteractionChange : null;
     this.hudCollapsedChangeHandler = typeof onHudCollapsedChange === "function" ? onHudCollapsedChange : null;
+    this.uiFocusChangeHandler = typeof onUIFocusChange === "function" ? onUIFocusChange : null;
 
     this.bindButton(this.startButton, onStartAR);
     this.bindButton(this.placeButton, onPlace);
@@ -233,6 +236,7 @@ export class UIController {
     this.bindSelect(this.modeSelect, () => this.handleModeChange(onModeChange));
     this.bindHudInteraction();
     this.bindDeviceCoordinateCopy();
+    this.bindFieldFocusState();
 
     this.refreshButtons();
     this.notifyHudCollapsedChange();
@@ -331,6 +335,31 @@ export class UIController {
     for (const trigger of this.geoCopyTriggers) {
       trigger.addEventListener("click", handleCopy);
       this.cleanupCallbacks.push(() => trigger.removeEventListener("click", handleCopy));
+    }
+  }
+
+  bindFieldFocusState() {
+    const focusableFields = [this.modeSelect, this.geoTargetInputs.latitude, this.geoTargetInputs.longitude].filter(
+      Boolean
+    );
+
+    for (const field of focusableFields) {
+      const handleFocus = () => {
+        if (this.uiFocusChangeHandler) {
+          this.uiFocusChangeHandler(true);
+        }
+      };
+      const handleBlur = () => {
+        if (this.uiFocusChangeHandler) {
+          this.uiFocusChangeHandler(false);
+        }
+      };
+
+      field.addEventListener("focus", handleFocus);
+      field.addEventListener("blur", handleBlur);
+
+      this.cleanupCallbacks.push(() => field.removeEventListener("focus", handleFocus));
+      this.cleanupCallbacks.push(() => field.removeEventListener("blur", handleBlur));
     }
   }
 

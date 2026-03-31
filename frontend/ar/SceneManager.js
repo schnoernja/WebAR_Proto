@@ -253,6 +253,10 @@ export class SceneManager {
   }
 
   handleResize() {
+    if (this.renderer.xr.isPresenting) {
+      return;
+    }
+
     const width = this.container.clientWidth || window.innerWidth;
     const height = this.container.clientHeight || window.innerHeight;
 

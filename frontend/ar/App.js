@@ -66,6 +66,7 @@ export class ARApp {
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
     this.isUIInteracting = false;
+    this.isUIFocused = false;
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -109,7 +110,8 @@ export class ARApp {
       onModeChange: (mode) => this.applyPlacementMode(mode),
       onRequestGeolocation: () => this.requestGeoLocation(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
-      onHudCollapsedChange: (isCollapsed) => this.handleHudCollapsedChange(isCollapsed)
+      onHudCollapsedChange: (isCollapsed) => this.handleHudCollapsedChange(isCollapsed),
+      onUIFocusChange: (isFocused) => this.handleUIFocusChange(isFocused)
     });
 
     const support = await this.arSessionManager.checkSupport();
@@ -199,6 +201,11 @@ export class ARApp {
         Boolean(frame) && Boolean(referenceSpace)
           ? frame.getViewerPose(referenceSpace)
           : null;
+      if (this.isUIFocused) {
+        this.sceneManager.render();
+        return;
+      }
+
       const tracking = Boolean(viewerPose);
       const cameraState = buildCameraState(viewerPose);
 
@@ -234,7 +241,7 @@ export class ARApp {
   }
 
   handleSelect() {
-    if (this.isUIInteracting) {
+    if (this.isUIInteracting || this.isUIFocused) {
       return;
     }
 
@@ -373,6 +380,10 @@ export class ARApp {
 
   handleHudCollapsedChange(isCollapsed) {
     this.sceneManager.setCanvasPointerEvents(isCollapsed ? "auto" : "none");
+  }
+
+  handleUIFocusChange(isFocused) {
+    this.isUIFocused = isFocused;
   }
 
   syncDebugPanels(surfaceState = null, cameraState = null) {
