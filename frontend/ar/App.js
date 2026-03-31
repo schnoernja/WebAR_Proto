@@ -2,7 +2,7 @@ import { SceneManager } from "./SceneManager.js";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
-import { PlacementController } from "./PlacementController.js";
+import { PlacementController, PlacementMode } from "./PlacementController.js";
 import { UIController } from "./UIController.js";
 import { GeoLocationService } from "./GeoLocationService.js";
 
@@ -12,6 +12,17 @@ function toMessage(error, fallbackMessage = "unbekannter Fehler") {
   }
 
   return fallbackMessage;
+}
+
+function toGeoCoord(position) {
+  if (!position) {
+    return null;
+  }
+
+  return {
+    latitude: position.latitude,
+    longitude: position.longitude
+  };
 }
 
 export class ARApp {
@@ -28,9 +39,11 @@ export class ARApp {
     this.placementController = null;
     this.arSessionManager = null;
     this.lastFrameTimeMs = 0;
+    this.activeSurfaceState = null;
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
+    this.handleSelect = this.handleSelect.bind(this);
   }
 
   async init() {
@@ -42,27 +55,32 @@ export class ARApp {
 
     const assetInfo = await this.sceneManager.createPlacementAsset();
     this.placementController.setAsset(assetInfo.object);
+
     this.ui.setAssetLabel(assetInfo.label);
-    this.ui.setTargetCoordInputs(this.placementController.getTargetCoordinate());
+    this.ui.setPlacementMode(this.placementController.getMode());
+    this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
 
     if (assetInfo.usedPlaceholder) {
       this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
     } else {
-      this.ui.setHint("Fallback-3D-Ansicht aktiv. In AR wird tree.glb automatisch relativ zur Referenzflaeche gesetzt.");
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Modus per Latitude/Longitude.");
     }
 
     this.arSessionManager = new ARSessionManager({
       renderer: this.sceneManager.getRenderer(),
       overlayRoot: this.document.getElementById("hud"),
-      onSessionEnded: this.handleSessionEnded
+      onSessionEnded: this.handleSessionEnded,
+      onSelect: this.handleSelect
     });
 
     this.ui.bindActions({
       onStartAR: () => this.startAR(),
+      onPlace: () => this.placeFreeObject(),
       onResetPlacement: () => this.resetPlacement(),
       onStopAR: () => this.stopAR(),
-      onApplyTargetCoord: (coord) => this.applyTargetCoord(coord)
+      onApplyGeoTarget: (coord) => this.applyGeoTarget(coord),
+      onModeChange: (mode) => this.applyPlacementMode(mode)
     });
 
     this.geoLocationService.start();
@@ -79,6 +97,7 @@ export class ARApp {
 
   async startAR() {
     this.lastFrameTimeMs = 0;
+    this.activeSurfaceState = null;
     this.ui.setMessage("Starte immersive AR...");
 
     let result = null;
@@ -106,12 +125,20 @@ export class ARApp {
 
     this.poseStabilizer.reset();
     this.arSessionManager.clearOriginPose();
+    this.placementController.clearGeoOrigin();
     this.placementController.enterARMode();
+    this.captureGeoOriginFromDevice();
     this.sceneManager.setARMode(true);
     this.ui.setSessionState(true, result.message);
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
+
+    if (this.placementController.getMode() === PlacementMode.GEO && !this.placementController.hasGeoOrigin()) {
+      this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.");
+      return;
+    }
+
     this.ui.setHint("Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.");
   }
 
@@ -121,6 +148,7 @@ export class ARApp {
 
   handleSessionEnded() {
     this.lastFrameTimeMs = 0;
+    this.activeSurfaceState = null;
     this.hitTestManager.dispose();
     this.poseStabilizer.reset();
     this.sceneManager.setARMode(false);
@@ -152,95 +180,211 @@ export class ARApp {
         surfaceState = this.poseStabilizer.update(null, deltaSeconds);
       }
 
+      this.activeSurfaceState = surfaceState;
       this.placementController.updateSurfaceState(surfaceState);
       this.ui.setSurfaceState(surfaceState.surfaceDetected, surfaceState.isStable);
 
-      if (tracking) {
-        this.maybePlaceAtTargetCoordinate(surfaceState);
+      if (surfaceState.isStable && !this.arSessionManager.hasOriginPose()) {
+        this.arSessionManager.setOriginPose(surfaceState.stablePose);
+      }
+
+      if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
+        this.maybePlaceGeoObject(surfaceState);
       }
 
       this.ui.setPlacementState(this.placementController.isPlaced());
-
-      if (this.placementController.isPlaced()) {
-        this.ui.setHint("Baum fixiert. 'Neu platzieren' setzt Referenzflaeche und Zielpunkt neu.");
-      } else if (surfaceState.isStable) {
-        this.ui.setHint("Stabile Referenzflaeche erkannt. Zielkoordinate wird automatisch gesetzt.");
-      } else if (surfaceState.surfaceDetected) {
-        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.");
-      } else {
-        this.ui.setHint("Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.");
-      }
+      this.updateInteractionHint(surfaceState, tracking);
     }
 
     this.sceneManager.render();
   }
 
-  maybePlaceAtTargetCoordinate(surfaceState) {
-    if (!surfaceState.isStable || this.placementController.isPlaced()) {
-      return;
+  handleSelect() {
+    if (this.placementController.getMode() === PlacementMode.FREE) {
+      this.placeFreeObject();
     }
-
-    if (!this.arSessionManager.hasOriginPose()) {
-      this.arSessionManager.setOriginPose(surfaceState.stablePose);
-    }
-
-    const originPose = this.arSessionManager.getOriginPose();
-    if (!originPose) {
-      return;
-    }
-
-    const placed = this.placementController.placeAtTargetCoordinate(originPose);
-    if (!placed) {
-      return;
-    }
-
-    const target = this.placementController.getTargetCoordinate();
-    this.ui.setMessage(
-      `tree.glb wurde automatisch auf die Zielkoordinate (${target.x.toFixed(1)}, ${target.y.toFixed(1)}, ${target.z.toFixed(1)}) gesetzt.`
-    );
   }
 
-  applyTargetCoord(coord) {
-    if (!this.placementController) {
-      return false;
-    }
-
-    const accepted = this.placementController.setTargetCoord(coord);
+  applyPlacementMode(mode) {
+    const accepted = this.placementController.setMode(mode);
     if (!accepted) {
-      this.ui.setMessage("Zielkoordinate konnte nicht uebernommen werden.");
+      this.ui.setMessage("Platzierungsmodus konnte nicht gewechselt werden.");
       return false;
     }
 
-    const target = this.placementController.getTargetCoordinate();
-    this.ui.setTargetCoordInputs(target);
-    this.ui.setMessage(
-      `Zielkoordinate uebernommen: (${target.x.toFixed(1)}, ${target.y.toFixed(1)}, ${target.z.toFixed(1)}).`
-    );
+    this.ui.setPlacementMode(this.placementController.getMode());
 
     if (this.placementController.isPlaced()) {
-      this.ui.setHint("Aktuelles Placement bleibt unveraendert. Neue Werte greifen nach Reset.");
+      this.ui.setHint("Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.");
+    } else if (this.placementController.getMode() === PlacementMode.GEO) {
+      this.ui.setHint("Koordinaten-Modus aktiv. Bei stabiler Flaeche wird das Objekt relativ zur Geo-Position gesetzt.");
     } else {
-      this.ui.setHint("Neue Zielkoordinate gespeichert. Sie wird bei der naechsten Platzierung verwendet.");
+      this.ui.setHint("Freie Platzierung aktiv. Sobald das Reticle stabil ist, kannst du das Objekt setzen.");
     }
 
     return true;
   }
 
+  applyGeoTarget(coord) {
+    if (!this.placementController) {
+      return false;
+    }
+
+    const accepted = this.placementController.setGeoTarget(coord);
+    if (!accepted) {
+      this.ui.setMessage("Geo-Koordinaten konnten nicht uebernommen werden.");
+      return false;
+    }
+
+    const target = this.placementController.getGeoTarget();
+    this.ui.setGeoTargetInputs(target);
+    this.ui.setMessage(
+      `Geo-Ziel uebernommen: ${target.latitude.toFixed(6)}, ${target.longitude.toFixed(6)}.`
+    );
+
+    if (this.placementController.isPlaced()) {
+      this.ui.setHint("Aktuelles Placement bleibt fixiert. Neue Geo-Koordinaten greifen nach Reset.");
+    } else if (this.placementController.getMode() === PlacementMode.GEO) {
+      this.ui.setHint("Neue Geo-Koordinaten gespeichert. Bei stabiler Flaeche wird die Position erneut geprueft.");
+    } else {
+      this.ui.setHint("Geo-Koordinaten gespeichert. Sie werden verwendet, sobald du in den Koordinaten-Modus wechselst.");
+    }
+
+    return true;
+  }
+
+  placeFreeObject() {
+    if (!this.arSessionManager || !this.arSessionManager.isActive()) {
+      return false;
+    }
+
+    if (this.placementController.getMode() !== PlacementMode.FREE) {
+      return false;
+    }
+
+    if (!this.activeSurfaceState || !this.activeSurfaceState.isStable || !this.activeSurfaceState.stablePose) {
+      this.ui.setMessage("Noch keine stabile Flaeche fuer die freie Platzierung.");
+      return false;
+    }
+
+    const placed = this.placementController.placeAtStablePose(this.activeSurfaceState.stablePose);
+    if (!placed) {
+      return false;
+    }
+
+    this.ui.setPlacementState(true);
+    this.ui.setMessage("Objekt stabil auf der erkannten Flaeche platziert.");
+    this.ui.setHint("Placement-Lock aktiv. Neu platzieren nur per Reset.");
+    return true;
+  }
+
+  maybePlaceGeoObject(surfaceState) {
+    if (!surfaceState.isStable || this.placementController.isPlaced()) {
+      return;
+    }
+
+    if (!this.placementController.hasGeoOrigin()) {
+      const captured = this.captureGeoOriginFromDevice();
+      if (!captured) {
+        return;
+      }
+    }
+
+    const computation = this.placementController.computeGeoPosition(surfaceState.stablePose);
+    if (computation.status !== "ready" || !computation.pose) {
+      return;
+    }
+
+    const placed = this.placementController.placeAtPose(computation.pose);
+    if (!placed) {
+      return;
+    }
+
+    this.ui.setPlacementState(true);
+    this.ui.setMessage(
+      `Objekt im Koordinaten-Modus platziert. Distanz zum Startpunkt: ${computation.distanceMeters.toFixed(1)} m.`
+    );
+    this.ui.setHint("Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.");
+  }
+
+  captureGeoOriginFromDevice() {
+    const devicePosition = this.geoLocationService.getCurrentPosition();
+    const geoCoord = toGeoCoord(devicePosition);
+    if (!geoCoord) {
+      return false;
+    }
+
+    return this.placementController.setGeoOrigin(geoCoord);
+  }
+
+  updateInteractionHint(surfaceState, tracking) {
+    if (this.placementController.isPlaced()) {
+      if (this.placementController.getMode() === PlacementMode.GEO) {
+        this.ui.setHint("Geo-Placement fixiert. 'Neu platzieren' berechnet die Zielposition erneut.");
+      } else {
+        this.ui.setHint("Objekt fixiert. 'Neu platzieren' aktiviert das Reticle erneut.");
+      }
+      return;
+    }
+
+    if (!tracking) {
+      this.ui.setHint("Tracking pausiert. Halte das Geraet ruhig, bis WebXR wieder Viewer-Pose liefert.");
+      return;
+    }
+
+    if (this.placementController.getMode() === PlacementMode.FREE) {
+      if (surfaceState.isStable) {
+        this.ui.setHint("Reticle stabil. Tippen oder 'Objekt setzen' druecken.");
+      } else if (surfaceState.surfaceDetected) {
+        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.");
+      } else {
+        this.ui.setHint("Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.");
+      }
+      return;
+    }
+
+    if (!this.placementController.hasGeoOrigin()) {
+      this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.");
+      return;
+    }
+
+    const geoState = this.placementController.getLastGeoComputation();
+    if (geoState.status === "too-far" && Number.isFinite(geoState.distanceMeters)) {
+      this.ui.setHint(`Objekt zu weit entfernt: ${geoState.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`);
+      return;
+    }
+
+    if (surfaceState.isStable) {
+      this.ui.setHint("Stabile Flaeche erkannt. Geo-Ziel wird relativ zum Startpunkt auf dem Boden gesetzt.");
+    } else if (surfaceState.surfaceDetected) {
+      this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Bodenhoehe fuer den Koordinaten-Modus stabil ist.");
+    } else {
+      this.ui.setHint("Keine Flaeche erkannt. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
+    }
+  }
+
   resetPlacement() {
     this.lastFrameTimeMs = 0;
+    this.activeSurfaceState = null;
     this.poseStabilizer.reset();
-    this.arSessionManager.clearOriginPose();
+    if (this.arSessionManager) {
+      this.arSessionManager.clearOriginPose();
+    }
     this.placementController.resetPlacement();
     this.ui.setPlacementState(false);
     this.ui.setSurfaceState(false, false);
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
-      this.ui.setMessage("Referenzflaeche und Zielplatzierung wurden zurueckgesetzt.");
-      this.ui.setHint("Suche eine neue stabile Referenzflaeche. Der Baum wird danach wieder automatisch gesetzt.");
+      this.ui.setMessage("Placement wurde zurueckgesetzt.");
+      if (this.placementController.getMode() === PlacementMode.GEO) {
+        this.ui.setHint("Suche eine neue stabile Flaeche. Das Geo-Ziel wird danach erneut auf dem Boden platziert.");
+      } else {
+        this.ui.setHint("Freie Platzierung aktiv. Richte das Reticle neu aus und setze das Objekt erneut.");
+      }
       return;
     }
 
-    this.ui.setMessage("Baum auf die Fallback-Buehne zurueckgesetzt.");
+    this.ui.setMessage("Objekt auf die Fallback-Buehne zurueckgesetzt.");
     this.ui.setHint("Fallback-3D-Ansicht aktiv.");
   }
 

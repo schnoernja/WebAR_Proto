@@ -10,13 +10,15 @@ function toMessage(error, fallbackMessage) {
 }
 
 export class ARSessionManager {
-  constructor({ renderer, overlayRoot, onSessionEnded }) {
+  constructor({ renderer, overlayRoot, onSessionEnded, onSelect }) {
     this.renderer = renderer;
     this.overlayRoot = overlayRoot;
     this.onSessionEnded = onSessionEnded;
+    this.onSelect = onSelect;
     this.session = null;
     this.originPose = null;
     this.handleSessionEnd = this.handleSessionEnd.bind(this);
+    this.handleSelect = this.handleSelect.bind(this);
   }
 
   async checkSupport() {
@@ -98,12 +100,14 @@ export class ARSessionManager {
     this.session = session;
     this.originPose = null;
     this.session.addEventListener("end", this.handleSessionEnd);
+    this.session.addEventListener("select", this.handleSelect);
 
     try {
       this.renderer.xr.setReferenceSpaceType(APP_CONFIG.ar.referenceSpaceType);
       await this.renderer.xr.setSession(this.session);
     } catch (error) {
       this.session.removeEventListener("end", this.handleSessionEnd);
+      this.session.removeEventListener("select", this.handleSelect);
 
       try {
         await this.session.end();
@@ -174,9 +178,16 @@ export class ARSessionManager {
     this.originPose = null;
   }
 
+  handleSelect(event) {
+    if (typeof this.onSelect === "function") {
+      this.onSelect(event);
+    }
+  }
+
   handleSessionEnd() {
     if (this.session) {
       this.session.removeEventListener("end", this.handleSessionEnd);
+      this.session.removeEventListener("select", this.handleSelect);
     }
 
     this.session = null;

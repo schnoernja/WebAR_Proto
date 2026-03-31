@@ -51,7 +51,7 @@
             <p class="eyebrow">Markerlose WebXR AR</p>
             <h1>Stable Surface Placement</h1>
             <p class="panel-intro">
-              Der Baum wird automatisch relativ zur ersten stabilen Referenzflaeche platziert.
+              Waehle zwischen freier Platzierung per stabilisiertem Reticle und Geo-Platzierung per Latitude/Longitude.
             </p>
             <p id="status-message" class="status-message">
               Browser und WebXR-Support werden geprueft.
@@ -60,6 +60,9 @@
             <div class="button-row">
               <button id="start-ar-button" class="button button-primary" type="button">
                 AR starten
+              </button>
+              <button id="place-button" class="button" type="button">
+                Objekt setzen
               </button>
               <button id="reset-button" class="button" type="button">
                 Neu platzieren
@@ -72,33 +75,36 @@
 
           <section class="panel coord-panel">
             <div class="section-header">
-              <h2>Zielkoordinate</h2>
-              <span class="panel-tag">TARGET_COORD</span>
+              <h2>Modus und Geo-Ziel</h2>
+              <span id="mode-badge" class="panel-tag">Freie Platzierung</span>
             </div>
 
             <div class="coord-grid">
-              <label class="field">
-                <span class="field-label">X</span>
-                <input id="target-coord-x" class="field-input" type="number" step="0.1" inputmode="decimal" />
+              <label class="field field-full">
+                <span class="field-label">Mode</span>
+                <select id="placement-mode-select" class="field-input">
+                  <option value="free">Freie Platzierung</option>
+                  <option value="geo">Koordinaten</option>
+                </select>
               </label>
               <label class="field">
-                <span class="field-label">Y</span>
-                <input id="target-coord-y" class="field-input" type="number" step="0.1" inputmode="decimal" />
+                <span class="field-label">Latitude</span>
+                <input id="geo-target-latitude" class="field-input" type="number" step="0.000001" inputmode="decimal" />
               </label>
               <label class="field">
-                <span class="field-label">Z</span>
-                <input id="target-coord-z" class="field-input" type="number" step="0.1" inputmode="decimal" />
+                <span class="field-label">Longitude</span>
+                <input id="geo-target-longitude" class="field-input" type="number" step="0.000001" inputmode="decimal" />
               </label>
             </div>
 
             <div class="coord-actions">
-              <button id="apply-target-coord-button" class="button" type="button">
-                Koordinate uebernehmen
+              <button id="apply-geo-target-button" class="button" type="button">
+                Koordinaten uebernehmen
               </button>
             </div>
 
-            <p id="target-coord-feedback" class="hint-text">
-              Neue Werte greifen erst bei der naechsten Platzierung oder nach Reset.
+            <p id="geo-target-feedback" class="hint-text">
+              Im Koordinaten-Modus wird das Objekt nur innerhalb von 100 m angezeigt.
             </p>
           </section>
 

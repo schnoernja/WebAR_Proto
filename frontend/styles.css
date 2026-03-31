@@ -95,15 +95,20 @@ body.ar-active {
 .hud {
   position: relative;
   z-index: 2;
-  width: min(420px, calc(100% - 20px));
+  width: min(440px, calc(100% - 20px));
+  max-height: 100vh;
   margin: 14px;
-  pointer-events: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  pointer-events: auto;
 }
 
 .hud-shell {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding-bottom: 8px;
 }
 
 .panel {
@@ -225,7 +230,7 @@ body.ar-active .hud-toggle {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  max-height: calc(100vh - 130px);
+  max-height: 4000px;
   overflow: hidden;
   transition:
     max-height 220ms ease,
@@ -265,7 +270,7 @@ h2 {
 h1 {
   font-size: clamp(1.8rem, 4vw, 2.4rem);
   line-height: 0.95;
-  max-width: 10ch;
+  max-width: 12ch;
 }
 
 h2 {
@@ -379,7 +384,13 @@ body.ar-active .button {
   background: transparent;
 }
 
-.coord-grid,
+.coord-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .geo-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -391,6 +402,10 @@ body.ar-active .button {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.field-full {
+  grid-column: 1 / -1;
 }
 
 .field-label,
@@ -601,10 +616,7 @@ body.ar-active .state-item {
     align-self: flex-end;
   }
 
-  .state-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .state-grid,
   .coord-grid,
   .geo-grid {
     grid-template-columns: 1fr;

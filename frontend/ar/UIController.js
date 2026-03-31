@@ -1,7 +1,7 @@
 const HUD_COLLAPSE_STORAGE_KEY = "webar-hud-collapsed";
 
-function toEditableValue(value) {
-  return Number.isFinite(value) ? String(value) : "";
+function toEditableValue(value, fractionDigits = 6) {
+  return Number.isFinite(value) ? value.toFixed(fractionDigits) : "";
 }
 
 function toBadgeStatus(status) {
@@ -36,6 +36,10 @@ function toGeoBadgeLabel(status) {
   }
 }
 
+function toModeLabel(mode) {
+  return mode === "geo" ? "Koordinaten" : "Freie Platzierung";
+}
+
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
@@ -47,17 +51,19 @@ export class UIController {
     this.messageEl = this.document.getElementById("status-message");
     this.hintEl = this.document.getElementById("interaction-hint");
     this.assetNameEl = this.document.getElementById("asset-name");
-    this.targetCoordFeedbackEl = this.document.getElementById("target-coord-feedback");
+    this.geoTargetFeedbackEl = this.document.getElementById("geo-target-feedback");
+    this.modeBadgeEl = this.document.getElementById("mode-badge");
 
     this.startButton = this.document.getElementById("start-ar-button");
+    this.placeButton = this.document.getElementById("place-button");
     this.resetButton = this.document.getElementById("reset-button");
     this.stopButton = this.document.getElementById("stop-ar-button");
-    this.applyTargetCoordButton = this.document.getElementById("apply-target-coord-button");
+    this.applyGeoTargetButton = this.document.getElementById("apply-geo-target-button");
 
-    this.targetCoordInputs = {
-      x: this.document.getElementById("target-coord-x"),
-      y: this.document.getElementById("target-coord-y"),
-      z: this.document.getElementById("target-coord-z")
+    this.modeSelect = this.document.getElementById("placement-mode-select");
+    this.geoTargetInputs = {
+      latitude: this.document.getElementById("geo-target-latitude"),
+      longitude: this.document.getElementById("geo-target-longitude")
     };
 
     this.geoRefs = {
@@ -89,18 +95,19 @@ export class UIController {
       surfaceDetected: false,
       stableSurface: false,
       placed: false,
+      placementMode: "free",
       hudCollapsed: this.readStoredCollapsedState()
     };
 
-    this.targetCoordDraft = {
-      x: "",
-      y: "",
-      z: ""
+    this.geoTargetDraft = {
+      latitude: "",
+      longitude: ""
     };
 
     this.cleanupCallbacks = [];
 
     this.applyHudCollapsedState();
+    this.setPlacementMode(this.uiState.placementMode);
     this.refreshMiniSummary();
     this.renderGeoSnapshot({
       status: "idle",
@@ -116,16 +123,17 @@ export class UIController {
     };
   }
 
-  bindActions({ onStartAR, onResetPlacement, onStopAR, onApplyTargetCoord }) {
+  bindActions({ onStartAR, onPlace, onResetPlacement, onStopAR, onApplyGeoTarget, onModeChange }) {
     this.bindButton(this.startButton, onStartAR);
+    this.bindButton(this.placeButton, onPlace);
     this.bindButton(this.resetButton, onResetPlacement);
     this.bindButton(this.stopButton, onStopAR);
     this.bindButton(this.toggleButton, () => this.toggleCollapsed());
-    this.bindButton(this.applyTargetCoordButton, () => this.handleApplyTargetCoord(onApplyTargetCoord));
+    this.bindButton(this.applyGeoTargetButton, () => this.handleApplyGeoTarget(onApplyGeoTarget));
 
-    this.bindInput(this.targetCoordInputs.x, () => this.updateTargetCoordDraftFromInputs());
-    this.bindInput(this.targetCoordInputs.y, () => this.updateTargetCoordDraftFromInputs());
-    this.bindInput(this.targetCoordInputs.z, () => this.updateTargetCoordDraftFromInputs());
+    this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
+    this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
+    this.bindSelect(this.modeSelect, () => this.handleModeChange(onModeChange));
 
     this.refreshButtons();
   }
@@ -167,6 +175,15 @@ export class UIController {
     this.cleanupCallbacks.push(() => input.removeEventListener("input", handler));
   }
 
+  bindSelect(select, handler) {
+    if (!select || typeof handler !== "function") {
+      return;
+    }
+
+    select.addEventListener("change", handler);
+    this.cleanupCallbacks.push(() => select.removeEventListener("change", handler));
+  }
+
   setAssetLabel(label) {
     if (this.assetNameEl) {
       this.assetNameEl.textContent = label;
@@ -185,70 +202,92 @@ export class UIController {
     }
   }
 
-  setTargetCoordInputs(coord) {
+  setPlacementMode(mode) {
+    this.uiState.placementMode = mode === "geo" ? "geo" : "free";
+
+    if (this.modeSelect) {
+      this.modeSelect.value = this.uiState.placementMode;
+    }
+
+    if (this.modeBadgeEl) {
+      this.modeBadgeEl.textContent = toModeLabel(this.uiState.placementMode);
+    }
+
+    this.refreshButtons();
+  }
+
+  setGeoTargetInputs(coord) {
     if (!coord) {
       return;
     }
 
-    this.targetCoordDraft = {
-      x: toEditableValue(coord.x),
-      y: toEditableValue(coord.y),
-      z: toEditableValue(coord.z)
+    this.geoTargetDraft = {
+      latitude: toEditableValue(coord.latitude),
+      longitude: toEditableValue(coord.longitude)
     };
 
-    if (this.targetCoordInputs.x) {
-      this.targetCoordInputs.x.value = this.targetCoordDraft.x;
+    if (this.geoTargetInputs.latitude) {
+      this.geoTargetInputs.latitude.value = this.geoTargetDraft.latitude;
     }
 
-    if (this.targetCoordInputs.y) {
-      this.targetCoordInputs.y.value = this.targetCoordDraft.y;
-    }
-
-    if (this.targetCoordInputs.z) {
-      this.targetCoordInputs.z.value = this.targetCoordDraft.z;
+    if (this.geoTargetInputs.longitude) {
+      this.geoTargetInputs.longitude.value = this.geoTargetDraft.longitude;
     }
   }
 
-  setTargetCoordFeedback(message) {
-    if (this.targetCoordFeedbackEl) {
-      this.targetCoordFeedbackEl.textContent = message;
+  setGeoTargetFeedback(message) {
+    if (this.geoTargetFeedbackEl) {
+      this.geoTargetFeedbackEl.textContent = message;
     }
   }
 
-  updateTargetCoordDraftFromInputs() {
-    this.targetCoordDraft = {
-      x: this.targetCoordInputs.x ? this.targetCoordInputs.x.value : "",
-      y: this.targetCoordInputs.y ? this.targetCoordInputs.y.value : "",
-      z: this.targetCoordInputs.z ? this.targetCoordInputs.z.value : ""
+  updateGeoTargetDraftFromInputs() {
+    this.geoTargetDraft = {
+      latitude: this.geoTargetInputs.latitude ? this.geoTargetInputs.latitude.value : "",
+      longitude: this.geoTargetInputs.longitude ? this.geoTargetInputs.longitude.value : ""
     };
   }
 
-  handleApplyTargetCoord(handler) {
-    this.updateTargetCoordDraftFromInputs();
+  handleApplyGeoTarget(handler) {
+    this.updateGeoTargetDraftFromInputs();
 
     const parsedCoord = {
-      x: Number.parseFloat(this.targetCoordDraft.x),
-      y: Number.parseFloat(this.targetCoordDraft.y),
-      z: Number.parseFloat(this.targetCoordDraft.z)
+      latitude: Number.parseFloat(this.geoTargetDraft.latitude),
+      longitude: Number.parseFloat(this.geoTargetDraft.longitude)
     };
 
     if (
-      !Number.isFinite(parsedCoord.x) ||
-      !Number.isFinite(parsedCoord.y) ||
-      !Number.isFinite(parsedCoord.z)
+      !Number.isFinite(parsedCoord.latitude) ||
+      !Number.isFinite(parsedCoord.longitude) ||
+      parsedCoord.latitude < -90 ||
+      parsedCoord.latitude > 90 ||
+      parsedCoord.longitude < -180 ||
+      parsedCoord.longitude > 180
     ) {
-      this.setTargetCoordFeedback("Bitte gueltige Zahlen fuer X, Y und Z eingeben.");
+      this.setGeoTargetFeedback("Bitte gueltige Latitude- und Longitude-Werte eingeben.");
       return;
     }
 
     const result = typeof handler === "function" ? handler(parsedCoord) : false;
     if (result === false) {
-      this.setTargetCoordFeedback("Koordinate konnte nicht uebernommen werden.");
+      this.setGeoTargetFeedback("Koordinaten konnten nicht uebernommen werden.");
       return;
     }
 
-    this.setTargetCoordInputs(parsedCoord);
-    this.setTargetCoordFeedback("Koordinate uebernommen. Wirkt ab der naechsten Platzierung oder nach Reset.");
+    this.setGeoTargetInputs(parsedCoord);
+    this.setGeoTargetFeedback("Koordinaten uebernommen. Sie greifen bei der naechsten Platzierung.");
+  }
+
+  handleModeChange(handler) {
+    const nextMode = this.modeSelect ? this.modeSelect.value : "free";
+    const accepted = typeof handler === "function" ? handler(nextMode) : false;
+
+    if (accepted === false) {
+      this.setPlacementMode(this.uiState.placementMode);
+      return;
+    }
+
+    this.setPlacementMode(nextMode);
   }
 
   setSupportState(available, detail) {
@@ -316,6 +355,14 @@ export class UIController {
   refreshButtons() {
     if (this.startButton) {
       this.startButton.disabled = !this.uiState.supportAvailable || this.uiState.sessionActive;
+    }
+
+    if (this.placeButton) {
+      this.placeButton.disabled =
+        this.uiState.placementMode !== "free" ||
+        !this.uiState.sessionActive ||
+        !this.uiState.stableSurface ||
+        this.uiState.placed;
     }
 
     if (this.resetButton) {
@@ -391,9 +438,7 @@ export class UIController {
     }
 
     if (this.geoRefs.accuracy) {
-      this.geoRefs.accuracy.textContent = position
-        ? `+/- ${Math.round(position.accuracyMeters)} m`
-        : "-";
+      this.geoRefs.accuracy.textContent = position ? `+/- ${Math.round(position.accuracyMeters)} m` : "-";
     }
 
     if (this.geoRefs.message) {

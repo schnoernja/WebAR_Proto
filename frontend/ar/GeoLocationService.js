@@ -57,6 +57,12 @@ export class GeoLocationService {
     this.message = "Warte auf Geraetestandort.";
     this.notify();
 
+    navigator.geolocation.getCurrentPosition(this.handleSuccess, this.handleError, {
+      enableHighAccuracy: true,
+      maximumAge: 0,
+      timeout: 15000
+    });
+
     try {
       this.watchId = navigator.geolocation.watchPosition(this.handleSuccess, this.handleError, {
         enableHighAccuracy: true,

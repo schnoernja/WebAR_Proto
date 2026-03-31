@@ -5,11 +5,12 @@ export const APP_CONFIG = Object.freeze({
     targetHeightMeters: 2.4
   },
   placement: {
-    targetCoordinate: {
-      x: 2.5,
-      y: 0,
-      z: -3.0
-    }
+    defaultMode: "free",
+    defaultGeoTarget: {
+      latitude: 50.984,
+      longitude: 11.029
+    },
+    maxVisibleDistanceMeters: 100
   },
   renderer: {
     pixelRatioCap: 2,
