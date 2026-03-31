@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import { SceneManager } from "./SceneManager.js";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { HitTestManager } from "./HitTestManager.js";
@@ -22,6 +23,30 @@ function toGeoCoord(position) {
   return {
     latitude: position.latitude,
     longitude: position.longitude
+  };
+}
+
+function buildCameraState(viewerPose) {
+  if (!viewerPose || !viewerPose.transform) {
+    return null;
+  }
+
+  const position = new THREE.Vector3(
+    viewerPose.transform.position.x,
+    viewerPose.transform.position.y,
+    viewerPose.transform.position.z
+  );
+  const orientation = new THREE.Quaternion(
+    viewerPose.transform.orientation.x,
+    viewerPose.transform.orientation.y,
+    viewerPose.transform.orientation.z,
+    viewerPose.transform.orientation.w
+  );
+  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(orientation).normalize();
+
+  return {
+    position,
+    direction
   };
 }
 
@@ -90,6 +115,7 @@ export class ARApp {
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
+    this.syncDebugPanels();
 
     this.sceneManager.setAnimationLoop(this.handleFrame);
   }
@@ -132,6 +158,7 @@ export class ARApp {
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
+    this.syncDebugPanels();
 
     if (this.placementController.getMode() === PlacementMode.GEO && !this.placementController.hasGeoOrigin()) {
       this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.");
@@ -156,6 +183,7 @@ export class ARApp {
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
+    this.syncDebugPanels();
     this.ui.setHint("Fallback-3D-Ansicht aktiv. AR kann jederzeit erneut gestartet werden.");
   }
 
@@ -164,10 +192,12 @@ export class ARApp {
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       const referenceSpace = this.arSessionManager.getReferenceSpace();
-      const tracking =
-        Boolean(frame) &&
-        Boolean(referenceSpace) &&
-        Boolean(frame.getViewerPose(referenceSpace));
+      const viewerPose =
+        Boolean(frame) && Boolean(referenceSpace)
+          ? frame.getViewerPose(referenceSpace)
+          : null;
+      const tracking = Boolean(viewerPose);
+      const cameraState = buildCameraState(viewerPose);
 
       this.ui.setTrackingState(tracking);
 
@@ -188,11 +218,13 @@ export class ARApp {
       }
 
       if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
-        this.maybePlaceGeoObject(surfaceState);
+        this.captureGeoReferenceDirection(cameraState);
+        this.maybePlaceGeoObject(surfaceState, cameraState);
       }
 
       this.ui.setPlacementState(this.placementController.isPlaced());
-      this.updateInteractionHint(surfaceState, tracking);
+      this.syncDebugPanels(surfaceState, cameraState);
+      this.updateInteractionHint(surfaceState, tracking, cameraState);
     }
 
     this.sceneManager.render();
@@ -281,7 +313,7 @@ export class ARApp {
     return true;
   }
 
-  maybePlaceGeoObject(surfaceState) {
+  maybePlaceGeoObject(surfaceState, cameraState) {
     if (!surfaceState.isStable || this.placementController.isPlaced()) {
       return;
     }
@@ -293,7 +325,7 @@ export class ARApp {
       }
     }
 
-    const computation = this.placementController.computeGeoPosition(surfaceState.stablePose);
+    const computation = this.placementController.computeGeoPosition(surfaceState.stablePose, cameraState);
     if (computation.status !== "ready" || !computation.pose) {
       return;
     }
@@ -320,10 +352,42 @@ export class ARApp {
     return this.placementController.setGeoOrigin(geoCoord);
   }
 
-  updateInteractionHint(surfaceState, tracking) {
+  captureGeoReferenceDirection(cameraState) {
+    if (!cameraState || this.placementController.hasGeoReferenceDirection()) {
+      return false;
+    }
+
+    return this.placementController.setGeoReferenceDirection(cameraState.direction);
+  }
+
+  syncDebugPanels(surfaceState = null, cameraState = null) {
+    if (!this.placementController) {
+      return;
+    }
+
+    this.ui.setGeoDebug(this.placementController.getGeoDebugSnapshot());
+    this.ui.setPlacementDebug(
+      this.placementController.getPlacementDebugSnapshot({
+        hasStableSurface: Boolean(surfaceState && surfaceState.isStable),
+        cameraState
+      })
+    );
+  }
+
+  updateInteractionHint(surfaceState, tracking, cameraState) {
+    const geoDebug = this.placementController.getGeoDebugSnapshot();
+    const placementDebug = this.placementController.getPlacementDebugSnapshot({
+      hasStableSurface: Boolean(surfaceState && surfaceState.isStable),
+      cameraState
+    });
+
     if (this.placementController.isPlaced()) {
       if (this.placementController.getMode() === PlacementMode.GEO) {
-        this.ui.setHint("Geo-Placement fixiert. 'Neu platzieren' berechnet die Zielposition erneut.");
+        if (placementDebug.objectBehindCamera) {
+          this.ui.setHint("Objekt liegt hinter dir. Geo-Placement bleibt fixiert, bis du resettest.");
+        } else {
+          this.ui.setHint("Geo-Placement fixiert. 'Neu platzieren' berechnet die Zielposition erneut.");
+        }
       } else {
         this.ui.setHint("Objekt fixiert. 'Neu platzieren' aktiviert das Reticle erneut.");
       }
@@ -347,7 +411,11 @@ export class ARApp {
     }
 
     if (!this.placementController.hasGeoOrigin()) {
-      if (this.geoLocationService.getStatus() !== "granted") {
+      if (!this.geoLocationService.getCurrentPosition()) {
+        this.ui.setHint("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+      } else if (!this.placementController.hasGeoReferenceDirection()) {
+        this.ui.setHint("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      } else if (this.geoLocationService.getStatus() !== "granted") {
         this.ui.setHint("Koordinaten-Modus aktiv. Aktiviere zuerst den Standort ueber 'Standort aktivieren'.");
       } else {
         this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.");
@@ -355,19 +423,36 @@ export class ARApp {
       return;
     }
 
-    const geoState = this.placementController.getLastGeoComputation();
-    if (geoState.status === "too-far" && Number.isFinite(geoState.distanceMeters)) {
-      this.ui.setHint(`Objekt zu weit entfernt: ${geoState.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`);
+    if (!this.placementController.hasGeoReferenceDirection()) {
+      this.ui.setHint("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
       return;
     }
 
-    if (surfaceState.isStable) {
-      this.ui.setHint("Stabile Flaeche erkannt. Geo-Ziel wird relativ zum Startpunkt auf dem Boden gesetzt.");
-    } else if (surfaceState.surfaceDetected) {
-      this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Bodenhoehe fuer den Koordinaten-Modus stabil ist.");
-    } else {
-      this.ui.setHint("Keine Flaeche erkannt. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
+    if (geoDebug.status === "missing-origin") {
+      this.ui.setHint("Keine Geraeteposition verfuegbar.");
+      return;
     }
+
+    if (geoDebug.status === "too-far" && Number.isFinite(geoDebug.distanceMeters)) {
+      this.ui.setHint(`Ziel zu weit entfernt: ${geoDebug.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`);
+      return;
+    }
+
+    if (!surfaceState.isStable) {
+      if (surfaceState.surfaceDetected) {
+        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Bodenhoehe stabil wird.");
+      } else {
+        this.ui.setHint("Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
+      }
+      return;
+    }
+
+    if (placementDebug.objectBehindCamera) {
+      this.ui.setHint("Objekt liegt hinter dir.");
+      return;
+    }
+
+    this.ui.setHint("Stabile Flaeche erkannt. Geo-Ziel wird relativ zum Startpunkt auf dem Boden gesetzt.");
   }
 
   resetPlacement() {
@@ -380,6 +465,7 @@ export class ARApp {
     this.placementController.resetPlacement();
     this.ui.setPlacementState(false);
     this.ui.setSurfaceState(false, false);
+    this.syncDebugPanels();
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       this.ui.setMessage("Placement wurde zurueckgesetzt.");

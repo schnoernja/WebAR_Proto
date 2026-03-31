@@ -82,6 +82,14 @@ function toModeLabel(mode) {
   return mode === "geo" ? "Koordinaten" : "Freie Platzierung";
 }
 
+function formatDebugNumber(value, fractionDigits = 2) {
+  return Number.isFinite(value) ? value.toFixed(fractionDigits) : "-";
+}
+
+function formatDebugBoolean(value) {
+  return value ? "true" : "false";
+}
+
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
@@ -117,6 +125,25 @@ export class UIController {
       accuracy: this.document.getElementById("geo-accuracy"),
       message: this.document.getElementById("geo-message"),
       help: this.document.getElementById("geo-help")
+    };
+
+    this.geoDebugRefs = {
+      originLatitude: this.document.getElementById("debug-origin-latitude"),
+      originLongitude: this.document.getElementById("debug-origin-longitude"),
+      targetLatitude: this.document.getElementById("debug-target-latitude"),
+      targetLongitude: this.document.getElementById("debug-target-longitude"),
+      deltaLatitude: this.document.getElementById("debug-delta-latitude"),
+      deltaLongitude: this.document.getElementById("debug-delta-longitude"),
+      xMeters: this.document.getElementById("debug-x-meters"),
+      zMeters: this.document.getElementById("debug-z-meters"),
+      distanceMeters: this.document.getElementById("debug-distance-meters")
+    };
+
+    this.placementDebugRefs = {
+      objectPlaced: this.document.getElementById("debug-object-placed"),
+      distanceTooFar: this.document.getElementById("debug-distance-too-far"),
+      hasStableSurface: this.document.getElementById("debug-has-stable-surface"),
+      objectBehindCamera: this.document.getElementById("debug-object-behind-camera")
     };
 
     this.miniRefs = {
@@ -163,6 +190,8 @@ export class UIController {
       helpText: "Tippe auf 'Standort aktivieren', damit der Browser die Freigabe anfragt.",
       position: null
     });
+    this.setGeoDebug({});
+    this.setPlacementDebug({});
   }
 
   getStateRef(key) {
@@ -522,6 +551,66 @@ export class UIController {
         this.uiState.geoStatus === "waiting" ||
         this.uiState.geoWatchActive ||
         (snapshot && (snapshot.issue === "https-required" || snapshot.issue === "unsupported"));
+    }
+  }
+
+  setGeoDebug(debug) {
+    const debugState = debug || {};
+
+    if (this.geoDebugRefs.originLatitude) {
+      this.geoDebugRefs.originLatitude.textContent = formatDebugNumber(debugState.originLatitude, 6);
+    }
+
+    if (this.geoDebugRefs.originLongitude) {
+      this.geoDebugRefs.originLongitude.textContent = formatDebugNumber(debugState.originLongitude, 6);
+    }
+
+    if (this.geoDebugRefs.targetLatitude) {
+      this.geoDebugRefs.targetLatitude.textContent = formatDebugNumber(debugState.targetLatitude, 6);
+    }
+
+    if (this.geoDebugRefs.targetLongitude) {
+      this.geoDebugRefs.targetLongitude.textContent = formatDebugNumber(debugState.targetLongitude, 6);
+    }
+
+    if (this.geoDebugRefs.deltaLatitude) {
+      this.geoDebugRefs.deltaLatitude.textContent = formatDebugNumber(debugState.deltaLatitude, 6);
+    }
+
+    if (this.geoDebugRefs.deltaLongitude) {
+      this.geoDebugRefs.deltaLongitude.textContent = formatDebugNumber(debugState.deltaLongitude, 6);
+    }
+
+    if (this.geoDebugRefs.xMeters) {
+      this.geoDebugRefs.xMeters.textContent = formatDebugNumber(debugState.xMeters, 2);
+    }
+
+    if (this.geoDebugRefs.zMeters) {
+      this.geoDebugRefs.zMeters.textContent = formatDebugNumber(debugState.zMeters, 2);
+    }
+
+    if (this.geoDebugRefs.distanceMeters) {
+      this.geoDebugRefs.distanceMeters.textContent = formatDebugNumber(debugState.distanceMeters, 2);
+    }
+  }
+
+  setPlacementDebug(debug) {
+    const debugState = debug || {};
+
+    if (this.placementDebugRefs.objectPlaced) {
+      this.placementDebugRefs.objectPlaced.textContent = formatDebugBoolean(Boolean(debugState.objectPlaced));
+    }
+
+    if (this.placementDebugRefs.distanceTooFar) {
+      this.placementDebugRefs.distanceTooFar.textContent = formatDebugBoolean(Boolean(debugState.distanceOverLimit));
+    }
+
+    if (this.placementDebugRefs.hasStableSurface) {
+      this.placementDebugRefs.hasStableSurface.textContent = formatDebugBoolean(Boolean(debugState.hasStableSurface));
+    }
+
+    if (this.placementDebugRefs.objectBehindCamera) {
+      this.placementDebugRefs.objectBehindCamera.textContent = formatDebugBoolean(Boolean(debugState.objectBehindCamera));
     }
   }
 

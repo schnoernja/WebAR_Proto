@@ -10,7 +10,8 @@ export const APP_CONFIG = Object.freeze({
       latitude: 50.984,
       longitude: 11.029
     },
-    maxVisibleDistanceMeters: 100
+    maxVisibleDistanceMeters: 100,
+    debugClampDistanceMeters: 10
   },
   renderer: {
     pixelRatioCap: 2,

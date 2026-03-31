@@ -187,6 +187,71 @@
               Tippe auf "Standort aktivieren", damit der Browser die Freigabe anfragt.
             </p>
           </section>
+
+          <section class="panel debug-panel">
+            <div class="section-header">
+              <h2>Geo Debug</h2>
+              <span class="panel-tag">Placement</span>
+            </div>
+
+            <div class="debug-grid">
+              <article class="debug-item">
+                <span class="debug-label">Origin Lat</span>
+                <strong id="debug-origin-latitude" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Origin Lon</span>
+                <strong id="debug-origin-longitude" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Target Lat</span>
+                <strong id="debug-target-latitude" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Target Lon</span>
+                <strong id="debug-target-longitude" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Delta Lat</span>
+                <strong id="debug-delta-latitude" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Delta Lon</span>
+                <strong id="debug-delta-longitude" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">X (m)</span>
+                <strong id="debug-x-meters" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Z (m)</span>
+                <strong id="debug-z-meters" class="debug-value">-</strong>
+              </article>
+              <article class="debug-item debug-item-wide">
+                <span class="debug-label">Distance (m)</span>
+                <strong id="debug-distance-meters" class="debug-value">-</strong>
+              </article>
+            </div>
+
+            <div class="debug-grid debug-grid-secondary">
+              <article class="debug-item">
+                <span class="debug-label">Object Placed</span>
+                <strong id="debug-object-placed" class="debug-value">false</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Distance &gt; 100m</span>
+                <strong id="debug-distance-too-far" class="debug-value">false</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Has Stable Surface</span>
+                <strong id="debug-has-stable-surface" class="debug-value">false</strong>
+              </article>
+              <article class="debug-item">
+                <span class="debug-label">Object Behind Camera</span>
+                <strong id="debug-object-behind-camera" class="debug-value">false</strong>
+              </article>
+            </div>
+          </section>
         </div>
       </div>
     </div>

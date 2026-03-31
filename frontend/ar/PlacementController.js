@@ -3,6 +3,7 @@ import { APP_CONFIG } from "./config.js";
 import { applyPose, disposeObject3D } from "./utils.js";
 
 const METERS_PER_DEGREE_LAT = 111320;
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 export const PlacementMode = Object.freeze({
   FREE: "free",
@@ -34,6 +35,26 @@ function clonePose(pose) {
     : null;
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function projectDirectionToGround(direction) {
+  if (!direction) {
+    return null;
+  }
+
+  const groundedDirection = direction.clone();
+  groundedDirection.y = 0;
+
+  if (groundedDirection.lengthSq() < 1e-6) {
+    return null;
+  }
+
+  groundedDirection.normalize();
+  return groundedDirection;
+}
+
 export class PlacementController {
   constructor({ scene }) {
     this.scene = scene;
@@ -45,7 +66,10 @@ export class PlacementController {
       : PlacementMode.FREE;
     this.geoTarget = { ...APP_CONFIG.placement.defaultGeoTarget };
     this.geoOrigin = null;
+    this.geoReferenceForward = null;
+    this.geoReferenceRight = null;
     this.maxVisibleDistanceMeters = APP_CONFIG.placement.maxVisibleDistanceMeters;
+    this.debugClampDistanceMeters = APP_CONFIG.placement.debugClampDistanceMeters;
 
     this.reticle = this.createReticle();
     this.reticle.visible = false;
@@ -57,13 +81,29 @@ export class PlacementController {
     this.currentSurfaceState = null;
     this.inARMode = false;
     this.placed = false;
-    this.lastGeoComputation = {
-      status: "idle",
-      distanceMeters: null,
-      pose: null
-    };
+    this.lastGeoComputation = this.createGeoDebugSnapshot("idle");
 
     this.showFallbackPreview();
+  }
+
+  createGeoDebugSnapshot(status, overrides = {}) {
+    return {
+      status,
+      originLatitude: this.geoOrigin ? this.geoOrigin.latitude : null,
+      originLongitude: this.geoOrigin ? this.geoOrigin.longitude : null,
+      targetLatitude: this.geoTarget ? this.geoTarget.latitude : null,
+      targetLongitude: this.geoTarget ? this.geoTarget.longitude : null,
+      deltaLatitude: null,
+      deltaLongitude: null,
+      xMeters: null,
+      zMeters: null,
+      distanceMeters: null,
+      distanceOverLimit: false,
+      debugClamped: false,
+      objectBehindCamera: false,
+      pose: null,
+      ...overrides
+    };
   }
 
   createReticle() {
@@ -113,12 +153,14 @@ export class PlacementController {
 
   enterARMode() {
     this.inARMode = true;
+    this.clearGeoReferenceDirection();
     this.resetPlacement();
   }
 
   exitARMode() {
     this.inARMode = false;
     this.clearGeoOrigin();
+    this.clearGeoReferenceDirection();
     this.resetPlacement();
     this.showFallbackPreview();
   }
@@ -187,6 +229,24 @@ export class PlacementController {
     return true;
   }
 
+  setGeoReferenceDirection(direction) {
+    const groundedDirection = projectDirectionToGround(direction);
+    if (!groundedDirection) {
+      return false;
+    }
+
+    this.geoReferenceForward = groundedDirection;
+    this.geoReferenceRight = new THREE.Vector3()
+      .crossVectors(this.geoReferenceForward, WORLD_UP)
+      .normalize();
+    this.clearGeoComputation();
+    return true;
+  }
+
+  hasGeoReferenceDirection() {
+    return this.geoReferenceForward !== null && this.geoReferenceRight !== null;
+  }
+
   hasGeoOrigin() {
     return this.geoOrigin !== null;
   }
@@ -200,22 +260,25 @@ export class PlacementController {
     this.clearGeoComputation();
   }
 
-  computeGeoPosition(floorPose) {
+  clearGeoReferenceDirection() {
+    this.geoReferenceForward = null;
+    this.geoReferenceRight = null;
+    this.clearGeoComputation();
+  }
+
+  computeGeoPosition(floorPose, cameraState = null) {
     if (!floorPose) {
-      this.lastGeoComputation = {
-        status: "missing-floor",
-        distanceMeters: null,
-        pose: null
-      };
+      this.lastGeoComputation = this.createGeoDebugSnapshot("missing-floor");
       return this.getLastGeoComputation();
     }
 
     if (!this.geoOrigin || !this.geoTarget) {
-      this.lastGeoComputation = {
-        status: "missing-origin",
-        distanceMeters: null,
-        pose: null
-      };
+      this.lastGeoComputation = this.createGeoDebugSnapshot("missing-origin");
+      return this.getLastGeoComputation();
+    }
+
+    if (!this.hasGeoReferenceDirection()) {
+      this.lastGeoComputation = this.createGeoDebugSnapshot("missing-reference");
       return this.getLastGeoComputation();
     }
 
@@ -223,30 +286,45 @@ export class PlacementController {
     const metersPerDegreeLon = Math.cos(originLatRad) * METERS_PER_DEGREE_LAT;
     const deltaLat = this.geoTarget.latitude - this.geoOrigin.latitude;
     const deltaLon = this.geoTarget.longitude - this.geoOrigin.longitude;
-
-    const x = deltaLon * metersPerDegreeLon;
-    const z = -deltaLat * METERS_PER_DEGREE_LAT;
-    const distanceMeters = Math.hypot(x, z);
+    const eastMeters = deltaLon * metersPerDegreeLon;
+    const northMeters = deltaLat * METERS_PER_DEGREE_LAT;
+    const distanceMeters = Math.hypot(eastMeters, northMeters);
 
     if (distanceMeters > this.maxVisibleDistanceMeters) {
-      this.lastGeoComputation = {
-        status: "too-far",
+      this.lastGeoComputation = this.createGeoDebugSnapshot("too-far", {
+        deltaLatitude: deltaLat,
+        deltaLongitude: deltaLon,
         distanceMeters,
-        pose: null
-      };
+        distanceOverLimit: true
+      });
       return this.getLastGeoComputation();
     }
 
+    const clampedEastMeters = clamp(eastMeters, -this.debugClampDistanceMeters, this.debugClampDistanceMeters);
+    const clampedNorthMeters = clamp(northMeters, -this.debugClampDistanceMeters, this.debugClampDistanceMeters);
+    const offset = this.geoReferenceRight
+      .clone()
+      .multiplyScalar(clampedEastMeters)
+      .add(this.geoReferenceForward.clone().multiplyScalar(clampedNorthMeters));
+
     const pose = {
-      position: new THREE.Vector3(x, floorPose.position.y, z),
+      position: new THREE.Vector3(offset.x, floorPose.position.y, offset.z),
       quaternion: floorPose.quaternion.clone()
     };
 
-    this.lastGeoComputation = {
-      status: "ready",
+    const visibilityDebug = this.computeVisibilityDebug(cameraState, pose.position);
+
+    this.lastGeoComputation = this.createGeoDebugSnapshot("ready", {
+      deltaLatitude: deltaLat,
+      deltaLongitude: deltaLon,
+      xMeters: pose.position.x,
+      zMeters: pose.position.z,
       distanceMeters,
+      distanceOverLimit: false,
+      debugClamped: clampedEastMeters !== eastMeters || clampedNorthMeters !== northMeters,
+      objectBehindCamera: visibilityDebug.objectBehindCamera,
       pose: clonePose(pose)
-    };
+    });
 
     return {
       status: "ready",
@@ -258,8 +336,34 @@ export class PlacementController {
   getLastGeoComputation() {
     return {
       status: this.lastGeoComputation.status,
+      originLatitude: this.lastGeoComputation.originLatitude,
+      originLongitude: this.lastGeoComputation.originLongitude,
+      targetLatitude: this.lastGeoComputation.targetLatitude,
+      targetLongitude: this.lastGeoComputation.targetLongitude,
+      deltaLatitude: this.lastGeoComputation.deltaLatitude,
+      deltaLongitude: this.lastGeoComputation.deltaLongitude,
+      xMeters: this.lastGeoComputation.xMeters,
+      zMeters: this.lastGeoComputation.zMeters,
       distanceMeters: this.lastGeoComputation.distanceMeters,
+      distanceOverLimit: this.lastGeoComputation.distanceOverLimit,
+      debugClamped: this.lastGeoComputation.debugClamped,
+      objectBehindCamera: this.lastGeoComputation.objectBehindCamera,
       pose: clonePose(this.lastGeoComputation.pose)
+    };
+  }
+
+  getGeoDebugSnapshot() {
+    return this.getLastGeoComputation();
+  }
+
+  getPlacementDebugSnapshot({ hasStableSurface = false, cameraState = null } = {}) {
+    const visibilityDebug = this.computeVisibilityDebug(cameraState);
+
+    return {
+      objectPlaced: this.placed,
+      distanceOverLimit: Boolean(this.lastGeoComputation.distanceOverLimit),
+      hasStableSurface: Boolean(hasStableSurface),
+      objectBehindCamera: visibilityDebug.objectBehindCamera
     };
   }
 
@@ -279,6 +383,45 @@ export class PlacementController {
     return true;
   }
 
+  computeVisibilityDebug(cameraState, targetPosition = null) {
+    if (!cameraState || !cameraState.position || !cameraState.direction) {
+      return {
+        objectBehindCamera: false,
+        dot: null
+      };
+    }
+
+    const referencePosition = targetPosition
+      ? targetPosition.clone()
+      : this.placed
+        ? this.objectRoot.position.clone()
+        : this.lastGeoComputation.pose
+          ? this.lastGeoComputation.pose.position.clone()
+          : null;
+
+    if (!referencePosition) {
+      return {
+        objectBehindCamera: false,
+        dot: null
+      };
+    }
+
+    const toObject = new THREE.Vector3().subVectors(referencePosition, cameraState.position);
+    if (toObject.lengthSq() < 1e-6) {
+      return {
+        objectBehindCamera: false,
+        dot: 1
+      };
+    }
+
+    toObject.normalize();
+    const dot = cameraState.direction.dot(toObject);
+    return {
+      objectBehindCamera: dot < 0,
+      dot
+    };
+  }
+
   resetPlacement() {
     this.placed = false;
     this.currentSurfaceState = null;
@@ -294,11 +437,7 @@ export class PlacementController {
   }
 
   clearGeoComputation() {
-    this.lastGeoComputation = {
-      status: "idle",
-      distanceMeters: null,
-      pose: null
-    };
+    this.lastGeoComputation = this.createGeoDebugSnapshot("idle");
   }
 
   showFallbackPreview() {

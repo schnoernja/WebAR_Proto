@@ -249,7 +249,8 @@ body.ar-active .hud-toggle {
 .coord-panel,
 .state-panel,
 .note-panel,
-.geo-panel {
+.geo-panel,
+.debug-panel {
   padding: 18px 18px 16px;
 }
 
@@ -480,6 +481,52 @@ body.ar-active .geo-item {
   display: none;
 }
 
+.debug-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.debug-grid-secondary {
+  margin-top: 10px;
+}
+
+.debug-item {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  background: rgba(255, 255, 255, 0.42);
+  padding: 12px 14px;
+}
+
+.debug-item-wide {
+  grid-column: 1 / -1;
+}
+
+body.ar-active .debug-item {
+  border-color: rgba(244, 241, 231, 0.12);
+  background: rgba(244, 241, 231, 0.06);
+}
+
+.debug-label {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+body.ar-active .debug-label {
+  color: rgba(244, 241, 231, 0.76);
+}
+
+.debug-value {
+  display: block;
+  margin-top: 8px;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -595,7 +642,8 @@ body.ar-active .state-item {
   .coord-panel,
   .state-panel,
   .note-panel,
-  .geo-panel {
+  .geo-panel,
+  .debug-panel {
     padding: 16px 14px 14px;
   }
 
@@ -630,7 +678,8 @@ body.ar-active .state-item {
 
   .state-grid,
   .coord-grid,
-  .geo-grid {
+  .geo-grid,
+  .debug-grid {
     grid-template-columns: 1fr;
   }
 
