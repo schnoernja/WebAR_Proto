@@ -4,6 +4,7 @@ import { applyPose, disposeObject3D } from "./utils.js";
 
 const METERS_PER_DEGREE_LAT = 111320;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
+const DEFAULT_GEO_FORWARD = new THREE.Vector3(0, 0, -1);
 
 export const PlacementMode = Object.freeze({
   FREE: "free",
@@ -309,7 +310,7 @@ export class PlacementController {
 
     const pose = {
       position: new THREE.Vector3(offset.x, floorPose.position.y, offset.z),
-      quaternion: floorPose.quaternion.clone()
+      quaternion: new THREE.Quaternion()
     };
 
     const visibilityDebug = this.computeVisibilityDebug(cameraState, pose.position);
@@ -381,6 +382,28 @@ export class PlacementController {
     this.reticle.visible = false;
     this.placed = true;
     return true;
+  }
+
+  placeGeoAtPose(pose, cameraState = null) {
+    if (!this.inARMode || this.placed || !pose) {
+      return false;
+    }
+
+    this.objectRoot.position.copy(pose.position);
+    this.objectRoot.quaternion.copy(this.createGeoPlacementQuaternion(cameraState));
+    this.objectRoot.visible = true;
+    this.reticle.visible = false;
+    this.placed = true;
+    return true;
+  }
+
+  createGeoPlacementQuaternion(cameraState = null) {
+    const groundedDirection =
+      projectDirectionToGround(cameraState && cameraState.direction) ||
+      (this.geoReferenceForward ? this.geoReferenceForward.clone() : null) ||
+      DEFAULT_GEO_FORWARD.clone();
+    const yaw = Math.atan2(groundedDirection.x, -groundedDirection.z);
+    return new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
   }
 
   computeVisibilityDebug(cameraState, targetPosition = null) {

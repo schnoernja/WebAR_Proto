@@ -270,6 +270,14 @@ export class SceneManager {
     return this.renderer;
   }
 
+  setCanvasPointerEvents(pointerEvents) {
+    if (!this.renderer || !this.renderer.domElement) {
+      return;
+    }
+
+    this.renderer.domElement.style.pointerEvents = pointerEvents;
+  }
+
   dispose() {
     window.removeEventListener("resize", this.handleResize);
     this.renderer.setAnimationLoop(null);

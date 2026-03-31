@@ -166,14 +166,26 @@
                 <span class="geo-label">Status</span>
                 <strong id="geo-status-text" class="geo-value">Not requested</strong>
               </article>
-              <article class="geo-item">
+              <button
+                id="geo-copy-latitude-button"
+                class="geo-item geo-copy-trigger"
+                type="button"
+                data-copy-device-coords="true"
+                title="Aktuelle Geraetekoordinaten uebernehmen"
+              >
                 <span class="geo-label">Lat</span>
                 <strong id="geo-latitude" class="geo-value">-</strong>
-              </article>
-              <article class="geo-item">
+              </button>
+              <button
+                id="geo-copy-longitude-button"
+                class="geo-item geo-copy-trigger"
+                type="button"
+                data-copy-device-coords="true"
+                title="Aktuelle Geraetekoordinaten uebernehmen"
+              >
                 <span class="geo-label">Lon</span>
                 <strong id="geo-longitude" class="geo-value">-</strong>
-              </article>
+              </button>
               <article class="geo-item">
                 <span class="geo-label">Accuracy</span>
                 <strong id="geo-accuracy" class="geo-value">-</strong>

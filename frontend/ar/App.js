@@ -65,6 +65,7 @@ export class ARApp {
     this.arSessionManager = null;
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
+    this.isUIInteracting = false;
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -106,7 +107,9 @@ export class ARApp {
       onStopAR: () => this.stopAR(),
       onApplyGeoTarget: (coord) => this.applyGeoTarget(coord),
       onModeChange: (mode) => this.applyPlacementMode(mode),
-      onRequestGeolocation: () => this.requestGeoLocation()
+      onRequestGeolocation: () => this.requestGeoLocation(),
+      onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
+      onHudCollapsedChange: (isCollapsed) => this.handleHudCollapsedChange(isCollapsed)
     });
 
     const support = await this.arSessionManager.checkSupport();
@@ -231,6 +234,10 @@ export class ARApp {
   }
 
   handleSelect() {
+    if (this.isUIInteracting) {
+      return;
+    }
+
     if (this.placementController.getMode() === PlacementMode.FREE) {
       this.placeFreeObject();
     }
@@ -330,7 +337,7 @@ export class ARApp {
       return;
     }
 
-    const placed = this.placementController.placeAtPose(computation.pose);
+    const placed = this.placementController.placeGeoAtPose(computation.pose, cameraState);
     if (!placed) {
       return;
     }
@@ -358,6 +365,14 @@ export class ARApp {
     }
 
     return this.placementController.setGeoReferenceDirection(cameraState.direction);
+  }
+
+  handleUIInteractionChange(isInteracting) {
+    this.isUIInteracting = isInteracting;
+  }
+
+  handleHudCollapsedChange(isCollapsed) {
+    this.sceneManager.setCanvasPointerEvents(isCollapsed ? "auto" : "none");
   }
 
   syncDebugPanels(surfaceState = null, cameraState = null) {
