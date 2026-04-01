@@ -7,11 +7,6 @@ import { PlacementController, PlacementMode } from "./PlacementController.js";
 import { UIController } from "./UIController.js";
 import { GeoLocationService } from "./GeoLocationService.js";
 
-const AppMode = Object.freeze({
-  CONFIG: "config",
-  AR: "ar"
-});
-
 function toMessage(error, fallbackMessage = "unbekannter Fehler") {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -71,7 +66,7 @@ export class ARApp {
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
     this.isUIInteracting = false;
-    this.appMode = AppMode.CONFIG;
+    this.isTextInputActive = false;
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -92,12 +87,11 @@ export class ARApp {
     this.ui.setPlacementMode(this.placementController.getMode());
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
-    this.ui.setAppMode(this.appMode);
 
     if (assetInfo.usedPlaceholder) {
       this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
     } else {
-      this.ui.setHint("Konfiguriere zuerst die Zielkoordinaten. Die AR-Session startet erst danach.");
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Modus per Latitude/Longitude.");
     }
 
     this.arSessionManager = new ARSessionManager({
@@ -108,13 +102,15 @@ export class ARApp {
     });
 
     this.ui.bindActions({
-      onStartAR: (coord) => this.startAR(coord),
+      onStartAR: () => this.startAR(),
       onPlace: () => this.placeFreeObject(),
       onResetPlacement: () => this.resetPlacement(),
-      onOpenSettings: () => this.openSettings(),
+      onStopAR: () => this.stopAR(),
+      onApplyGeoTarget: (coord) => this.applyGeoTarget(coord),
       onModeChange: (mode) => this.applyPlacementMode(mode),
       onRequestGeolocation: () => this.requestGeoLocation(),
-      onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting)
+      onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
+      onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
 
     const support = await this.arSessionManager.checkSupport();
@@ -124,25 +120,12 @@ export class ARApp {
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
     this.syncDebugPanels();
+    this.syncCanvasPointerState();
 
     this.sceneManager.setAnimationLoop(this.handleFrame);
   }
 
-  setAppMode(mode) {
-    this.appMode = mode === AppMode.AR ? AppMode.AR : AppMode.CONFIG;
-    this.ui.setAppMode(this.appMode);
-  }
-
-  async startAR(configCoord = null) {
-    if (this.appMode === AppMode.AR && this.arSessionManager && this.arSessionManager.isActive()) {
-      return true;
-    }
-
-    if (configCoord && !this.applyGeoTarget(configCoord, { quiet: true })) {
-      return false;
-    }
-
-    this.setAppMode(AppMode.AR);
+  async startAR() {
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
     this.ui.setMessage("Starte immersive AR...");
@@ -151,17 +134,15 @@ export class ARApp {
     try {
       result = await this.arSessionManager.startSession();
     } catch (error) {
-      this.setAppMode(AppMode.CONFIG);
       this.ui.setSessionState(false, `AR-Start fehlgeschlagen: ${toMessage(error)}`);
-      this.ui.setHint("Konfiguration bleibt erhalten. Du kannst AR erneut starten.");
-      return false;
+      this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
+      return;
     }
 
     if (!result.started) {
-      this.setAppMode(AppMode.CONFIG);
       this.ui.setSessionState(false, result.message);
-      this.ui.setHint("Konfiguration bleibt erhalten. Du kannst AR erneut starten.");
-      return false;
+      this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
+      return;
     }
 
     try {
@@ -169,13 +150,14 @@ export class ARApp {
     } catch (error) {
       this.ui.setMessage(`Hit-Test konnte nicht initialisiert werden: ${toMessage(error)}`);
       await this.arSessionManager.endSession();
-      return false;
+      return;
     }
 
     this.poseStabilizer.reset();
     this.arSessionManager.clearOriginPose();
     this.placementController.clearGeoOrigin();
     this.placementController.enterARMode();
+    this.placementController.setTextInputActive(this.isTextInputActive);
     this.captureGeoOriginFromDevice();
     this.sceneManager.setARMode(true);
     this.ui.setSessionState(true, result.message);
@@ -183,27 +165,18 @@ export class ARApp {
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
     this.syncDebugPanels();
+    this.syncCanvasPointerState();
 
     if (this.placementController.getMode() === PlacementMode.GEO && !this.placementController.hasGeoOrigin()) {
       this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.");
-      return true;
-    }
-
-    this.ui.setHint("Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.");
-    return true;
-  }
-
-  async stopAR() {
-    if (!this.arSessionManager || !this.arSessionManager.isActive()) {
-      this.setAppMode(AppMode.CONFIG);
       return;
     }
 
-    await this.arSessionManager.endSession();
+    this.ui.setHint("Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.");
   }
 
-  async openSettings() {
-    await this.stopAR();
+  async stopAR() {
+    await this.arSessionManager.endSession();
   }
 
   handleSessionEnded() {
@@ -213,19 +186,24 @@ export class ARApp {
     this.poseStabilizer.reset();
     this.sceneManager.setARMode(false);
     this.placementController.exitARMode();
-    this.setAppMode(AppMode.CONFIG);
-    this.ui.setSessionState(false, "AR beendet. Konfiguration ist wieder aktiv.");
+    this.handleTextInputActiveChange(false);
+    this.ui.setSessionState(false, "AR beendet. Fallback-3D-Ansicht aktiv.");
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
     this.syncDebugPanels();
-    this.ui.setHint("Bearbeite die Koordinaten in der normalen Ansicht und starte AR danach erneut.");
+    this.ui.setHint("Fallback-3D-Ansicht aktiv. AR kann jederzeit erneut gestartet werden.");
   }
 
   handleFrame(timeMs, frame) {
     const deltaSeconds = this.computeDeltaSeconds(timeMs);
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
+      if (this.isTextInputActive) {
+        this.sceneManager.render();
+        return;
+      }
+
       const referenceSpace = this.arSessionManager.getReferenceSpace();
       const viewerPose =
         Boolean(frame) && Boolean(referenceSpace)
@@ -266,12 +244,12 @@ export class ARApp {
   }
 
   handleSelect() {
-    if (this.appMode !== AppMode.AR || this.isUIInteracting) {
+    if (this.isTextInputActive || this.isUIInteracting) {
       return;
     }
 
     if (this.placementController.getMode() === PlacementMode.FREE) {
-      this.placeFreeObject();
+      this.placeFreeObject("xr");
     }
   }
 
@@ -284,19 +262,10 @@ export class ARApp {
 
     this.ui.setPlacementMode(this.placementController.getMode());
 
-    if (this.appMode === AppMode.CONFIG) {
-      if (this.placementController.getMode() === PlacementMode.GEO) {
-        this.ui.setHint("Koordinaten-Modus gespeichert. AR startet spaeter mit den konfigurierten Werten.");
-      } else {
-        this.ui.setHint("Freie Platzierung gespeichert. AR kann ohne Texteingabe gestartet werden.");
-      }
-      return true;
-    }
-
     if (this.placementController.isPlaced()) {
       this.ui.setHint("Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.");
     } else if (this.placementController.getMode() === PlacementMode.GEO) {
-      this.ui.setHint("Koordinaten-Modus aktiv. Das gespeicherte Geo-Ziel wird verwendet.");
+      this.ui.setHint("Koordinaten-Modus aktiv. Bei stabiler Flaeche wird das Objekt relativ zur Geo-Position gesetzt.");
     } else {
       this.ui.setHint("Freie Platzierung aktiv. Sobald das Reticle stabil ist, kannst du das Objekt setzen.");
     }
@@ -304,35 +273,22 @@ export class ARApp {
     return true;
   }
 
-  applyGeoTarget(coord, { quiet = false } = {}) {
+  applyGeoTarget(coord) {
     if (!this.placementController) {
       return false;
     }
 
     const accepted = this.placementController.setGeoTarget(coord);
     if (!accepted) {
-      if (!quiet) {
-        this.ui.setMessage("Geo-Koordinaten konnten nicht uebernommen werden.");
-      }
+      this.ui.setMessage("Geo-Koordinaten konnten nicht uebernommen werden.");
       return false;
     }
 
     const target = this.placementController.getGeoTarget();
     this.ui.setGeoTargetInputs(target);
-
-    if (quiet) {
-      return true;
-    }
-
     this.ui.setMessage(
       `Geo-Ziel uebernommen: ${target.latitude.toFixed(6)}, ${target.longitude.toFixed(6)}.`
     );
-
-    if (this.appMode === AppMode.CONFIG) {
-      this.ui.setGeoTargetFeedback("Koordinaten gespeichert. AR kann jetzt gestartet werden.");
-      this.ui.setHint("Die Eingabe bleibt ausserhalb von AR. Starte die Session erst nach der Konfiguration.");
-      return true;
-    }
 
     if (this.placementController.isPlaced()) {
       this.ui.setHint("Aktuelles Placement bleibt fixiert. Neue Geo-Koordinaten greifen nach Reset.");
@@ -349,8 +305,16 @@ export class ARApp {
     return this.geoLocationService.requestPermissionAndStart();
   }
 
-  placeFreeObject() {
+  placeFreeObject(source = "ui") {
     if (!this.arSessionManager || !this.arSessionManager.isActive()) {
+      return false;
+    }
+
+    if (this.isTextInputActive) {
+      return false;
+    }
+
+    if (source !== "ui" && this.isUIInteracting) {
       return false;
     }
 
@@ -375,7 +339,7 @@ export class ARApp {
   }
 
   maybePlaceGeoObject(surfaceState, cameraState) {
-    if (!surfaceState.isStable || this.placementController.isPlaced()) {
+    if (this.isTextInputActive || !surfaceState.isStable || this.placementController.isPlaced()) {
       return;
     }
 
@@ -425,6 +389,20 @@ export class ARApp {
     this.isUIInteracting = isInteracting;
   }
 
+  handleTextInputActiveChange(isActive) {
+    this.isTextInputActive = Boolean(isActive);
+
+    if (this.placementController) {
+      this.placementController.setTextInputActive(this.isTextInputActive);
+    }
+
+    this.syncCanvasPointerState();
+  }
+
+  syncCanvasPointerState() {
+    this.sceneManager.setCanvasPointerEvents(this.isTextInputActive ? "none" : "auto");
+  }
+
   syncDebugPanels(surfaceState = null, cameraState = null) {
     if (!this.placementController) {
       return;
@@ -451,7 +429,7 @@ export class ARApp {
         if (placementDebug.objectBehindCamera) {
           this.ui.setHint("Objekt liegt hinter dir. Geo-Placement bleibt fixiert, bis du resettest.");
         } else {
-          this.ui.setHint("Geo-Placement fixiert. Fuer neue Koordinaten zuerst Einstellungen oeffnen.");
+          this.ui.setHint("Geo-Placement fixiert. 'Neu platzieren' berechnet die Zielposition erneut.");
         }
       } else {
         this.ui.setHint("Objekt fixiert. 'Neu platzieren' aktiviert das Reticle erneut.");
@@ -477,9 +455,11 @@ export class ARApp {
 
     if (!this.placementController.hasGeoOrigin()) {
       if (!this.geoLocationService.getCurrentPosition()) {
-        this.ui.setHint("Keine Geraeteposition verfuegbar. Oeffne Einstellungen, falls du neue Koordinaten setzen willst.");
+        this.ui.setHint("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
       } else if (!this.placementController.hasGeoReferenceDirection()) {
         this.ui.setHint("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      } else if (this.geoLocationService.getStatus() !== "granted") {
+        this.ui.setHint("Koordinaten-Modus aktiv. Aktiviere zuerst den Standort ueber 'Standort aktivieren'.");
       } else {
         this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.");
       }
@@ -515,7 +495,7 @@ export class ARApp {
       return;
     }
 
-    this.ui.setHint("Stabile Flaeche erkannt. Das konfigurierte Geo-Ziel wird jetzt im AR-Raum verwendet.");
+    this.ui.setHint("Stabile Flaeche erkannt. Geo-Ziel wird relativ zum Startpunkt auf dem Boden gesetzt.");
   }
 
   resetPlacement() {
@@ -533,7 +513,7 @@ export class ARApp {
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       this.ui.setMessage("Placement wurde zurueckgesetzt.");
       if (this.placementController.getMode() === PlacementMode.GEO) {
-        this.ui.setHint("Suche eine neue stabile Flaeche. Die gespeicherten Koordinaten werden danach erneut verwendet.");
+        this.ui.setHint("Suche eine neue stabile Flaeche. Das Geo-Ziel wird danach erneut auf dem Boden platziert.");
       } else {
         this.ui.setHint("Freie Platzierung aktiv. Richte das Reticle neu aus und setze das Objekt erneut.");
       }
@@ -541,7 +521,7 @@ export class ARApp {
     }
 
     this.ui.setMessage("Objekt auf die Fallback-Buehne zurueckgesetzt.");
-    this.ui.setHint("Konfiguriere Koordinaten und starte AR erst danach erneut.");
+    this.ui.setHint("Fallback-3D-Ansicht aktiv.");
   }
 
   computeDeltaSeconds(timeMs) {

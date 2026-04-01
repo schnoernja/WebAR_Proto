@@ -82,6 +82,7 @@ export class PlacementController {
     this.currentSurfaceState = null;
     this.inARMode = false;
     this.placed = false;
+    this.textInputActive = false;
     this.lastGeoComputation = this.createGeoDebugSnapshot("idle");
 
     this.showFallbackPreview();
@@ -169,7 +170,7 @@ export class PlacementController {
   updateSurfaceState(surfaceState) {
     this.currentSurfaceState = surfaceState;
 
-    if (!this.inARMode || this.placed || !surfaceState.displayPose) {
+    if (this.textInputActive || !this.inARMode || this.placed || !surfaceState.displayPose) {
       this.reticle.visible = false;
       return;
     }
@@ -373,7 +374,7 @@ export class PlacementController {
   }
 
   placeAtPose(pose) {
-    if (!this.inARMode || this.placed || !pose) {
+    if (this.textInputActive || !this.inARMode || this.placed || !pose) {
       return false;
     }
 
@@ -385,7 +386,7 @@ export class PlacementController {
   }
 
   placeGeoAtPose(pose, cameraState = null) {
-    if (!this.inARMode || this.placed || !pose) {
+    if (this.textInputActive || !this.inARMode || this.placed || !pose) {
       return false;
     }
 
@@ -472,6 +473,19 @@ export class PlacementController {
 
   isPlaced() {
     return this.placed;
+  }
+
+  setTextInputActive(active) {
+    this.textInputActive = Boolean(active);
+
+    if (this.textInputActive) {
+      this.reticle.visible = false;
+      return;
+    }
+
+    if (this.currentSurfaceState) {
+      this.updateSurfaceState(this.currentSurfaceState);
+    }
   }
 
   dispose() {
