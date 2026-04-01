@@ -1,22 +1,664 @@
 const DEFAULT_CARD_VISIBILITY = Object.freeze({
+  welcome: true,
   placement: true,
   coord: false,
   state: false,
   note: false,
   geo: true,
   debug: false,
-  help: true
+  help: true,
+  survey: false,
+  settings: false
 });
 
 const DEFAULT_CARD_COLLAPSED = Object.freeze({
+  welcome: false,
   placement: false,
   coord: true,
   state: true,
   note: true,
   geo: true,
   debug: true,
-  help: false
+  help: false,
+  survey: false,
+  settings: false
 });
+
+const SUPPORTED_LANGUAGES = new Set(["de", "en"]);
+
+const ACTION_MENU_TABS = Object.freeze({
+  help: "help",
+  survey: "survey",
+  settings: "settings"
+});
+
+const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
+  "tree.glb konnte nicht geladen werden. Platzhalter aktiv.": "Could not load tree.glb. Placeholder active.",
+  "Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Modus per Latitude/Longitude.":
+    "Fallback 3D view active. In free mode you place via the reticle, in coordinate mode via latitude/longitude.",
+  "Starte immersive AR...": "Starting immersive AR...",
+  "Fallback-3D-Ansicht bleibt aktiv.": "Fallback 3D view remains active.",
+  "Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.":
+    "Coordinate mode active. Waiting for device location and a stable surface.",
+  "Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.":
+    "Move the device slowly over the floor or table until a stable reference surface is detected.",
+  "Platzierungsmodus konnte nicht gewechselt werden.": "Could not switch placement mode.",
+  "Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.":
+    "Mode changed. The current placement remains unchanged until reset.",
+  "Koordinaten-Modus aktiv. Bei stabiler Flaeche wird das Objekt relativ zur Geo-Position gesetzt.":
+    "Coordinate mode active. The object is placed relative to the geo position once a stable surface is available.",
+  "Freie Platzierung aktiv. Sobald das Reticle stabil ist, kannst du das Objekt setzen.":
+    "Free placement active. Once the reticle is stable you can place the object.",
+  "Geo-Koordinaten konnten nicht uebernommen werden.": "Could not apply geo coordinates.",
+  "Aktuelles Placement bleibt fixiert. Neue Geo-Koordinaten greifen nach Reset.":
+    "The current placement stays fixed. New geo coordinates take effect after reset.",
+  "Neue Geo-Koordinaten gespeichert. Bei stabiler Flaeche wird die Position erneut geprueft.":
+    "New geo coordinates saved. The position will be checked again once a stable surface is available.",
+  "Geo-Koordinaten gespeichert. Sie werden verwendet, sobald du in den Koordinaten-Modus wechselst.":
+    "Geo coordinates saved. They are used once you switch to coordinate mode.",
+  "Noch keine stabile Flaeche fuer die freie Platzierung.": "No stable surface is available for free placement yet.",
+  "Objekt stabil auf der erkannten Flaeche platziert.": "Object placed stably on the detected surface.",
+  "Placement-Lock aktiv. Neu platzieren nur per Reset.": "Placement lock active. Repositioning is only possible after reset.",
+  "Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.":
+    "Placement lock active. Geo placement remains fixed until you reset.",
+  "Objekt liegt hinter dir. Geo-Placement bleibt fixiert, bis du resettest.":
+    "The object is behind you. Geo placement remains fixed until you reset.",
+  "Geo-Placement fixiert. 'Neu platzieren' berechnet die Zielposition erneut.":
+    "Geo placement fixed. 'Reposition' recalculates the target position.",
+  "Objekt fixiert. 'Neu platzieren' aktiviert das Reticle erneut.":
+    "Object fixed. 'Reposition' activates the reticle again.",
+  "Tracking pausiert. Halte das Geraet ruhig, bis WebXR wieder Viewer-Pose liefert.":
+    "Tracking paused. Keep the device still until WebXR provides a viewer pose again.",
+  "Reticle stabil. Tippen oder 'Objekt setzen' druecken.": "Reticle stable. Tap or press 'Place object'.",
+  "Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.":
+    "Surface detected. Hold still briefly so the multi-frame check can stabilize.",
+  "Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.":
+    "No surface detected. Move the device steadily over a flat area.",
+  "Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.":
+    "No device position is available. Enable location access first.",
+  "Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.":
+    "The geo reference is being initialized. Keep the viewing direction stable for a moment.",
+  "Koordinaten-Modus aktiv. Aktiviere zuerst den Standort ueber 'Standort aktivieren'.":
+    "Coordinate mode active. Enable location first via 'Enable location'.",
+  "Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.":
+    "Coordinate mode active. Waiting for the device location to calculate the target position.",
+  "Keine Geraeteposition verfuegbar.": "No device position is available.",
+  "Flaeche erkannt. Kurz ruhig halten, damit die Bodenhoehe stabil wird.":
+    "Surface detected. Hold still briefly so the ground height can stabilize.",
+  "Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.":
+    "No stable surface is available. Coordinate mode requires a stable ground surface.",
+  "Objekt liegt hinter dir.": "The object is behind you.",
+  "Stabile Flaeche erkannt. Geo-Ziel wird relativ zum Startpunkt auf dem Boden gesetzt.":
+    "Stable surface detected. The geo target is placed on the ground relative to the start point.",
+  "Placement wurde zurueckgesetzt.": "Placement has been reset.",
+  "Suche eine neue stabile Flaeche. Das Geo-Ziel wird danach erneut auf dem Boden platziert.":
+    "Find a new stable surface. The geo target will then be placed on the ground again.",
+  "Freie Platzierung aktiv. Richte das Reticle neu aus und setze das Objekt erneut.":
+    "Free placement active. Reposition the reticle and place the object again.",
+  "Objekt auf die Fallback-Buehne zurueckgesetzt.": "Object reset to the fallback stage.",
+  "Fallback-3D-Ansicht aktiv.": "Fallback 3D view active.",
+  "Browser und WebXR-Support werden geprueft.": "Checking browser and WebXR support.",
+  "Im Koordinaten-Modus wird das Objekt nur innerhalb von 100 m angezeigt.":
+    "In coordinate mode the object is only shown within 100 m.",
+  "Bitte gueltige Latitude- und Longitude-Werte eingeben.": "Please enter valid latitude and longitude values.",
+  "Koordinaten konnten nicht uebernommen werden.": "Coordinates could not be applied.",
+  "Koordinaten uebernommen. Sie greifen bei der naechsten Platzierung.":
+    "Coordinates applied. They take effect on the next placement.",
+  "Keine Geraetekoordinaten verfuegbar.": "No device coordinates are available.",
+  "Aktuelle Geraetekoordinaten uebernommen.": "Current device coordinates applied.",
+  "Modell laedt": "Loading model",
+  "Fallback-Modell": "Fallback model",
+  "Platzhalter": "Placeholder",
+  "Immersive AR benoetigt HTTPS oder localhost.": "Immersive AR requires HTTPS or localhost.",
+  "Dieser Browser bietet keine WebXR-Schnittstelle.": "This browser does not provide a WebXR interface.",
+  "WebXR immersive-ar ist verfuegbar.": "WebXR immersive-ar is available.",
+  "Immersive AR wird auf diesem Geraet oder Browser nicht angeboten.":
+    "Immersive AR is not available on this device or browser.",
+  "AR-Session laeuft bereits.": "AR session is already running.",
+  "AR-Session aktiv.": "AR session is active.",
+  "AR-Session aktiv. Browser zeigt kein DOM-Overlay an.":
+    "AR session is active. The browser does not provide a DOM overlay.",
+  "AR beendet. Fallback-3D-Ansicht aktiv.": "AR ended. Fallback 3D view active."
+});
+
+const REGEX_RUNTIME_TRANSLATIONS_EN = Object.freeze([
+  {
+    pattern: /^WebXR-Pruefung fehlgeschlagen: (.+)$/,
+    replace: (_, detail) => `WebXR check failed: ${detail}`
+  },
+  {
+    pattern: /^AR-Start fehlgeschlagen: (.+)$/,
+    replace: (_, detail) => `Failed to start AR: ${detail}`
+  },
+  {
+    pattern: /^Hit-Test konnte nicht initialisiert werden: (.+)$/,
+    replace: (_, detail) => `Could not initialize hit test: ${detail}`
+  },
+  {
+    pattern: /^Geo-Ziel uebernommen: (.+)\.$/,
+    replace: (_, detail) => `Geo target saved: ${detail}.`
+  },
+  {
+    pattern: /^Objekt im Koordinaten-Modus platziert\. Distanz zum Startpunkt: (.+) m\.$/,
+    replace: (_, distance) => `Object placed in coordinate mode. Distance from the start point: ${distance} m.`
+  },
+  {
+    pattern: /^Ziel zu weit entfernt: (.+) m\. Sichtbarkeit endet bei 100 m\.$/,
+    replace: (_, distance) => `Target is too far away: ${distance} m. Visibility ends at 100 m.`
+  },
+  {
+    pattern: /^AR-Session konnte nicht gestartet werden: (.+)$/,
+    replace: (_, detail) => `Could not start the AR session: ${detail}`
+  },
+  {
+    pattern: /^XR-Session konnte nicht an den Renderer gebunden werden: (.+)$/,
+    replace: (_, detail) => `Could not bind the XR session to the renderer: ${detail}`
+  }
+]);
+
+const DE_TRANSLATIONS = Object.freeze({
+  languageCode: "de",
+  menu: {
+    eyebrow: "Steuerung",
+    title: "Menue",
+    tabs: {
+      placement: "Platzierung",
+      developer: "Entwickler",
+      help: "Hilfe",
+      survey: "Umfrage",
+      settings: "Einstellungen"
+    },
+    placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
+    developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
+    helpCopy: "Die Hilfskachel laesst sich jederzeit erneut einblenden.",
+    surveyCopy: "Die Umfragekachel enthaelt einen Platzhalter fuer eine spaetere Nutzerumfrage.",
+    settingsCopy: "Die Einstellungenkachel enthaelt die Sprachumschaltung fuer die UI.",
+    openHelp: "Hilfskachel oeffnen",
+    openSurvey: "Umfragekachel oeffnen",
+    openSettings: "Einstellungen oeffnen",
+    visibility: {
+      placement: "Objektplatzierung",
+      coord: "Modus und Geo-Ziel",
+      state: "Status",
+      note: "Ablauf",
+      geo: "Geolocation",
+      debug: "Geo Debug anzeigen"
+    }
+  },
+  placement: {
+    eyebrow: "EPARtwin WebAR",
+    title: "Objektplatzierung",
+    intro: "Waehle zwischen freier Platzierung per stabilisiertem Reticle und Geo-Platzierung per Latitude/Longitude.",
+    buttons: {
+      start: "AR starten",
+      place: "Objekt setzen",
+      reset: "Neu platzieren",
+      stop: "AR beenden"
+    }
+  },
+  welcome: {
+    title: "Willkommen",
+    headline: "Herzlich Willkommen bei der EPARtwin WebAR Experience!",
+    subheading: "Anforderungen",
+    items: [
+      "Ein mobiles Geraet mit WebXR-Unterstuetzung",
+      "Kamerafreigabe fuer den AR-Modus",
+      "Standortfreigabe fuer den Koordinatenmodus",
+      "Eine erkennbare Boden- oder Tischflaeche fuer stabiles Placement"
+    ]
+  },
+  help: {
+    title: "Hilfe",
+    steps: [
+      "1. Starte AR ueber die Aktionskachel oben.",
+      "2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.",
+      "3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.",
+      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude lokal in den AR-Raum uebertragen."
+    ]
+  },
+  survey: {
+    title: "Umfrage",
+    placeholderTitle: "Platzhalter",
+    placeholderText: "Hier wird kuenftig eine Nutzerumfrage integriert.",
+    recommendationTitle: "Technische Empfehlung",
+    recommendationText:
+      "Geeignet sind eingebettete Formulare, die anonym genutzt und spaeter exportiert oder per E-Mail ausgewertet werden koennen.",
+    tools: [
+      {
+        name: "Google Forms",
+        description: "schnell verfuegbar, einfach teilbar und Antworten im Google-Workspace auswertbar"
+      },
+      {
+        name: "Typeform",
+        description: "starke mobile UX, gutes Embedding und gefuehrte Frageablaeufe"
+      },
+      {
+        name: "Tally.so",
+        description: "leichtgewichtig, iframe-faehig und gut fuer anonyme Formulare mit Export"
+      },
+      {
+        name: "Microsoft Forms",
+        description: "sinnvoll bei bestehender Microsoft-Umgebung und Auswertung im M365-Kontext"
+      }
+    ],
+    requirementsTitle: "Wichtige Anforderungen",
+    requirements: [
+      "Per iframe in die bestehende UI einbettbar",
+      "Optional anonym nutzbar",
+      "Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard moeglich"
+    ]
+  },
+  settings: {
+    title: "Einstellungen",
+    languageTitle: "Sprache",
+    languageDescription: "Die UI kann zwischen Deutsch und Englisch umgeschaltet werden.",
+    languages: {
+      de: "Deutsch",
+      en: "English"
+    }
+  },
+  coord: {
+    title: "Modus und Geo-Ziel",
+    modeLabel: "Mode",
+    latitudeLabel: "Latitude",
+    longitudeLabel: "Longitude",
+    options: {
+      free: "Freie Platzierung",
+      geo: "Koordinaten"
+    },
+    apply: "Koordinaten uebernehmen",
+    feedbackDefault: "Im Koordinaten-Modus wird das Objekt nur im gueltigen Umkreis angezeigt."
+  },
+  state: {
+    title: "Status",
+    labels: {
+      support: "WebXR",
+      session: "AR aktiv",
+      tracking: "Tracking",
+      surface: "Flaeche",
+      stability: "Stabilitaet",
+      placement: "Objekt"
+    },
+    values: {
+      checking: "Pruefung",
+      available: "Verfuegbar",
+      unavailable: "Nicht verfuegbar",
+      yes: "Ja",
+      no: "Nein",
+      waiting: "Wartet",
+      running: "Laeuft",
+      search: "Suche",
+      detected: "Erkannt",
+      stable: "Stabil",
+      notPlaced: "Nicht platziert",
+      placed: "Platziert"
+    }
+  },
+  note: {
+    title: "Ablauf"
+  },
+  geo: {
+    title: "Geolocation",
+    button: "Standort aktivieren",
+    labels: {
+      status: "Status",
+      latitude: "Lat",
+      longitude: "Lon",
+      accuracy: "Accuracy"
+    },
+    badges: {
+      checking: "Pruefung",
+      ready: "Bereit",
+      waiting: "Wartet",
+      granted: "Granted",
+      denied: "Denied",
+      https: "HTTPS",
+      unsupported: "Kein GPS"
+    },
+    statusTexts: {
+      notRequested: "Not requested",
+      waiting: "Waiting for permission",
+      denied: "Denied",
+      granted: "Granted"
+    },
+    messages: {
+      notRequested: "Standort noch nicht angefordert.",
+      httpsRequired: "Geolocation benoetigt HTTPS oder localhost.",
+      unsupported: "Geolocation ist in diesem Browser nicht verfuegbar.",
+      waiting: "Warte auf Standortfreigabe.",
+      denied: "Standort verweigert - bitte im Browser aktivieren.",
+      positionUnavailable: "Standort aktuell nicht verfuegbar.",
+      timeout: "Standortabfrage Timeout.",
+      genericError: "Geolocation konnte nicht gelesen werden.",
+      available: "Geraetestandort verfuegbar.",
+      permissionGranted: "Standortfreigabe vorhanden. Position wird aktualisiert."
+    },
+    help: {
+      notRequested: "Tippe auf 'Standort aktivieren', damit der Browser die Freigabe anfragt.",
+      httpsRequired: "Oeffne die Seite ueber https:// oder localhost, damit der Browser Standortzugriff erlaubt.",
+      denied: "Bitte aktiviere Standort in: Browser Einstellungen -> Standort -> Erlauben.",
+      waiting: "Bestaetige die Standortabfrage im Browser, damit Latitude und Longitude geladen werden.",
+      positionUnavailable: "Pruefe GPS, Netzverbindung und freie Sicht zum Himmel.",
+      timeout: "Versuche es erneut oder bewege dich an einen Ort mit besserem Empfang.",
+      none: ""
+    }
+  },
+  debug: {
+    title: "Geo Debug",
+    tag: "Placement",
+    labels: {
+      originLatitude: "Origin Lat",
+      originLongitude: "Origin Lon",
+      targetLatitude: "Target Lat",
+      targetLongitude: "Target Lon",
+      deltaLatitude: "Delta Lat",
+      deltaLongitude: "Delta Lon",
+      xMeters: "X (m)",
+      zMeters: "Z (m)",
+      distanceMeters: "Distance (m)",
+      objectPlaced: "Object Placed",
+      distanceTooFar: "Distance > 100m",
+      hasStableSurface: "Has Stable Surface",
+      objectBehindCamera: "Object Behind Camera"
+    }
+  },
+  mini: {
+    session: {
+      active: "AR: Aktiv",
+      checking: "AR: Pruefung",
+      ready: "AR: Bereit",
+      inactive: "AR: Inaktiv"
+    },
+    surface: {
+      stable: "Flaeche: Stabil",
+      checking: "Flaeche: Pruefung",
+      search: "Flaeche: Suche"
+    },
+    placement: {
+      placed: "Objekt: Platziert",
+      waiting: "Objekt: Wartet"
+    }
+  },
+  aria: {
+    menuOpen: "Menue oeffnen",
+    menuClose: "Menue schliessen",
+    closeButtons: {
+      welcome: "Begruessung schliessen",
+      help: "Hilfskachel schliessen",
+      survey: "Umfrage schliessen",
+      settings: "Einstellungen schliessen"
+    },
+    toggleButtons: {
+      welcome: "Begruessung auf- oder zuklappen",
+      placement: "Objektplatzierung auf- oder zuklappen",
+      help: "Hilfskachel auf- oder zuklappen",
+      survey: "Umfrage auf- oder zuklappen",
+      settings: "Einstellungen auf- oder zuklappen",
+      coord: "Modus und Geo-Ziel auf- oder zuklappen",
+      state: "Status auf- oder zuklappen",
+      note: "Ablauf auf- oder zuklappen",
+      geo: "Geolocation auf- oder zuklappen",
+      debug: "Geo Debug auf- oder zuklappen"
+    },
+    languageGroup: "Sprachauswahl"
+  }
+});
+const EN_TRANSLATIONS = Object.freeze({
+  languageCode: "en",
+  menu: {
+    eyebrow: "Controls",
+    title: "Menu",
+    tabs: {
+      placement: "Placement",
+      developer: "Developer",
+      help: "Help",
+      survey: "Survey",
+      settings: "Settings"
+    },
+    placementCopy: "Control the visibility of the main cards in the overlay.",
+    developerCopy: "Show or hide developer views and debug cards separately.",
+    helpCopy: "The help card can be opened again at any time.",
+    surveyCopy: "The survey card contains a placeholder for a future user survey.",
+    settingsCopy: "The settings card contains the language switch for the UI.",
+    openHelp: "Open help card",
+    openSurvey: "Open survey card",
+    openSettings: "Open settings",
+    visibility: {
+      placement: "Object placement",
+      coord: "Mode and geo target",
+      state: "Status",
+      note: "Flow",
+      geo: "Geolocation",
+      debug: "Show geo debug"
+    }
+  },
+  placement: {
+    eyebrow: "EPARtwin WebAR",
+    title: "Object Placement",
+    intro: "Choose between free placement via a stabilized reticle and geo placement via latitude/longitude.",
+    buttons: {
+      start: "Start AR",
+      place: "Place object",
+      reset: "Reposition",
+      stop: "Stop AR"
+    }
+  },
+  welcome: {
+    title: "Welcome",
+    headline: "Welcome to the EPARtwin WebAR Experience!",
+    subheading: "Requirements",
+    items: [
+      "A mobile device with WebXR support",
+      "Camera permission for AR mode",
+      "Location permission for coordinate mode",
+      "A visible floor or table surface for stable placement"
+    ]
+  },
+  help: {
+    title: "Help",
+    steps: [
+      "1. Start AR from the action card above.",
+      "2. Move the device slowly until a stable surface is detected.",
+      "3. In free mode you place the object directly on the stable surface.",
+      "4. In coordinate mode the target latitude and longitude are mapped into the local AR space."
+    ]
+  },
+  survey: {
+    title: "Survey",
+    placeholderTitle: "Placeholder",
+    placeholderText: "A user survey will be integrated here in the future.",
+    recommendationTitle: "Technical recommendation",
+    recommendationText:
+      "Suitable choices are embedded forms that can be used anonymously and later exported or reviewed by email or dashboard.",
+    tools: [
+      {
+        name: "Google Forms",
+        description: "quickly available, easy to share and simple to evaluate in Google Workspace"
+      },
+      {
+        name: "Typeform",
+        description: "strong mobile UX, good embedding and guided question flows"
+      },
+      {
+        name: "Tally.so",
+        description: "lightweight, iframe-friendly and useful for anonymous forms with export"
+      },
+      {
+        name: "Microsoft Forms",
+        description: "useful in an existing Microsoft environment with M365 reporting"
+      }
+    ],
+    requirementsTitle: "Key requirements",
+    requirements: [
+      "Embeddable in the current UI via iframe",
+      "Optionally usable anonymously",
+      "Export or delivery of results via email or dashboard"
+    ]
+  },
+  settings: {
+    title: "Settings",
+    languageTitle: "Language",
+    languageDescription: "The UI can be switched between German and English.",
+    languages: {
+      de: "Deutsch",
+      en: "English"
+    }
+  },
+  coord: {
+    title: "Mode and Geo Target",
+    modeLabel: "Mode",
+    latitudeLabel: "Latitude",
+    longitudeLabel: "Longitude",
+    options: {
+      free: "Free placement",
+      geo: "Coordinates"
+    },
+    apply: "Apply coordinates",
+    feedbackDefault: "In coordinate mode the object is only shown within the valid radius."
+  },
+  state: {
+    title: "Status",
+    labels: {
+      support: "WebXR",
+      session: "AR active",
+      tracking: "Tracking",
+      surface: "Surface",
+      stability: "Stability",
+      placement: "Object"
+    },
+    values: {
+      checking: "Checking",
+      available: "Available",
+      unavailable: "Unavailable",
+      yes: "Yes",
+      no: "No",
+      waiting: "Waiting",
+      running: "Running",
+      search: "Searching",
+      detected: "Detected",
+      stable: "Stable",
+      notPlaced: "Not placed",
+      placed: "Placed"
+    }
+  },
+  note: {
+    title: "Flow"
+  },
+  geo: {
+    title: "Geolocation",
+    button: "Enable location",
+    labels: {
+      status: "Status",
+      latitude: "Lat",
+      longitude: "Lon",
+      accuracy: "Accuracy"
+    },
+    badges: {
+      checking: "Checking",
+      ready: "Ready",
+      waiting: "Waiting",
+      granted: "Granted",
+      denied: "Denied",
+      https: "HTTPS",
+      unsupported: "No GPS"
+    },
+    statusTexts: {
+      notRequested: "Not requested",
+      waiting: "Waiting for permission",
+      denied: "Denied",
+      granted: "Granted"
+    },
+    messages: {
+      notRequested: "Location has not been requested yet.",
+      httpsRequired: "Geolocation requires HTTPS or localhost.",
+      unsupported: "Geolocation is not available in this browser.",
+      waiting: "Waiting for location permission.",
+      denied: "Location access denied. Enable it in the browser settings.",
+      positionUnavailable: "Location is currently unavailable.",
+      timeout: "Location request timed out.",
+      genericError: "Geolocation could not be read.",
+      available: "Device location is available.",
+      permissionGranted: "Location permission is available. Position is being updated."
+    },
+    help: {
+      notRequested: "Tap 'Enable location' so the browser can request permission.",
+      httpsRequired: "Open the page via https:// or localhost so the browser can allow location access.",
+      denied: "Enable location in the browser settings to continue.",
+      waiting: "Confirm the location request in the browser so latitude and longitude can be loaded.",
+      positionUnavailable: "Check GPS, network connectivity and clear sky visibility.",
+      timeout: "Try again or move to a place with better reception.",
+      none: ""
+    }
+  },
+  debug: {
+    title: "Geo Debug",
+    tag: "Placement",
+    labels: {
+      originLatitude: "Origin Lat",
+      originLongitude: "Origin Lon",
+      targetLatitude: "Target Lat",
+      targetLongitude: "Target Lon",
+      deltaLatitude: "Delta Lat",
+      deltaLongitude: "Delta Lon",
+      xMeters: "X (m)",
+      zMeters: "Z (m)",
+      distanceMeters: "Distance (m)",
+      objectPlaced: "Object Placed",
+      distanceTooFar: "Distance > 100m",
+      hasStableSurface: "Has Stable Surface",
+      objectBehindCamera: "Object Behind Camera"
+    }
+  },
+  mini: {
+    session: {
+      active: "AR: Active",
+      checking: "AR: Checking",
+      ready: "AR: Ready",
+      inactive: "AR: Inactive"
+    },
+    surface: {
+      stable: "Surface: Stable",
+      checking: "Surface: Checking",
+      search: "Surface: Search"
+    },
+    placement: {
+      placed: "Object: Placed",
+      waiting: "Object: Waiting"
+    }
+  },
+  aria: {
+    menuOpen: "Open menu",
+    menuClose: "Close menu",
+    closeButtons: {
+      welcome: "Close welcome card",
+      help: "Close help card",
+      survey: "Close survey card",
+      settings: "Close settings card"
+    },
+    toggleButtons: {
+      welcome: "Toggle welcome card",
+      placement: "Toggle object placement card",
+      help: "Toggle help card",
+      survey: "Toggle survey card",
+      settings: "Toggle settings card",
+      coord: "Toggle mode and geo target card",
+      state: "Toggle status card",
+      note: "Toggle flow card",
+      geo: "Toggle geolocation card",
+      debug: "Toggle geo debug card"
+    },
+    languageGroup: "Language selection"
+  }
+});
+
+const UI_TRANSLATIONS = Object.freeze({
+  de: DE_TRANSLATIONS,
+  en: EN_TRANSLATIONS
+});
+
+function getTranslations(language) {
+  return UI_TRANSLATIONS[SUPPORTED_LANGUAGES.has(language) ? language : "de"];
+}
 
 function toEditableValue(value, fractionDigits = 6) {
   return Number.isFinite(value) ? value.toFixed(fractionDigits) : "";
@@ -51,61 +693,41 @@ function toGeoSeverity(snapshot) {
   return toBadgeStatus(snapshot.status);
 }
 
-function toGeoBadgeLabel(snapshot) {
-  if (!snapshot) {
-    return "Pruefung";
-  }
-
-  if (snapshot.issue === "https-required") {
-    return "HTTPS";
-  }
-
-  if (snapshot.issue === "unsupported") {
-    return "Kein GPS";
-  }
-
-  switch (snapshot.status) {
-    case "granted":
-      return "Granted";
-    case "waiting":
-      return "Wartet";
-    case "denied":
-      return "Denied";
-    case "not-requested":
-      return "Bereit";
-    default:
-      return "Pruefung";
-  }
-}
-
-function toGeoStatusText(snapshot) {
-  if (!snapshot) {
-    return "Not requested";
-  }
-
-  switch (snapshot.status) {
-    case "granted":
-      return "Granted";
-    case "waiting":
-      return "Waiting for permission";
-    case "denied":
-      return "Denied";
-    case "not-requested":
-    default:
-      return "Not requested";
-  }
-}
-
-function toModeLabel(mode) {
-  return mode === "geo" ? "Koordinaten" : "Freie Platzierung";
-}
-
 function formatDebugNumber(value, fractionDigits = 2) {
   return Number.isFinite(value) ? value.toFixed(fractionDigits) : "-";
 }
 
 function formatDebugBoolean(value) {
   return value ? "true" : "false";
+}
+
+function translateRuntimeText(text, language) {
+  if (!text || language !== "en") {
+    return text;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(EXACT_RUNTIME_TRANSLATIONS_EN, text)) {
+    return EXACT_RUNTIME_TRANSLATIONS_EN[text];
+  }
+
+  for (const rule of REGEX_RUNTIME_TRANSLATIONS_EN) {
+    const match = text.match(rule.pattern);
+    if (match) {
+      return rule.replace(...match);
+    }
+  }
+
+  return text;
+}
+
+function createGeoSnapshotDefaults() {
+  return {
+    status: "not-requested",
+    issue: null,
+    position: null,
+    watchActive: false,
+    requestPending: false
+  };
 }
 
 export class UIController {
@@ -119,6 +741,8 @@ export class UIController {
     this.menuOverlay = this.document.getElementById("menu-overlay");
     this.menuCloseButton = this.document.getElementById("menu-close-button");
     this.openHelpCardButton = this.document.getElementById("open-help-card-button");
+    this.openSurveyCardButton = this.document.getElementById("open-survey-card-button");
+    this.openSettingsCardButton = this.document.getElementById("open-settings-card-button");
     this.menuTabButtons = Array.from(this.document.querySelectorAll("[data-menu-tab]"));
     this.menuTabPanels = Array.from(this.document.querySelectorAll("[data-menu-panel]"));
     this.cardVisibilityToggles = Array.from(this.document.querySelectorAll("[data-card-visibility-toggle]"));
@@ -135,7 +759,15 @@ export class UIController {
     this.stopButton = this.document.getElementById("stop-ar-button");
     this.applyGeoTargetButton = this.document.getElementById("apply-geo-target-button");
     this.activateGeoButton = this.document.getElementById("activate-geolocation-button");
+    this.closeWelcomeButton = this.document.getElementById("close-welcome-button");
     this.closeHelpButton = this.document.getElementById("close-help-button");
+    this.closeSurveyButton = this.document.getElementById("close-survey-button");
+    this.closeSettingsButton = this.document.getElementById("close-settings-button");
+
+    this.languageButtons = {
+      de: this.document.getElementById("language-de-button"),
+      en: this.document.getElementById("language-en-button")
+    };
 
     this.modeSelect = this.document.getElementById("placement-mode-select");
     this.geoTargetInputs = {
@@ -189,18 +821,103 @@ export class UIController {
     };
 
     this.cardRefs = {
+      welcome: this.getCardRefs("welcome"),
       placement: this.getCardRefs("placement"),
+      help: this.getCardRefs("help"),
+      survey: this.getCardRefs("survey"),
+      settings: this.getCardRefs("settings"),
       coord: this.getCardRefs("coord"),
       state: this.getCardRefs("state"),
       note: this.getCardRefs("note"),
       geo: this.getCardRefs("geo"),
-      debug: this.getCardRefs("debug"),
-      help: this.getCardRefs("help")
+      debug: this.getCardRefs("debug")
+    };
+
+    this.staticRefs = {
+      menuEyebrow: this.document.querySelector(".menu-eyebrow"),
+      menuTitle: this.document.querySelector(".menu-header h2"),
+      menuTabs: {
+        placement: this.document.getElementById("menu-tab-placement"),
+        developer: this.document.getElementById("menu-tab-developer"),
+        help: this.document.getElementById("menu-tab-help"),
+        survey: this.document.getElementById("menu-tab-survey"),
+        settings: this.document.getElementById("menu-tab-settings")
+      },
+      menuCopies: {
+        placement: this.document.querySelector('[data-menu-panel="placement"] .menu-copy'),
+        developer: this.document.querySelector('[data-menu-panel="developer"] .menu-copy'),
+        help: this.document.querySelector('[data-menu-panel="help"] .menu-copy'),
+        survey: this.document.querySelector('[data-menu-panel="survey"] .menu-copy'),
+        settings: this.document.querySelector('[data-menu-panel="settings"] .menu-copy')
+      },
+      menuVisibilityLabels: {
+        placement: this.getVisibilityToggleLabel("placement"),
+        coord: this.getVisibilityToggleLabel("coord"),
+        state: this.getVisibilityToggleLabel("state"),
+        note: this.getVisibilityToggleLabel("note"),
+        geo: this.getVisibilityToggleLabel("geo"),
+        debug: this.getVisibilityToggleLabel("debug")
+      },
+      placementEyebrow: this.document.querySelector("#card-placement .eyebrow"),
+      placementTitle: this.document.querySelector("#card-placement h1"),
+      placementIntro: this.document.querySelector("#card-placement .panel-intro"),
+      welcomeTitle: this.document.getElementById("welcome-card-title"),
+      welcomeHeadline: this.document.getElementById("welcome-card-headline"),
+      welcomeSubheading: this.document.getElementById("welcome-card-subheading"),
+      welcomeList: this.document.getElementById("welcome-card-list"),
+      helpTitle: this.document.querySelector("#card-help .card-title-group h2"),
+      helpCopy: this.document.querySelector("#card-help .help-copy"),
+      surveyTitle: this.document.getElementById("survey-card-title"),
+      surveyPlaceholderTitle: this.document.getElementById("survey-placeholder-title"),
+      surveyPlaceholderText: this.document.getElementById("survey-placeholder-text"),
+      surveyRecommendationTitle: this.document.getElementById("survey-recommendation-title"),
+      surveyRecommendationText: this.document.getElementById("survey-recommendation-text"),
+      surveyToolList: this.document.getElementById("survey-tool-list"),
+      surveyRequirementsTitle: this.document.getElementById("survey-requirements-title"),
+      surveyRequirementsList: this.document.getElementById("survey-requirements-list"),
+      settingsTitle: this.document.getElementById("settings-card-title"),
+      settingsLanguageTitle: this.document.getElementById("settings-language-title"),
+      settingsLanguageDescription: this.document.getElementById("settings-language-description"),
+      coordTitle: this.document.querySelector("#card-coord .card-title-group h2"),
+      coordModeLabel: this.modeSelect ? this.modeSelect.closest("label")?.querySelector(".field-label") : null,
+      coordLatitudeLabel: this.geoTargetInputs.latitude
+        ? this.geoTargetInputs.latitude.closest("label")?.querySelector(".field-label")
+        : null,
+      coordLongitudeLabel: this.geoTargetInputs.longitude
+        ? this.geoTargetInputs.longitude.closest("label")?.querySelector(".field-label")
+        : null,
+      stateTitle: this.document.querySelector("#card-state .card-title-group h2"),
+      noteTitle: this.document.querySelector("#card-note .card-title-group h2"),
+      geoTitle: this.document.querySelector("#card-geo .card-title-group h2"),
+      debugTitle: this.document.querySelector("#card-debug .card-title-group h2"),
+      debugTag: this.document.querySelector("#card-debug .panel-tag"),
+      geoLabels: {
+        status: this.geoRefs.statusText ? this.geoRefs.statusText.closest(".geo-item")?.querySelector(".geo-label") : null,
+        latitude: this.geoRefs.latitude ? this.geoRefs.latitude.closest(".geo-item")?.querySelector(".geo-label") : null,
+        longitude: this.geoRefs.longitude ? this.geoRefs.longitude.closest(".geo-item")?.querySelector(".geo-label") : null,
+        accuracy: this.geoRefs.accuracy ? this.geoRefs.accuracy.closest(".geo-item")?.querySelector(".geo-label") : null
+      },
+      debugLabels: {
+        originLatitude: this.getDebugLabel(this.geoDebugRefs.originLatitude),
+        originLongitude: this.getDebugLabel(this.geoDebugRefs.originLongitude),
+        targetLatitude: this.getDebugLabel(this.geoDebugRefs.targetLatitude),
+        targetLongitude: this.getDebugLabel(this.geoDebugRefs.targetLongitude),
+        deltaLatitude: this.getDebugLabel(this.geoDebugRefs.deltaLatitude),
+        deltaLongitude: this.getDebugLabel(this.geoDebugRefs.deltaLongitude),
+        xMeters: this.getDebugLabel(this.geoDebugRefs.xMeters),
+        zMeters: this.getDebugLabel(this.geoDebugRefs.zMeters),
+        distanceMeters: this.getDebugLabel(this.geoDebugRefs.distanceMeters),
+        objectPlaced: this.getDebugLabel(this.placementDebugRefs.objectPlaced),
+        distanceTooFar: this.getDebugLabel(this.placementDebugRefs.distanceTooFar),
+        hasStableSurface: this.getDebugLabel(this.placementDebugRefs.hasStableSurface),
+        objectBehindCamera: this.getDebugLabel(this.placementDebugRefs.objectBehindCamera)
+      }
     };
 
     this.uiState = {
       supportAvailable: null,
       sessionActive: false,
+      trackingActive: false,
       surfaceDetected: false,
       stableSurface: false,
       placed: false,
@@ -210,7 +927,15 @@ export class UIController {
       menuOpen: false,
       activeMenuTab: "placement",
       cardVisibility: { ...DEFAULT_CARD_VISIBILITY },
-      cardCollapsed: { ...DEFAULT_CARD_COLLAPSED }
+      cardCollapsed: { ...DEFAULT_CARD_COLLAPSED },
+      language: "de"
+    };
+
+    this.rawUiText = {
+      message: this.messageEl ? this.messageEl.textContent.trim() : "",
+      hint: this.hintEl ? this.hintEl.textContent.trim() : "",
+      geoTargetFeedback: this.geoTargetFeedbackEl ? this.geoTargetFeedbackEl.textContent.trim() : "",
+      assetLabel: this.assetNameEl ? this.assetNameEl.textContent.trim() : ""
     };
 
     this.geoTargetDraft = {
@@ -218,27 +943,30 @@ export class UIController {
       longitude: ""
     };
     this.latestGeoPosition = null;
+    this.lastGeoSnapshot = createGeoSnapshotDefaults();
     this.uiInteracting = false;
+    this.textInputActive = false;
     this.uiInteractionChangeHandler = null;
+    this.textInputActiveChangeHandler = null;
     this.uiInteractionReleaseTimeoutId = null;
+    this.textInputReleaseTimeoutId = null;
     this.cleanupCallbacks = [];
 
     this.configureTextInputs();
     this.applyMenuState();
     this.applyMenuTabState();
     this.applyAllCardStates();
+    this.applyStaticTexts();
     this.setPlacementMode(this.uiState.placementMode);
-    this.refreshMiniSummary();
-    this.renderGeoSnapshot({
-      status: "not-requested",
-      issue: null,
-      message: "Standort noch nicht angefordert.",
-      helpText: "Tippe auf 'Standort aktivieren', damit der Browser die Freigabe anfragt.",
-      position: null
-    });
+    this.renderSystemStates();
+    this.renderGeoSnapshot(this.lastGeoSnapshot);
     this.setGeoDebug({});
     this.setPlacementDebug({});
     this.syncCanvasPointerEvents();
+  }
+
+  getText() {
+    return getTranslations(this.uiState.language);
   }
 
   getStateRef(key) {
@@ -255,6 +983,15 @@ export class UIController {
       toggleButton: this.document.querySelector(`[data-card-toggle="${key}"]`),
       toggleIcon: this.document.querySelector(`[data-card-toggle-icon="${key}"]`)
     };
+  }
+
+  getVisibilityToggleLabel(cardKey) {
+    const toggle = this.document.querySelector(`[data-card-visibility-toggle="${cardKey}"]`);
+    return toggle ? toggle.closest("label")?.querySelector("span") : null;
+  }
+
+  getDebugLabel(valueEl) {
+    return valueEl ? valueEl.closest(".debug-item")?.querySelector(".debug-label") : null;
   }
 
   configureTextInputs() {
@@ -276,9 +1013,12 @@ export class UIController {
     onApplyGeoTarget,
     onModeChange,
     onRequestGeolocation,
-    onUIInteractionChange
+    onUIInteractionChange,
+    onTextInputActiveChange
   }) {
     this.uiInteractionChangeHandler = typeof onUIInteractionChange === "function" ? onUIInteractionChange : null;
+    this.textInputActiveChangeHandler =
+      typeof onTextInputActiveChange === "function" ? onTextInputActiveChange : null;
 
     this.bindButton(this.startButton, onStartAR);
     this.bindButton(this.placeButton, onPlace);
@@ -286,7 +1026,10 @@ export class UIController {
     this.bindButton(this.stopButton, onStopAR);
     this.bindButton(this.applyGeoTargetButton, () => this.handleApplyGeoTarget(onApplyGeoTarget));
     this.bindButton(this.activateGeoButton, onRequestGeolocation);
-    this.bindButton(this.closeHelpButton, () => this.closeHelpCard());
+    this.bindButton(this.closeWelcomeButton, () => this.closeCard("welcome"));
+    this.bindButton(this.closeHelpButton, () => this.closeCard("help"));
+    this.bindButton(this.closeSurveyButton, () => this.closeCard("survey"));
+    this.bindButton(this.closeSettingsButton, () => this.closeCard("settings"));
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
@@ -294,9 +1037,11 @@ export class UIController {
 
     this.bindCardToggleButtons();
     this.bindMenuControls();
+    this.bindLanguageControls();
     this.bindInteractionSurface(this.uiContainer);
     this.bindInteractionSurface(this.hudRoot);
     this.bindDeviceCoordinateCopy();
+    this.bindTextInputActivity();
 
     this.refreshButtons();
   }
@@ -305,8 +1050,10 @@ export class UIController {
     if (!service || typeof service.subscribe !== "function") {
       this.renderGeoSnapshot({
         status: "unsupported",
-        message: "Geolocation nicht verfuegbar.",
-        position: null
+        issue: "unsupported",
+        position: null,
+        watchActive: false,
+        requestPending: false
       });
       return;
     }
@@ -366,13 +1113,28 @@ export class UIController {
     this.bindButton(this.menuButton, () => this.toggleMenu());
     this.bindButton(this.menuCloseButton, () => this.closeMenu());
     this.bindButton(this.openHelpCardButton, () => {
-      this.openHelpCard();
+      this.openCard("help");
+      this.closeMenu();
+    });
+    this.bindButton(this.openSurveyCardButton, () => {
+      this.openCard("survey");
+      this.closeMenu();
+    });
+    this.bindButton(this.openSettingsCardButton, () => {
+      this.openCard("settings");
       this.closeMenu();
     });
 
     for (const tabButton of this.menuTabButtons) {
       const handler = () => {
-        this.setActiveMenuTab(tabButton.dataset.menuTab || "placement");
+        const tabKey = tabButton.dataset.menuTab || "placement";
+        if (tabKey === ACTION_MENU_TABS.help || tabKey === ACTION_MENU_TABS.survey || tabKey === ACTION_MENU_TABS.settings) {
+          this.openCard(tabKey);
+          this.closeMenu();
+          return;
+        }
+
+        this.setActiveMenuTab(tabKey);
       };
 
       tabButton.addEventListener("click", handler);
@@ -397,6 +1159,40 @@ export class UIController {
 
       this.menuOverlay.addEventListener("click", handler);
       this.cleanupCallbacks.push(() => this.menuOverlay.removeEventListener("click", handler));
+    }
+  }
+
+  bindLanguageControls() {
+    for (const [language, button] of Object.entries(this.languageButtons)) {
+      if (!button) {
+        continue;
+      }
+
+      const handler = () => {
+        this.setLanguage(language);
+      };
+
+      button.addEventListener("click", handler);
+      this.cleanupCallbacks.push(() => button.removeEventListener("click", handler));
+    }
+  }
+
+  bindTextInputActivity() {
+    const inputs = [this.geoTargetInputs.latitude, this.geoTargetInputs.longitude].filter(Boolean);
+    for (const input of inputs) {
+      const handleFocus = () => {
+        this.clearPendingTextInputRelease();
+        this.setTextInputActive(true);
+      };
+      const handleBlur = () => {
+        this.scheduleTextInputRelease();
+      };
+
+      input.addEventListener("focus", handleFocus);
+      input.addEventListener("blur", handleBlur);
+
+      this.cleanupCallbacks.push(() => input.removeEventListener("focus", handleFocus));
+      this.cleanupCallbacks.push(() => input.removeEventListener("blur", handleBlur));
     }
   }
 
@@ -470,6 +1266,33 @@ export class UIController {
     }
   }
 
+  scheduleTextInputRelease() {
+    this.clearPendingTextInputRelease();
+    this.textInputReleaseTimeoutId = window.setTimeout(() => {
+      this.textInputReleaseTimeoutId = null;
+      this.setTextInputActive(false);
+    }, 50);
+  }
+
+  clearPendingTextInputRelease() {
+    if (this.textInputReleaseTimeoutId !== null) {
+      window.clearTimeout(this.textInputReleaseTimeoutId);
+      this.textInputReleaseTimeoutId = null;
+    }
+  }
+
+  setTextInputActive(active) {
+    const nextValue = Boolean(active);
+    if (this.textInputActive === nextValue) {
+      return;
+    }
+
+    this.textInputActive = nextValue;
+    if (this.textInputActiveChangeHandler) {
+      this.textInputActiveChangeHandler(nextValue);
+    }
+  }
+
   getCanvasElement() {
     return this.document.getElementById("ar-canvas");
   }
@@ -518,6 +1341,11 @@ export class UIController {
 
     if (this.menuButton) {
       this.menuButton.setAttribute("aria-expanded", String(this.uiState.menuOpen));
+      this.menuButton.setAttribute("aria-label", this.uiState.menuOpen ? this.getText().aria.menuClose : this.getText().aria.menuOpen);
+    }
+
+    if (this.menuCloseButton) {
+      this.menuCloseButton.setAttribute("aria-label", this.getText().aria.menuClose);
     }
   }
 
@@ -607,6 +1435,7 @@ export class UIController {
 
     if (refs.toggleButton) {
       refs.toggleButton.setAttribute("aria-expanded", String(!collapsed));
+      refs.toggleButton.setAttribute("aria-label", this.getText().aria.toggleButtons[cardKey] || "");
     }
 
     if (refs.toggleIcon) {
@@ -614,44 +1443,282 @@ export class UIController {
     }
   }
 
-  openHelpCard() {
-    this.setCardVisibility("help", true);
-    this.setCardCollapsed("help", false);
+  openCard(cardKey) {
+    this.setCardVisibility(cardKey, true);
+    this.setCardCollapsed(cardKey, false);
   }
 
-  closeHelpCard() {
-    this.setCardVisibility("help", false);
+  closeCard(cardKey) {
+    this.setCardVisibility(cardKey, false);
+  }
+
+  setLanguage(language) {
+    const nextLanguage = SUPPORTED_LANGUAGES.has(language) ? language : "de";
+    if (this.uiState.language === nextLanguage) {
+      this.updateLanguageButtons();
+      return;
+    }
+
+    this.uiState.language = nextLanguage;
+    this.applyStaticTexts();
+    this.applyMenuState();
+    this.applyMenuTabState();
+    this.applyAllCardStates();
+    this.refreshButtons();
+  }
+
+  applyStaticTexts() {
+    const text = this.getText();
+    this.document.documentElement.lang = text.languageCode;
+
+    this.setElementText(this.staticRefs.menuEyebrow, text.menu.eyebrow);
+    this.setElementText(this.staticRefs.menuTitle, text.menu.title);
+    this.setElementText(this.staticRefs.menuTabs.placement, text.menu.tabs.placement);
+    this.setElementText(this.staticRefs.menuTabs.developer, text.menu.tabs.developer);
+    this.setElementText(this.staticRefs.menuTabs.help, text.menu.tabs.help);
+    this.setElementText(this.staticRefs.menuTabs.survey, text.menu.tabs.survey);
+    this.setElementText(this.staticRefs.menuTabs.settings, text.menu.tabs.settings);
+    this.setElementText(this.staticRefs.menuCopies.placement, text.menu.placementCopy);
+    this.setElementText(this.staticRefs.menuCopies.developer, text.menu.developerCopy);
+    this.setElementText(this.staticRefs.menuCopies.help, text.menu.helpCopy);
+    this.setElementText(this.staticRefs.menuCopies.survey, text.menu.surveyCopy);
+    this.setElementText(this.staticRefs.menuCopies.settings, text.menu.settingsCopy);
+    this.setElementText(this.openHelpCardButton, text.menu.openHelp);
+    this.setElementText(this.openSurveyCardButton, text.menu.openSurvey);
+    this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
+    this.setElementText(this.staticRefs.menuVisibilityLabels.placement, text.menu.visibility.placement);
+    this.setElementText(this.staticRefs.menuVisibilityLabels.coord, text.menu.visibility.coord);
+    this.setElementText(this.staticRefs.menuVisibilityLabels.state, text.menu.visibility.state);
+    this.setElementText(this.staticRefs.menuVisibilityLabels.note, text.menu.visibility.note);
+    this.setElementText(this.staticRefs.menuVisibilityLabels.geo, text.menu.visibility.geo);
+    this.setElementText(this.staticRefs.menuVisibilityLabels.debug, text.menu.visibility.debug);
+
+    this.setElementText(this.staticRefs.placementEyebrow, text.placement.eyebrow);
+    this.setElementText(this.staticRefs.placementTitle, text.placement.title);
+    this.setElementText(this.staticRefs.placementIntro, text.placement.intro);
+    this.setElementText(this.startButton, text.placement.buttons.start);
+    this.setElementText(this.placeButton, text.placement.buttons.place);
+    this.setElementText(this.resetButton, text.placement.buttons.reset);
+    this.setElementText(this.stopButton, text.placement.buttons.stop);
+
+    this.setElementText(this.staticRefs.welcomeTitle, text.welcome.title);
+    this.setElementText(this.staticRefs.welcomeHeadline, text.welcome.headline);
+    this.setElementText(this.staticRefs.welcomeSubheading, text.welcome.subheading);
+    this.setListItems(this.staticRefs.welcomeList, text.welcome.items);
+
+    this.setElementText(this.staticRefs.helpTitle, text.help.title);
+    this.setParagraphList(this.staticRefs.helpCopy, text.help.steps);
+
+    this.setElementText(this.staticRefs.surveyTitle, text.survey.title);
+    this.setElementText(this.staticRefs.surveyPlaceholderTitle, text.survey.placeholderTitle);
+    this.setElementText(this.staticRefs.surveyPlaceholderText, text.survey.placeholderText);
+    this.setElementText(this.staticRefs.surveyRecommendationTitle, text.survey.recommendationTitle);
+    this.setElementText(this.staticRefs.surveyRecommendationText, text.survey.recommendationText);
+    this.setToolList(this.staticRefs.surveyToolList, text.survey.tools);
+    this.setElementText(this.staticRefs.surveyRequirementsTitle, text.survey.requirementsTitle);
+    this.setListItems(this.staticRefs.surveyRequirementsList, text.survey.requirements);
+
+    this.setElementText(this.staticRefs.settingsTitle, text.settings.title);
+    this.setElementText(this.staticRefs.settingsLanguageTitle, text.settings.languageTitle);
+    this.setElementText(this.staticRefs.settingsLanguageDescription, text.settings.languageDescription);
+    this.setElementText(this.languageButtons.de, text.settings.languages.de);
+    this.setElementText(this.languageButtons.en, text.settings.languages.en);
+
+    this.setElementText(this.staticRefs.coordTitle, text.coord.title);
+    this.setElementText(this.staticRefs.coordModeLabel, text.coord.modeLabel);
+    this.setElementText(this.staticRefs.coordLatitudeLabel, text.coord.latitudeLabel);
+    this.setElementText(this.staticRefs.coordLongitudeLabel, text.coord.longitudeLabel);
+    this.setElementText(this.applyGeoTargetButton, text.coord.apply);
+
+    this.setElementText(this.staticRefs.stateTitle, text.state.title);
+    this.setElementText(this.getStateLabel("support"), text.state.labels.support);
+    this.setElementText(this.getStateLabel("session"), text.state.labels.session);
+    this.setElementText(this.getStateLabel("tracking"), text.state.labels.tracking);
+    this.setElementText(this.getStateLabel("surface"), text.state.labels.surface);
+    this.setElementText(this.getStateLabel("stability"), text.state.labels.stability);
+    this.setElementText(this.getStateLabel("placement"), text.state.labels.placement);
+
+    this.setElementText(this.staticRefs.noteTitle, text.note.title);
+    this.setElementText(this.staticRefs.geoTitle, text.geo.title);
+    this.setElementText(this.activateGeoButton, text.geo.button);
+    this.setElementText(this.staticRefs.geoLabels.status, text.geo.labels.status);
+    this.setElementText(this.staticRefs.geoLabels.latitude, text.geo.labels.latitude);
+    this.setElementText(this.staticRefs.geoLabels.longitude, text.geo.labels.longitude);
+    this.setElementText(this.staticRefs.geoLabels.accuracy, text.geo.labels.accuracy);
+
+    this.setElementText(this.staticRefs.debugTitle, text.debug.title);
+    this.setElementText(this.staticRefs.debugTag, text.debug.tag);
+    this.setElementText(this.staticRefs.debugLabels.originLatitude, text.debug.labels.originLatitude);
+    this.setElementText(this.staticRefs.debugLabels.originLongitude, text.debug.labels.originLongitude);
+    this.setElementText(this.staticRefs.debugLabels.targetLatitude, text.debug.labels.targetLatitude);
+    this.setElementText(this.staticRefs.debugLabels.targetLongitude, text.debug.labels.targetLongitude);
+    this.setElementText(this.staticRefs.debugLabels.deltaLatitude, text.debug.labels.deltaLatitude);
+    this.setElementText(this.staticRefs.debugLabels.deltaLongitude, text.debug.labels.deltaLongitude);
+    this.setElementText(this.staticRefs.debugLabels.xMeters, text.debug.labels.xMeters);
+    this.setElementText(this.staticRefs.debugLabels.zMeters, text.debug.labels.zMeters);
+    this.setElementText(this.staticRefs.debugLabels.distanceMeters, text.debug.labels.distanceMeters);
+    this.setElementText(this.staticRefs.debugLabels.objectPlaced, text.debug.labels.objectPlaced);
+    this.setElementText(this.staticRefs.debugLabels.distanceTooFar, text.debug.labels.distanceTooFar);
+    this.setElementText(this.staticRefs.debugLabels.hasStableSurface, text.debug.labels.hasStableSurface);
+    this.setElementText(this.staticRefs.debugLabels.objectBehindCamera, text.debug.labels.objectBehindCamera);
+
+    if (this.modeSelect) {
+      const [freeOption, geoOption] = this.modeSelect.options;
+      if (freeOption) {
+        freeOption.textContent = text.coord.options.free;
+      }
+      if (geoOption) {
+        geoOption.textContent = text.coord.options.geo;
+      }
+    }
+
+    const settingsGroup = this.document.querySelector(".language-switch");
+    if (settingsGroup) {
+      settingsGroup.setAttribute("aria-label", text.aria.languageGroup);
+    }
+
+    if (this.closeWelcomeButton) {
+      this.closeWelcomeButton.setAttribute("aria-label", text.aria.closeButtons.welcome);
+    }
+    if (this.closeHelpButton) {
+      this.closeHelpButton.setAttribute("aria-label", text.aria.closeButtons.help);
+    }
+    if (this.closeSurveyButton) {
+      this.closeSurveyButton.setAttribute("aria-label", text.aria.closeButtons.survey);
+    }
+    if (this.closeSettingsButton) {
+      this.closeSettingsButton.setAttribute("aria-label", text.aria.closeButtons.settings);
+    }
+
+    this.updateLanguageButtons();
+    this.renderPlacementModeUI();
+    this.renderSystemStates();
+    this.renderMessageText();
+    this.renderHintText();
+    this.renderGeoTargetFeedback();
+    this.renderAssetLabel();
+    this.renderGeoSnapshot(this.lastGeoSnapshot);
+  }
+
+  updateLanguageButtons() {
+    for (const [language, button] of Object.entries(this.languageButtons)) {
+      if (!button) {
+        continue;
+      }
+
+      const isActive = this.uiState.language === language;
+      button.dataset.active = isActive ? "true" : "false";
+      button.setAttribute("aria-pressed", String(isActive));
+    }
+  }
+
+  getStateLabel(key) {
+    const ref = this.stateRefs[key];
+    return ref && ref.item ? ref.item.querySelector(".state-label") : null;
+  }
+
+  setElementText(element, text) {
+    if (element) {
+      element.textContent = text;
+    }
+  }
+
+  setListItems(listElement, items) {
+    if (!listElement) {
+      return;
+    }
+
+    const nextItems = Array.isArray(items) ? items : [];
+    listElement.replaceChildren(
+      ...nextItems.map((item) => {
+        const li = this.document.createElement("li");
+        li.textContent = item;
+        return li;
+      })
+    );
+  }
+
+  setParagraphList(container, items) {
+    if (!container) {
+      return;
+    }
+
+    const nextItems = Array.isArray(items) ? items : [];
+    container.replaceChildren(
+      ...nextItems.map((item) => {
+        const paragraph = this.document.createElement("p");
+        paragraph.textContent = item;
+        return paragraph;
+      })
+    );
+  }
+
+  setToolList(listElement, items) {
+    if (!listElement) {
+      return;
+    }
+
+    const nextItems = Array.isArray(items) ? items : [];
+    listElement.replaceChildren(
+      ...nextItems.map((item) => {
+        const li = this.document.createElement("li");
+        const strong = this.document.createElement("strong");
+        strong.textContent = `${item.name}: `;
+        li.append(strong, item.description);
+        return li;
+      })
+    );
+  }
+
+  renderPlacementModeUI() {
+    const text = this.getText();
+    const mode = this.uiState.placementMode === "geo" ? "geo" : "free";
+
+    if (this.modeSelect) {
+      this.modeSelect.value = mode;
+    }
+
+    if (this.modeBadgeEl) {
+      this.modeBadgeEl.textContent = text.coord.options[mode];
+    }
   }
 
   setAssetLabel(label) {
+    this.rawUiText.assetLabel = label || "";
+    this.renderAssetLabel();
+  }
+
+  renderAssetLabel() {
     if (this.assetNameEl) {
-      this.assetNameEl.textContent = label;
+      this.assetNameEl.textContent = translateRuntimeText(this.rawUiText.assetLabel, this.uiState.language);
     }
   }
 
   setMessage(message) {
+    this.rawUiText.message = message || "";
+    this.renderMessageText();
+  }
+
+  renderMessageText() {
     if (this.messageEl) {
-      this.messageEl.textContent = message;
+      this.messageEl.textContent = translateRuntimeText(this.rawUiText.message, this.uiState.language);
     }
   }
 
   setHint(message) {
+    this.rawUiText.hint = message || "";
+    this.renderHintText();
+  }
+
+  renderHintText() {
     if (this.hintEl) {
-      this.hintEl.textContent = message;
+      this.hintEl.textContent = translateRuntimeText(this.rawUiText.hint, this.uiState.language);
     }
   }
 
   setPlacementMode(mode) {
     this.uiState.placementMode = mode === "geo" ? "geo" : "free";
-
-    if (this.modeSelect) {
-      this.modeSelect.value = this.uiState.placementMode;
-    }
-
-    if (this.modeBadgeEl) {
-      this.modeBadgeEl.textContent = toModeLabel(this.uiState.placementMode);
-    }
-
+    this.renderPlacementModeUI();
     this.refreshButtons();
   }
 
@@ -675,9 +1742,18 @@ export class UIController {
   }
 
   setGeoTargetFeedback(message) {
-    if (this.geoTargetFeedbackEl) {
-      this.geoTargetFeedbackEl.textContent = message;
+    this.rawUiText.geoTargetFeedback = message || "";
+    this.renderGeoTargetFeedback();
+  }
+
+  renderGeoTargetFeedback() {
+    if (!this.geoTargetFeedbackEl) {
+      return;
     }
+
+    const fallbackText = this.getText().coord.feedbackDefault;
+    const feedbackText = this.rawUiText.geoTargetFeedback || fallbackText;
+    this.geoTargetFeedbackEl.textContent = translateRuntimeText(feedbackText, this.uiState.language);
   }
 
   updateGeoTargetDraftFromInputs() {
@@ -731,18 +1807,17 @@ export class UIController {
 
   setSupportState(available, detail) {
     this.uiState.supportAvailable = available;
-    this.setState("support", available ? "Verfuegbar" : "Nicht verfuegbar", available ? "ok" : "error");
+    this.renderSystemStates();
     if (detail) {
       this.setMessage(detail);
     }
-    this.refreshMiniSummary();
     this.refreshButtons();
   }
 
   setSessionState(active, detail) {
     this.uiState.sessionActive = active;
-    this.setState("session", active ? "Ja" : "Nein", active ? "active" : "idle");
     this.document.body.classList.toggle("ar-active", active);
+
     if (detail) {
       this.setMessage(detail);
     }
@@ -756,34 +1831,67 @@ export class UIController {
       this.setCardVisibility("help", false);
     }
 
-    this.refreshMiniSummary();
+    this.renderSystemStates();
     this.refreshButtons();
   }
 
   setTrackingState(active) {
-    this.setState("tracking", active ? "Laeuft" : "Wartet", active ? "ok" : "idle");
+    this.uiState.trackingActive = Boolean(active);
+    this.renderSystemStates();
   }
 
   setSurfaceState(detected, stable) {
-    this.uiState.surfaceDetected = detected;
-    this.uiState.stableSurface = detected && stable;
-
-    this.setState("surface", detected ? "Erkannt" : "Suche", detected ? "warning" : "idle");
-    this.setState(
-      "stability",
-      stable ? "Stabil" : detected ? "Pruefung" : "Wartet",
-      stable ? "ok" : detected ? "warning" : "idle"
-    );
-
-    this.refreshMiniSummary();
+    this.uiState.surfaceDetected = Boolean(detected);
+    this.uiState.stableSurface = Boolean(detected && stable);
+    this.renderSystemStates();
     this.refreshButtons();
   }
 
   setPlacementState(placed) {
-    this.uiState.placed = placed;
-    this.setState("placement", placed ? "Platziert" : "Nicht platziert", placed ? "done" : "idle");
-    this.refreshMiniSummary();
+    this.uiState.placed = Boolean(placed);
+    this.renderSystemStates();
     this.refreshButtons();
+  }
+
+  renderSystemStates() {
+    const text = this.getText();
+
+    const supportStatus =
+      this.uiState.supportAvailable === null ? "idle" : this.uiState.supportAvailable ? "ok" : "error";
+    const supportText =
+      this.uiState.supportAvailable === null
+        ? text.state.values.checking
+        : this.uiState.supportAvailable
+          ? text.state.values.available
+          : text.state.values.unavailable;
+
+    const sessionStatus = this.uiState.sessionActive ? "active" : "idle";
+    const sessionText = this.uiState.sessionActive ? text.state.values.yes : text.state.values.no;
+
+    const trackingStatus = this.uiState.trackingActive ? "ok" : "idle";
+    const trackingText = this.uiState.trackingActive ? text.state.values.running : text.state.values.waiting;
+
+    const surfaceStatus = this.uiState.surfaceDetected ? "warning" : "idle";
+    const surfaceText = this.uiState.surfaceDetected ? text.state.values.detected : text.state.values.search;
+
+    const stabilityStatus = this.uiState.stableSurface ? "ok" : this.uiState.surfaceDetected ? "warning" : "idle";
+    const stabilityText = this.uiState.stableSurface
+      ? text.state.values.stable
+      : this.uiState.surfaceDetected
+        ? text.state.values.checking
+        : text.state.values.waiting;
+
+    const placementStatus = this.uiState.placed ? "done" : "idle";
+    const placementText = this.uiState.placed ? text.state.values.placed : text.state.values.notPlaced;
+
+    this.setState("support", supportText, supportStatus);
+    this.setState("session", sessionText, sessionStatus);
+    this.setState("tracking", trackingText, trackingStatus);
+    this.setState("surface", surfaceText, surfaceStatus);
+    this.setState("stability", stabilityText, stabilityStatus);
+    this.setState("placement", placementText, placementStatus);
+
+    this.refreshMiniSummary();
   }
 
   setState(key, text, status) {
@@ -824,13 +1932,15 @@ export class UIController {
   }
 
   refreshMiniSummary() {
+    const text = this.getText();
+
     const sessionText = this.uiState.sessionActive
-      ? "AR: Aktiv"
+      ? text.mini.session.active
       : this.uiState.supportAvailable === null
-        ? "AR: Pruefung"
+        ? text.mini.session.checking
         : this.uiState.supportAvailable
-          ? "AR: Bereit"
-          : "AR: Inaktiv";
+          ? text.mini.session.ready
+          : text.mini.session.inactive;
     const sessionStatus = this.uiState.sessionActive
       ? "active"
       : this.uiState.supportAvailable === null
@@ -840,17 +1950,17 @@ export class UIController {
           : "error";
 
     const surfaceText = this.uiState.stableSurface
-      ? "Flaeche: Stabil"
+      ? text.mini.surface.stable
       : this.uiState.surfaceDetected
-        ? "Flaeche: Pruefung"
-        : "Flaeche: Suche";
+        ? text.mini.surface.checking
+        : text.mini.surface.search;
     const surfaceStatus = this.uiState.stableSurface
       ? "ok"
       : this.uiState.surfaceDetected
         ? "warning"
         : "idle";
 
-    const placementText = this.uiState.placed ? "Objekt: Platziert" : "Objekt: Wartet";
+    const placementText = this.uiState.placed ? text.mini.placement.placed : text.mini.placement.waiting;
     const placementStatus = this.uiState.placed ? "done" : "idle";
 
     this.setMiniState("session", sessionText, sessionStatus);
@@ -859,24 +1969,27 @@ export class UIController {
   }
 
   setMiniState(key, text, status) {
-    const el = this.miniRefs[key];
-    if (!el) {
+    const element = this.miniRefs[key];
+    if (!element) {
       return;
     }
 
-    el.textContent = text;
-    el.dataset.status = status;
+    element.textContent = text;
+    element.dataset.status = status;
   }
 
   renderGeoSnapshot(snapshot) {
-    const position = snapshot && snapshot.position ? snapshot.position : null;
-    const message = snapshot && snapshot.message ? snapshot.message : "Standort noch nicht angefordert.";
-    const helpText = snapshot && snapshot.helpText ? snapshot.helpText : "";
-    const severity = toGeoSeverity(snapshot);
-    const statusText = toGeoStatusText(snapshot);
+    this.lastGeoSnapshot = {
+      ...createGeoSnapshotDefaults(),
+      ...(snapshot || {})
+    };
 
-    this.uiState.geoStatus = snapshot && snapshot.status ? snapshot.status : "not-requested";
-    this.uiState.geoWatchActive = Boolean(snapshot && snapshot.watchActive);
+    const text = this.getText();
+    const position = this.lastGeoSnapshot.position ? this.lastGeoSnapshot.position : null;
+    const severity = toGeoSeverity(this.lastGeoSnapshot);
+
+    this.uiState.geoStatus = this.lastGeoSnapshot.status || "not-requested";
+    this.uiState.geoWatchActive = Boolean(this.lastGeoSnapshot.watchActive);
     this.latestGeoPosition = position
       ? {
           latitude: position.latitude,
@@ -885,12 +1998,12 @@ export class UIController {
       : null;
 
     if (this.geoRefs.statusBadge) {
-      this.geoRefs.statusBadge.textContent = toGeoBadgeLabel(snapshot);
+      this.geoRefs.statusBadge.textContent = this.getGeoBadgeLabel(this.lastGeoSnapshot, text);
       this.geoRefs.statusBadge.dataset.status = severity;
     }
 
     if (this.geoRefs.statusText) {
-      this.geoRefs.statusText.textContent = statusText;
+      this.geoRefs.statusText.textContent = this.getGeoStatusText(this.lastGeoSnapshot, text);
     }
 
     if (this.geoRefs.latitude) {
@@ -906,10 +2019,11 @@ export class UIController {
     }
 
     if (this.geoRefs.message) {
-      this.geoRefs.message.textContent = message;
+      this.geoRefs.message.textContent = this.getGeoMessage(this.lastGeoSnapshot, text);
     }
 
     if (this.geoRefs.help) {
+      const helpText = this.getGeoHelp(this.lastGeoSnapshot, text);
       this.geoRefs.help.textContent = helpText;
       this.geoRefs.help.hidden = !helpText;
     }
@@ -918,8 +2032,122 @@ export class UIController {
       this.activateGeoButton.disabled =
         this.uiState.geoStatus === "waiting" ||
         this.uiState.geoWatchActive ||
-        (snapshot && (snapshot.issue === "https-required" || snapshot.issue === "unsupported"));
+        (this.lastGeoSnapshot.issue === "https-required" || this.lastGeoSnapshot.issue === "unsupported");
     }
+  }
+
+  getGeoBadgeLabel(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.badges.checking;
+    }
+
+    if (snapshot.issue === "https-required") {
+      return text.geo.badges.https;
+    }
+
+    if (snapshot.issue === "unsupported") {
+      return text.geo.badges.unsupported;
+    }
+
+    switch (snapshot.status) {
+      case "granted":
+        return text.geo.badges.granted;
+      case "waiting":
+        return text.geo.badges.waiting;
+      case "denied":
+        return text.geo.badges.denied;
+      case "not-requested":
+        return text.geo.badges.ready;
+      default:
+        return text.geo.badges.checking;
+    }
+  }
+
+  getGeoStatusText(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.statusTexts.notRequested;
+    }
+
+    switch (snapshot.status) {
+      case "granted":
+        return text.geo.statusTexts.granted;
+      case "waiting":
+        return text.geo.statusTexts.waiting;
+      case "denied":
+        return text.geo.statusTexts.denied;
+      case "not-requested":
+      default:
+        return text.geo.statusTexts.notRequested;
+    }
+  }
+
+  getGeoMessage(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.messages.notRequested;
+    }
+
+    switch (snapshot.issue) {
+      case "https-required":
+        return text.geo.messages.httpsRequired;
+      case "unsupported":
+        return text.geo.messages.unsupported;
+      case "permission-denied":
+        return text.geo.messages.denied;
+      case "position-unavailable":
+        return text.geo.messages.positionUnavailable;
+      case "timeout":
+        return text.geo.messages.timeout;
+      case "error":
+        return text.geo.messages.genericError;
+      default:
+        break;
+    }
+
+    if (snapshot.status === "waiting" || snapshot.requestPending) {
+      return text.geo.messages.waiting;
+    }
+
+    if (snapshot.status === "granted") {
+      return snapshot.position ? text.geo.messages.available : text.geo.messages.permissionGranted;
+    }
+
+    if (snapshot.status === "denied") {
+      return text.geo.messages.denied;
+    }
+
+    return text.geo.messages.notRequested;
+  }
+
+  getGeoHelp(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.help.notRequested;
+    }
+
+    switch (snapshot.issue) {
+      case "https-required":
+        return text.geo.help.httpsRequired;
+      case "permission-denied":
+        return text.geo.help.denied;
+      case "position-unavailable":
+        return text.geo.help.positionUnavailable;
+      case "timeout":
+        return text.geo.help.timeout;
+      case "unsupported":
+      case "error":
+        return text.geo.help.none;
+      default:
+        break;
+    }
+
+    if (snapshot.status === "waiting" || snapshot.requestPending) {
+      return text.geo.help.waiting;
+    }
+
+    if (snapshot.status === "not-requested") {
+      return text.geo.help.notRequested;
+    }
+
+    return text.geo.help.none;
   }
 
   setGeoDebug(debug) {
@@ -1010,7 +2238,9 @@ export class UIController {
 
   dispose() {
     this.clearPendingUIInteractionRelease();
+    this.clearPendingTextInputRelease();
     this.setUIInteracting(false);
+    this.setTextInputActive(false);
 
     for (const cleanup of this.cleanupCallbacks) {
       cleanup();

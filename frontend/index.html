@@ -86,6 +86,26 @@
               >
                 Hilfe
               </button>
+              <button
+                id="menu-tab-survey"
+                class="menu-tab"
+                type="button"
+                data-menu-tab="survey"
+                role="tab"
+                aria-selected="false"
+              >
+                Umfrage
+              </button>
+              <button
+                id="menu-tab-settings"
+                class="menu-tab"
+                type="button"
+                data-menu-tab="settings"
+                role="tab"
+                aria-selected="false"
+              >
+                Einstellungen
+              </button>
             </div>
 
             <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">
@@ -130,6 +150,24 @@
                 Hilfskachel oeffnen
               </button>
             </section>
+
+            <section class="menu-tab-panel" data-menu-panel="survey" role="tabpanel" hidden>
+              <p class="menu-copy">
+                Die Umfragekachel enthaelt einen Platzhalter fuer eine spaetere Nutzerumfrage.
+              </p>
+              <button id="open-survey-card-button" class="button" type="button">
+                Umfragekachel oeffnen
+              </button>
+            </section>
+
+            <section class="menu-tab-panel" data-menu-panel="settings" role="tabpanel" hidden>
+              <p class="menu-copy">
+                Die Einstellungenkachel enthaelt die Sprachumschaltung fuer die UI.
+              </p>
+              <button id="open-settings-card-button" class="button" type="button">
+                Einstellungen oeffnen
+              </button>
+            </section>
           </div>
         </div>
 
@@ -146,6 +184,48 @@
           </div>
 
           <div id="hud-body" class="hud-body">
+            <section id="card-welcome" class="panel card-panel welcome-panel" data-card="welcome">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="welcome-card-title">Willkommen</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="close-welcome-button"
+                    class="card-close-button"
+                    type="button"
+                    aria-label="Begruessung schliessen"
+                  >
+                    X
+                  </button>
+                  <button
+                    id="toggle-welcome-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="welcome"
+                    aria-expanded="true"
+                    aria-controls="card-welcome-content"
+                    aria-label="Begruessung auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="welcome">-</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="card-welcome-content" class="card-content" data-card-content="welcome">
+                <p id="welcome-card-headline" class="welcome-headline">
+                  Herzlich Willkommen bei der EPARtwin WebAR Experience!
+                </p>
+                <p id="welcome-card-subheading" class="card-subheading">Anforderungen</p>
+                <ul id="welcome-card-list" class="card-list welcome-list">
+                  <li>Ein mobiles Geraet mit WebXR-Unterstuetzung</li>
+                  <li>Kamerafreigabe fuer den AR-Modus</li>
+                  <li>Standortfreigabe fuer den Koordinatenmodus</li>
+                  <li>Eine erkennbare Boden- oder Tischflaeche fuer stabiles Placement</li>
+                </ul>
+              </div>
+            </section>
+
             <section id="card-placement" class="panel card-panel hero-panel" data-card="placement">
               <div class="card-header">
                 <div class="card-title-group">
@@ -226,6 +306,125 @@
                   <p>2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.</p>
                   <p>3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.</p>
                   <p>4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude lokal in den AR-Raum uebertragen.</p>
+                </div>
+              </div>
+            </section>
+
+            <section id="card-survey" class="panel card-panel survey-panel" data-card="survey" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="survey-card-title">Umfrage</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="close-survey-button"
+                    class="card-close-button"
+                    type="button"
+                    aria-label="Umfrage schliessen"
+                  >
+                    X
+                  </button>
+                  <button
+                    id="toggle-survey-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="survey"
+                    aria-expanded="true"
+                    aria-controls="card-survey-content"
+                    aria-label="Umfrage auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="survey">-</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="card-survey-content" class="card-content" data-card-content="survey">
+                <div class="card-copy-block">
+                  <p id="survey-placeholder-title" class="card-subheading">Platzhalter</p>
+                  <p id="survey-placeholder-text">
+                    Hier wird kuenftig eine Nutzerumfrage integriert.
+                  </p>
+                </div>
+
+                <div class="card-copy-block">
+                  <p id="survey-recommendation-title" class="card-subheading">Technische Empfehlung</p>
+                  <p id="survey-recommendation-text">
+                    Geeignet sind eingebettete Formulare, die anonym genutzt und spaeter exportiert oder per E-Mail ausgewertet werden koennen.
+                  </p>
+                  <ul id="survey-tool-list" class="card-list survey-tool-list">
+                    <li><strong>Google Forms:</strong> schnell verfuegbar, einfach teilbar, Antworten im Google-Workspace auswertbar.</li>
+                    <li><strong>Typeform:</strong> starke mobile UX, gutes Embedding, Fokus auf gefuehrte Frageablaeufe.</li>
+                    <li><strong>Tally.so:</strong> leichtgewichtig, iframe-faehig, einfach fuer anonyme Formulare und Export.</li>
+                    <li><strong>Microsoft Forms:</strong> sinnvoll bei bestehender Microsoft-Umgebung und Auswertung im M365-Kontext.</li>
+                  </ul>
+                </div>
+
+                <div class="card-copy-block">
+                  <p id="survey-requirements-title" class="card-subheading">Wichtige Anforderungen</p>
+                  <ul id="survey-requirements-list" class="card-list survey-requirements-list">
+                    <li>Per iframe in die bestehende UI einbettbar</li>
+                    <li>Optional anonym nutzbar</li>
+                    <li>Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard moeglich</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section id="card-settings" class="panel card-panel settings-panel" data-card="settings" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="settings-card-title">Einstellungen</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="close-settings-button"
+                    class="card-close-button"
+                    type="button"
+                    aria-label="Einstellungen schliessen"
+                  >
+                    X
+                  </button>
+                  <button
+                    id="toggle-settings-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="settings"
+                    aria-expanded="true"
+                    aria-controls="card-settings-content"
+                    aria-label="Einstellungen auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="settings">-</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="card-settings-content" class="card-content" data-card-content="settings">
+                <div class="card-copy-block">
+                  <p id="settings-language-title" class="card-subheading">Sprache</p>
+                  <p id="settings-language-description">
+                    Die UI kann zwischen Deutsch und Englisch umgeschaltet werden.
+                  </p>
+                </div>
+
+                <div class="language-switch" role="group" aria-label="Sprachauswahl">
+                  <button
+                    id="language-de-button"
+                    class="language-button"
+                    type="button"
+                    data-language-option="de"
+                    aria-pressed="true"
+                  >
+                    Deutsch
+                  </button>
+                  <button
+                    id="language-en-button"
+                    class="language-button"
+                    type="button"
+                    data-language-option="en"
+                    aria-pressed="false"
+                  >
+                    English
+                  </button>
                 </div>
               </div>
             </section>
