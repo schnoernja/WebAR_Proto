@@ -105,7 +105,7 @@ body.ar-active {
 #ui-container {
   position: fixed;
   inset: 0;
-  z-index: 10;
+  z-index: 1000;
   pointer-events: auto;
 }
 
@@ -128,7 +128,7 @@ body.ar-active .panel {
   position: fixed;
   top: 14px;
   right: 14px;
-  z-index: 40;
+  z-index: 1200;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -152,10 +152,6 @@ body.ar-active .floating-menu-button {
 
 .floating-menu-button:hover,
 .floating-menu-button:focus-visible,
-.card-toggle-button:hover,
-.card-toggle-button:focus-visible,
-.card-close-button:hover,
-.card-close-button:focus-visible,
 .menu-close-button:hover,
 .menu-close-button:focus-visible,
 .menu-tab:hover,
@@ -186,7 +182,7 @@ body.ar-active .menu-icon span {
 .menu-overlay {
   position: fixed;
   inset: 0;
-  z-index: 35;
+  z-index: 1150;
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
@@ -206,6 +202,11 @@ body.ar-active .menu-icon span {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.card-header {
+  position: relative;
+  padding-right: 40px;
 }
 
 .menu-header {
@@ -248,9 +249,7 @@ h1 {
   max-width: 12ch;
 }
 
-.menu-close-button,
-.card-toggle-button,
-.card-close-button {
+.menu-close-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -269,12 +268,62 @@ h1 {
     border-color 140ms ease;
 }
 
-body.ar-active .menu-close-button,
-body.ar-active .card-toggle-button,
-body.ar-active .card-close-button {
+body.ar-active .menu-close-button {
   border-color: rgba(244, 241, 231, 0.16);
   background: rgba(244, 241, 231, 0.08);
   color: #f4f1e7;
+}
+
+.card-toggle-button,
+.card-close-button {
+  position: absolute;
+  top: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  box-shadow: none;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 8px;
+  border-radius: 0;
+}
+
+.card-toggle-button {
+  right: 8px;
+  z-index: 2;
+  color: var(--ink);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.card-close-button {
+  right: 34px;
+  z-index: 2;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+body.ar-active .card-toggle-button,
+body.ar-active .card-close-button {
+  color: #f4f1e7;
+}
+
+.card-toggle-button:hover,
+.card-toggle-button:focus-visible,
+.card-close-button:hover,
+.card-close-button:focus-visible {
+  transform: none;
+  border: none;
+  background: none;
+  opacity: 0.72;
+  outline: none;
 }
 
 .menu-tabs {
@@ -370,8 +419,8 @@ body.ar-active .menu-option {
   position: fixed;
   top: 14px;
   left: 14px;
-  z-index: 20;
-  width: min(460px, calc(100vw - 92px));
+  z-index: 1050;
+  width: min(460px, calc(100vw - 20px));
   max-height: 80vh;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -389,6 +438,10 @@ body.ar-active .menu-option {
 .hud-toolbar,
 .card-panel {
   padding: 16px;
+}
+
+.card-panel {
+  position: relative;
 }
 
 .hud-toolbar-main {
@@ -457,6 +510,15 @@ body.ar-active .mini-pill {
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+  padding-right: 32px;
+}
+
+.help-panel .card-header {
+  padding-right: 72px;
+}
+
+.help-panel .card-header-actions {
+  padding-right: 64px;
 }
 
 .card-content {
@@ -763,7 +825,7 @@ body.ar-active .state-item {
   .hud {
     top: 10px;
     left: 10px;
-    width: calc(100vw - 84px);
+    width: calc(100vw - 20px);
     max-height: 80vh;
   }
 

@@ -22,117 +22,117 @@
     <div id="render-root" aria-label="3D viewport"></div>
 
     <div id="ui-container">
-      <button
-        id="menu-button"
-        class="floating-menu-button"
-        type="button"
-        aria-expanded="false"
-        aria-controls="menu-overlay"
-        aria-label="Menue oeffnen"
-      >
-        <span class="menu-icon" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-        </span>
-      </button>
-
-      <div id="menu-overlay" class="menu-overlay" hidden>
-        <div id="menu-panel" class="panel menu-panel" role="dialog" aria-modal="false" aria-label="Menue">
-          <div class="menu-header">
-            <div>
-              <p class="menu-eyebrow">Steuerung</p>
-              <h2>Menue</h2>
-            </div>
-            <button
-              id="menu-close-button"
-              class="menu-close-button"
-              type="button"
-              aria-label="Menue schliessen"
-            >
-              X
-            </button>
-          </div>
-
-          <div class="menu-tabs" role="tablist" aria-label="Menuebereiche">
-            <button
-              id="menu-tab-placement"
-              class="menu-tab"
-              type="button"
-              data-menu-tab="placement"
-              role="tab"
-              aria-selected="true"
-            >
-              Platzierung
-            </button>
-            <button
-              id="menu-tab-developer"
-              class="menu-tab"
-              type="button"
-              data-menu-tab="developer"
-              role="tab"
-              aria-selected="false"
-            >
-              Entwickler
-            </button>
-            <button
-              id="menu-tab-help"
-              class="menu-tab"
-              type="button"
-              data-menu-tab="help"
-              role="tab"
-              aria-selected="false"
-            >
-              Hilfe
-            </button>
-          </div>
-
-          <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">
-            <p class="menu-copy">Sichtbarkeit der Hauptkacheln im Overlay steuern.</p>
-            <div class="menu-option-list">
-              <label class="menu-option">
-                <input type="checkbox" data-card-visibility-toggle="placement" checked />
-                <span>Objektplatzierung</span>
-              </label>
-              <label class="menu-option">
-                <input type="checkbox" data-card-visibility-toggle="coord" />
-                <span>Modus und Geo-Ziel</span>
-              </label>
-              <label class="menu-option">
-                <input type="checkbox" data-card-visibility-toggle="state" />
-                <span>Status</span>
-              </label>
-              <label class="menu-option">
-                <input type="checkbox" data-card-visibility-toggle="note" />
-                <span>Ablauf</span>
-              </label>
-              <label class="menu-option">
-                <input type="checkbox" data-card-visibility-toggle="geo" checked />
-                <span>Geolocation</span>
-              </label>
-            </div>
-          </section>
-
-          <section class="menu-tab-panel" data-menu-panel="developer" role="tabpanel" hidden>
-            <p class="menu-copy">Entwickleransicht und Debug-Kacheln separat einblenden.</p>
-            <div class="menu-option-list">
-              <label class="menu-option">
-                <input type="checkbox" data-card-visibility-toggle="debug" />
-                <span>Geo Debug anzeigen</span>
-              </label>
-            </div>
-          </section>
-
-          <section class="menu-tab-panel" data-menu-panel="help" role="tabpanel" hidden>
-            <p class="menu-copy">Die Hilfskachel laesst sich jederzeit erneut einblenden.</p>
-            <button id="open-help-card-button" class="button" type="button">
-              Hilfskachel oeffnen
-            </button>
-          </section>
-        </div>
-      </div>
-
       <div id="hud" class="hud" aria-live="polite">
+        <button
+          id="menu-button"
+          class="floating-menu-button"
+          type="button"
+          aria-expanded="false"
+          aria-controls="menu-overlay"
+          aria-label="Menue oeffnen"
+        >
+          <span class="menu-icon" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </span>
+        </button>
+
+        <div id="menu-overlay" class="menu-overlay" hidden>
+          <div id="menu-panel" class="panel menu-panel" role="dialog" aria-modal="false" aria-label="Menue">
+            <div class="menu-header">
+              <div>
+                <p class="menu-eyebrow">Steuerung</p>
+                <h2>Menue</h2>
+              </div>
+              <button
+                id="menu-close-button"
+                class="menu-close-button"
+                type="button"
+                aria-label="Menue schliessen"
+              >
+                X
+              </button>
+            </div>
+
+            <div class="menu-tabs" role="tablist" aria-label="Menuebereiche">
+              <button
+                id="menu-tab-placement"
+                class="menu-tab"
+                type="button"
+                data-menu-tab="placement"
+                role="tab"
+                aria-selected="true"
+              >
+                Platzierung
+              </button>
+              <button
+                id="menu-tab-developer"
+                class="menu-tab"
+                type="button"
+                data-menu-tab="developer"
+                role="tab"
+                aria-selected="false"
+              >
+                Entwickler
+              </button>
+              <button
+                id="menu-tab-help"
+                class="menu-tab"
+                type="button"
+                data-menu-tab="help"
+                role="tab"
+                aria-selected="false"
+              >
+                Hilfe
+              </button>
+            </div>
+
+            <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">
+              <p class="menu-copy">Sichtbarkeit der Hauptkacheln im Overlay steuern.</p>
+              <div class="menu-option-list">
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="placement" checked />
+                  <span>Objektplatzierung</span>
+                </label>
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="coord" />
+                  <span>Modus und Geo-Ziel</span>
+                </label>
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="state" />
+                  <span>Status</span>
+                </label>
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="note" />
+                  <span>Ablauf</span>
+                </label>
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="geo" checked />
+                  <span>Geolocation</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="menu-tab-panel" data-menu-panel="developer" role="tabpanel" hidden>
+              <p class="menu-copy">Entwickleransicht und Debug-Kacheln separat einblenden.</p>
+              <div class="menu-option-list">
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="debug" />
+                  <span>Geo Debug anzeigen</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="menu-tab-panel" data-menu-panel="help" role="tabpanel" hidden>
+              <p class="menu-copy">Die Hilfskachel laesst sich jederzeit erneut einblenden.</p>
+              <button id="open-help-card-button" class="button" type="button">
+                Hilfskachel oeffnen
+              </button>
+            </section>
+          </div>
+        </div>
+
         <div class="hud-shell">
           <div class="panel hud-toolbar">
             <div class="hud-toolbar-main">
