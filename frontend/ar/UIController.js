@@ -172,8 +172,7 @@ export class UIController {
       placementMode: "free",
       hudCollapsed: this.readStoredCollapsedState(),
       geoStatus: "not-requested",
-      geoWatchActive: false,
-      textInputActive: false
+      geoWatchActive: false
     };
 
     this.geoTargetDraft = {
@@ -183,8 +182,7 @@ export class UIController {
     this.latestGeoPosition = null;
     this.uiInteracting = false;
     this.uiInteractionChangeHandler = null;
-    this.textInputActiveChangeHandler = null;
-    this.textInputBlurTimeoutId = null;
+    this.uiInteractionReleaseTimeoutId = null;
 
     this.cleanupCallbacks = [];
 
@@ -201,6 +199,7 @@ export class UIController {
     });
     this.setGeoDebug({});
     this.setPlacementDebug({});
+    this.syncCanvasPointerEvents();
   }
 
   getStateRef(key) {
@@ -229,12 +228,9 @@ export class UIController {
     onApplyGeoTarget,
     onModeChange,
     onRequestGeolocation,
-    onUIInteractionChange,
-    onTextInputActiveChange
+    onUIInteractionChange
   }) {
     this.uiInteractionChangeHandler = typeof onUIInteractionChange === "function" ? onUIInteractionChange : null;
-    this.textInputActiveChangeHandler =
-      typeof onTextInputActiveChange === "function" ? onTextInputActiveChange : null;
 
     this.bindButton(this.startButton, onStartAR);
     this.bindButton(this.placeButton, onPlace);
@@ -247,10 +243,9 @@ export class UIController {
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindSelect(this.modeSelect, () => this.handleModeChange(onModeChange));
-    this.bindContainerIsolation();
-    this.bindHudInteraction();
+    this.bindInteractionSurface(this.uiContainer);
+    this.bindInteractionSurface(this.hudRoot);
     this.bindDeviceCoordinateCopy();
-    this.bindTextInputLock();
 
     this.refreshButtons();
   }
@@ -301,63 +296,87 @@ export class UIController {
     this.cleanupCallbacks.push(() => select.removeEventListener("change", handler));
   }
 
-  bindContainerIsolation() {
-    if (!this.uiContainer) {
+  bindInteractionSurface(surface) {
+    if (!surface) {
       return;
     }
 
-    const handlePointerDown = (event) => {
-      event.stopPropagation();
-    };
     const handleTouchStart = (event) => {
       event.stopPropagation();
+      this.beginUIInteraction();
     };
-
-    this.uiContainer.addEventListener("pointerdown", handlePointerDown);
-    this.uiContainer.addEventListener("touchstart", handleTouchStart, { passive: false });
-
-    this.cleanupCallbacks.push(() => this.uiContainer.removeEventListener("pointerdown", handlePointerDown));
-    this.cleanupCallbacks.push(() => this.uiContainer.removeEventListener("touchstart", handleTouchStart));
-  }
-
-  bindHudInteraction() {
-    if (!this.hudRoot) {
-      return;
-    }
-
+    const handleTouchEnd = (event) => {
+      event.stopPropagation();
+      this.scheduleUIInteractionRelease();
+    };
+    const handleTouchCancel = (event) => {
+      event.stopPropagation();
+      this.scheduleUIInteractionRelease();
+    };
     const handlePointerDown = (event) => {
       event.stopPropagation();
-      this.setUIInteracting(true);
+      this.beginUIInteraction();
     };
     const handlePointerUp = (event) => {
       event.stopPropagation();
-      this.setUIInteracting(false);
+      this.scheduleUIInteractionRelease();
+    };
+    const handlePointerCancel = (event) => {
+      event.stopPropagation();
+      this.scheduleUIInteractionRelease();
     };
     const handleClick = (event) => {
       event.stopPropagation();
     };
-    const handleTouchStart = (event) => {
-      event.stopPropagation();
-    };
-    const handleWindowPointerEnd = () => {
+
+    surface.addEventListener("touchstart", handleTouchStart, { passive: false });
+    surface.addEventListener("touchend", handleTouchEnd);
+    surface.addEventListener("touchcancel", handleTouchCancel);
+    surface.addEventListener("pointerdown", handlePointerDown);
+    surface.addEventListener("pointerup", handlePointerUp);
+    surface.addEventListener("pointercancel", handlePointerCancel);
+    surface.addEventListener("click", handleClick);
+
+    this.cleanupCallbacks.push(() => surface.removeEventListener("touchstart", handleTouchStart));
+    this.cleanupCallbacks.push(() => surface.removeEventListener("touchend", handleTouchEnd));
+    this.cleanupCallbacks.push(() => surface.removeEventListener("touchcancel", handleTouchCancel));
+    this.cleanupCallbacks.push(() => surface.removeEventListener("pointerdown", handlePointerDown));
+    this.cleanupCallbacks.push(() => surface.removeEventListener("pointerup", handlePointerUp));
+    this.cleanupCallbacks.push(() => surface.removeEventListener("pointercancel", handlePointerCancel));
+    this.cleanupCallbacks.push(() => surface.removeEventListener("click", handleClick));
+  }
+
+  beginUIInteraction() {
+    this.clearPendingUIInteractionRelease();
+    this.setUIInteracting(true);
+  }
+
+  scheduleUIInteractionRelease() {
+    this.clearPendingUIInteractionRelease();
+    this.uiInteractionReleaseTimeoutId = window.setTimeout(() => {
+      this.uiInteractionReleaseTimeoutId = null;
       this.setUIInteracting(false);
-    };
+    }, 50);
+  }
 
-    this.hudRoot.addEventListener("pointerdown", handlePointerDown);
-    this.hudRoot.addEventListener("pointerup", handlePointerUp);
-    this.hudRoot.addEventListener("pointercancel", handlePointerUp);
-    this.hudRoot.addEventListener("click", handleClick);
-    this.hudRoot.addEventListener("touchstart", handleTouchStart, { passive: false });
-    window.addEventListener("pointerup", handleWindowPointerEnd);
-    window.addEventListener("pointercancel", handleWindowPointerEnd);
+  clearPendingUIInteractionRelease() {
+    if (this.uiInteractionReleaseTimeoutId !== null) {
+      window.clearTimeout(this.uiInteractionReleaseTimeoutId);
+      this.uiInteractionReleaseTimeoutId = null;
+    }
+  }
 
-    this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("pointerdown", handlePointerDown));
-    this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("pointerup", handlePointerUp));
-    this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("pointercancel", handlePointerUp));
-    this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("click", handleClick));
-    this.cleanupCallbacks.push(() => this.hudRoot.removeEventListener("touchstart", handleTouchStart));
-    this.cleanupCallbacks.push(() => window.removeEventListener("pointerup", handleWindowPointerEnd));
-    this.cleanupCallbacks.push(() => window.removeEventListener("pointercancel", handleWindowPointerEnd));
+  getCanvasElement() {
+    return this.document.getElementById("ar-canvas");
+  }
+
+  syncCanvasPointerEvents() {
+    const canvas = this.getCanvasElement();
+    if (!canvas) {
+      return;
+    }
+
+    canvas.style.pointerEvents = this.uiInteracting ? "none" : "auto";
   }
 
   bindDeviceCoordinateCopy() {
@@ -372,30 +391,6 @@ export class UIController {
     for (const trigger of this.geoCopyTriggers) {
       trigger.addEventListener("click", handleCopy);
       this.cleanupCallbacks.push(() => trigger.removeEventListener("click", handleCopy));
-    }
-  }
-
-  bindTextInputLock() {
-    const textInputs = [this.geoTargetInputs.latitude, this.geoTargetInputs.longitude].filter(Boolean);
-
-    for (const input of textInputs) {
-      const handleFocus = () => {
-        this.clearPendingTextInputRelease();
-        this.setTextInputActive(true);
-      };
-      const handleBlur = () => {
-        this.clearPendingTextInputRelease();
-        this.textInputBlurTimeoutId = window.setTimeout(() => {
-          this.textInputBlurTimeoutId = null;
-          this.setTextInputActive(false);
-        }, 300);
-      };
-
-      input.addEventListener("focus", handleFocus);
-      input.addEventListener("blur", handleBlur);
-
-      this.cleanupCallbacks.push(() => input.removeEventListener("focus", handleFocus));
-      this.cleanupCallbacks.push(() => input.removeEventListener("blur", handleBlur));
     }
   }
 
@@ -752,9 +747,8 @@ export class UIController {
     this.uiState.hudCollapsed = !this.uiState.hudCollapsed;
     this.persistCollapsedState();
     this.applyHudCollapsedState();
+    this.clearPendingUIInteractionRelease();
     this.setUIInteracting(false);
-    this.clearPendingTextInputRelease();
-    this.setTextInputActive(false);
   }
 
   applyHudCollapsedState() {
@@ -799,32 +793,17 @@ export class UIController {
   }
 
   setUIInteracting(interacting) {
-    if (this.uiInteracting === interacting) {
+    const nextValue = Boolean(interacting);
+    if (this.uiInteracting === nextValue) {
+      this.syncCanvasPointerEvents();
       return;
     }
 
-    this.uiInteracting = interacting;
+    this.uiInteracting = nextValue;
+    this.syncCanvasPointerEvents();
+
     if (this.uiInteractionChangeHandler) {
-      this.uiInteractionChangeHandler(interacting);
-    }
-  }
-
-  setTextInputActive(active) {
-    const normalizedActive = Boolean(active);
-    if (this.uiState.textInputActive === normalizedActive) {
-      return;
-    }
-
-    this.uiState.textInputActive = normalizedActive;
-    if (this.textInputActiveChangeHandler) {
-      this.textInputActiveChangeHandler(normalizedActive);
-    }
-  }
-
-  clearPendingTextInputRelease() {
-    if (this.textInputBlurTimeoutId !== null) {
-      window.clearTimeout(this.textInputBlurTimeoutId);
-      this.textInputBlurTimeoutId = null;
+      this.uiInteractionChangeHandler(nextValue);
     }
   }
 
@@ -840,7 +819,9 @@ export class UIController {
   }
 
   dispose() {
-    this.clearPendingTextInputRelease();
+    this.clearPendingUIInteractionRelease();
+    this.setUIInteracting(false);
+
     for (const cleanup of this.cleanupCallbacks) {
       cleanup();
     }
