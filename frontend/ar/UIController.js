@@ -1,4 +1,22 @@
-const HUD_COLLAPSE_STORAGE_KEY = "webar-hud-collapsed";
+const DEFAULT_CARD_VISIBILITY = Object.freeze({
+  placement: true,
+  coord: false,
+  state: false,
+  note: false,
+  geo: true,
+  debug: false,
+  help: true
+});
+
+const DEFAULT_CARD_COLLAPSED = Object.freeze({
+  placement: false,
+  coord: true,
+  state: true,
+  note: true,
+  geo: true,
+  debug: true,
+  help: false
+});
 
 function toEditableValue(value, fractionDigits = 6) {
   return Number.isFinite(value) ? value.toFixed(fractionDigits) : "";
@@ -96,8 +114,14 @@ export class UIController {
     this.uiContainer = this.document.getElementById("ui-container");
     this.hudRoot = this.document.getElementById("hud");
     this.hudBody = this.document.getElementById("hud-body");
-    this.toggleButton = this.document.getElementById("hud-toggle-button");
-    this.toggleIconEl = this.document.getElementById("hud-toggle-icon");
+
+    this.menuButton = this.document.getElementById("menu-button");
+    this.menuOverlay = this.document.getElementById("menu-overlay");
+    this.menuCloseButton = this.document.getElementById("menu-close-button");
+    this.openHelpCardButton = this.document.getElementById("open-help-card-button");
+    this.menuTabButtons = Array.from(this.document.querySelectorAll("[data-menu-tab]"));
+    this.menuTabPanels = Array.from(this.document.querySelectorAll("[data-menu-panel]"));
+    this.cardVisibilityToggles = Array.from(this.document.querySelectorAll("[data-card-visibility-toggle]"));
 
     this.messageEl = this.document.getElementById("status-message");
     this.hintEl = this.document.getElementById("interaction-hint");
@@ -111,6 +135,7 @@ export class UIController {
     this.stopButton = this.document.getElementById("stop-ar-button");
     this.applyGeoTargetButton = this.document.getElementById("apply-geo-target-button");
     this.activateGeoButton = this.document.getElementById("activate-geolocation-button");
+    this.closeHelpButton = this.document.getElementById("close-help-button");
 
     this.modeSelect = this.document.getElementById("placement-mode-select");
     this.geoTargetInputs = {
@@ -163,6 +188,16 @@ export class UIController {
       placement: this.getStateRef("placement")
     };
 
+    this.cardRefs = {
+      placement: this.getCardRefs("placement"),
+      coord: this.getCardRefs("coord"),
+      state: this.getCardRefs("state"),
+      note: this.getCardRefs("note"),
+      geo: this.getCardRefs("geo"),
+      debug: this.getCardRefs("debug"),
+      help: this.getCardRefs("help")
+    };
+
     this.uiState = {
       supportAvailable: null,
       sessionActive: false,
@@ -170,9 +205,12 @@ export class UIController {
       stableSurface: false,
       placed: false,
       placementMode: "free",
-      hudCollapsed: this.readStoredCollapsedState(),
       geoStatus: "not-requested",
-      geoWatchActive: false
+      geoWatchActive: false,
+      menuOpen: false,
+      activeMenuTab: "placement",
+      cardVisibility: { ...DEFAULT_CARD_VISIBILITY },
+      cardCollapsed: { ...DEFAULT_CARD_COLLAPSED }
     };
 
     this.geoTargetDraft = {
@@ -183,11 +221,12 @@ export class UIController {
     this.uiInteracting = false;
     this.uiInteractionChangeHandler = null;
     this.uiInteractionReleaseTimeoutId = null;
-
     this.cleanupCallbacks = [];
 
     this.configureTextInputs();
-    this.applyHudCollapsedState();
+    this.applyMenuState();
+    this.applyMenuTabState();
+    this.applyAllCardStates();
     this.setPlacementMode(this.uiState.placementMode);
     this.refreshMiniSummary();
     this.renderGeoSnapshot({
@@ -206,6 +245,15 @@ export class UIController {
     return {
       item: this.document.querySelector(`[data-state="${key}"]`),
       value: this.document.getElementById(`state-${key}`)
+    };
+  }
+
+  getCardRefs(key) {
+    return {
+      root: this.document.querySelector(`[data-card="${key}"]`),
+      content: this.document.querySelector(`[data-card-content="${key}"]`),
+      toggleButton: this.document.querySelector(`[data-card-toggle="${key}"]`),
+      toggleIcon: this.document.querySelector(`[data-card-toggle-icon="${key}"]`)
     };
   }
 
@@ -236,13 +284,16 @@ export class UIController {
     this.bindButton(this.placeButton, onPlace);
     this.bindButton(this.resetButton, onResetPlacement);
     this.bindButton(this.stopButton, onStopAR);
-    this.bindButton(this.toggleButton, () => this.toggleCollapsed());
     this.bindButton(this.applyGeoTargetButton, () => this.handleApplyGeoTarget(onApplyGeoTarget));
     this.bindButton(this.activateGeoButton, onRequestGeolocation);
+    this.bindButton(this.closeHelpButton, () => this.closeHelpCard());
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindSelect(this.modeSelect, () => this.handleModeChange(onModeChange));
+
+    this.bindCardToggleButtons();
+    this.bindMenuControls();
     this.bindInteractionSurface(this.uiContainer);
     this.bindInteractionSurface(this.hudRoot);
     this.bindDeviceCoordinateCopy();
@@ -294,6 +345,59 @@ export class UIController {
 
     select.addEventListener("change", handler);
     this.cleanupCallbacks.push(() => select.removeEventListener("change", handler));
+  }
+
+  bindCardToggleButtons() {
+    for (const [cardKey, refs] of Object.entries(this.cardRefs)) {
+      if (!refs.toggleButton) {
+        continue;
+      }
+
+      const handler = () => {
+        this.toggleCardCollapsed(cardKey);
+      };
+
+      refs.toggleButton.addEventListener("click", handler);
+      this.cleanupCallbacks.push(() => refs.toggleButton.removeEventListener("click", handler));
+    }
+  }
+
+  bindMenuControls() {
+    this.bindButton(this.menuButton, () => this.toggleMenu());
+    this.bindButton(this.menuCloseButton, () => this.closeMenu());
+    this.bindButton(this.openHelpCardButton, () => {
+      this.openHelpCard();
+      this.closeMenu();
+    });
+
+    for (const tabButton of this.menuTabButtons) {
+      const handler = () => {
+        this.setActiveMenuTab(tabButton.dataset.menuTab || "placement");
+      };
+
+      tabButton.addEventListener("click", handler);
+      this.cleanupCallbacks.push(() => tabButton.removeEventListener("click", handler));
+    }
+
+    for (const toggle of this.cardVisibilityToggles) {
+      const handler = () => {
+        this.setCardVisibility(toggle.dataset.cardVisibilityToggle, toggle.checked);
+      };
+
+      toggle.addEventListener("change", handler);
+      this.cleanupCallbacks.push(() => toggle.removeEventListener("change", handler));
+    }
+
+    if (this.menuOverlay) {
+      const handler = (event) => {
+        if (event.target === this.menuOverlay) {
+          this.closeMenu();
+        }
+      };
+
+      this.menuOverlay.addEventListener("click", handler);
+      this.cleanupCallbacks.push(() => this.menuOverlay.removeEventListener("click", handler));
+    }
   }
 
   bindInteractionSurface(surface) {
@@ -392,6 +496,131 @@ export class UIController {
       trigger.addEventListener("click", handleCopy);
       this.cleanupCallbacks.push(() => trigger.removeEventListener("click", handleCopy));
     }
+  }
+
+  setMenuOpen(open) {
+    this.uiState.menuOpen = Boolean(open);
+    this.applyMenuState();
+  }
+
+  toggleMenu() {
+    this.setMenuOpen(!this.uiState.menuOpen);
+  }
+
+  closeMenu() {
+    this.setMenuOpen(false);
+  }
+
+  applyMenuState() {
+    if (this.menuOverlay) {
+      this.menuOverlay.hidden = !this.uiState.menuOpen;
+    }
+
+    if (this.menuButton) {
+      this.menuButton.setAttribute("aria-expanded", String(this.uiState.menuOpen));
+    }
+  }
+
+  setActiveMenuTab(tabKey) {
+    this.uiState.activeMenuTab = tabKey;
+    this.applyMenuTabState();
+  }
+
+  applyMenuTabState() {
+    for (const tabButton of this.menuTabButtons) {
+      const isActive = tabButton.dataset.menuTab === this.uiState.activeMenuTab;
+      tabButton.dataset.active = isActive ? "true" : "false";
+      tabButton.setAttribute("aria-selected", String(isActive));
+    }
+
+    for (const tabPanel of this.menuTabPanels) {
+      tabPanel.hidden = tabPanel.dataset.menuPanel !== this.uiState.activeMenuTab;
+    }
+  }
+
+  applyAllCardStates() {
+    for (const cardKey of Object.keys(this.cardRefs)) {
+      this.applyCardVisibility(cardKey);
+      this.applyCardCollapse(cardKey);
+      this.syncCardVisibilityToggle(cardKey);
+    }
+  }
+
+  setCardVisibility(cardKey, visible) {
+    if (!Object.prototype.hasOwnProperty.call(this.uiState.cardVisibility, cardKey)) {
+      return;
+    }
+
+    this.uiState.cardVisibility[cardKey] = Boolean(visible);
+    this.applyCardVisibility(cardKey);
+    this.syncCardVisibilityToggle(cardKey);
+  }
+
+  applyCardVisibility(cardKey) {
+    const refs = this.cardRefs[cardKey];
+    if (!refs || !refs.root) {
+      return;
+    }
+
+    refs.root.hidden = !this.uiState.cardVisibility[cardKey];
+  }
+
+  syncCardVisibilityToggle(cardKey) {
+    for (const toggle of this.cardVisibilityToggles) {
+      if (toggle.dataset.cardVisibilityToggle === cardKey) {
+        toggle.checked = Boolean(this.uiState.cardVisibility[cardKey]);
+      }
+    }
+  }
+
+  toggleCardCollapsed(cardKey) {
+    if (!Object.prototype.hasOwnProperty.call(this.uiState.cardCollapsed, cardKey)) {
+      return;
+    }
+
+    this.setCardCollapsed(cardKey, !this.uiState.cardCollapsed[cardKey]);
+  }
+
+  setCardCollapsed(cardKey, collapsed) {
+    if (!Object.prototype.hasOwnProperty.call(this.uiState.cardCollapsed, cardKey)) {
+      return;
+    }
+
+    this.uiState.cardCollapsed[cardKey] = Boolean(collapsed);
+    this.applyCardCollapse(cardKey);
+  }
+
+  applyCardCollapse(cardKey) {
+    const refs = this.cardRefs[cardKey];
+    if (!refs) {
+      return;
+    }
+
+    const collapsed = Boolean(this.uiState.cardCollapsed[cardKey]);
+    if (refs.root) {
+      refs.root.classList.toggle("is-collapsed", collapsed);
+    }
+
+    if (refs.content) {
+      refs.content.hidden = collapsed;
+    }
+
+    if (refs.toggleButton) {
+      refs.toggleButton.setAttribute("aria-expanded", String(!collapsed));
+    }
+
+    if (refs.toggleIcon) {
+      refs.toggleIcon.textContent = collapsed ? "+" : "-";
+    }
+  }
+
+  openHelpCard() {
+    this.setCardVisibility("help", true);
+    this.setCardCollapsed("help", false);
+  }
+
+  closeHelpCard() {
+    this.setCardVisibility("help", false);
   }
 
   setAssetLabel(label) {
@@ -517,6 +746,16 @@ export class UIController {
     if (detail) {
       this.setMessage(detail);
     }
+
+    if (active) {
+      this.closeMenu();
+      this.setCardVisibility("placement", true);
+      this.setCardVisibility("coord", true);
+      this.setCardCollapsed("placement", false);
+      this.setCardCollapsed("coord", false);
+      this.setCardVisibility("help", false);
+    }
+
     this.refreshMiniSummary();
     this.refreshButtons();
   }
@@ -740,55 +979,6 @@ export class UIController {
 
     if (this.placementDebugRefs.objectBehindCamera) {
       this.placementDebugRefs.objectBehindCamera.textContent = formatDebugBoolean(Boolean(debugState.objectBehindCamera));
-    }
-  }
-
-  toggleCollapsed() {
-    this.uiState.hudCollapsed = !this.uiState.hudCollapsed;
-    this.persistCollapsedState();
-    this.applyHudCollapsedState();
-    this.clearPendingUIInteractionRelease();
-    this.setUIInteracting(false);
-  }
-
-  applyHudCollapsedState() {
-    if (this.hudRoot) {
-      this.hudRoot.classList.toggle("is-collapsed", this.uiState.hudCollapsed);
-    }
-
-    if (this.toggleButton) {
-      this.toggleButton.setAttribute("aria-expanded", String(!this.uiState.hudCollapsed));
-      this.toggleButton.setAttribute(
-        "aria-label",
-        this.uiState.hudCollapsed ? "Bedienfeld aufklappen" : "Bedienfeld minimieren"
-      );
-      this.toggleButton.title = this.uiState.hudCollapsed
-        ? "Bedienfeld aufklappen"
-        : "Bedienfeld minimieren";
-    }
-
-    if (this.toggleIconEl) {
-      this.toggleIconEl.textContent = this.uiState.hudCollapsed ? "+" : "-";
-    }
-
-    if (this.hudBody) {
-      this.hudBody.setAttribute("aria-hidden", String(this.uiState.hudCollapsed));
-    }
-  }
-
-  readStoredCollapsedState() {
-    try {
-      return window.localStorage.getItem(HUD_COLLAPSE_STORAGE_KEY) === "true";
-    } catch {
-      return false;
-    }
-  }
-
-  persistCollapsedState() {
-    try {
-      window.localStorage.setItem(HUD_COLLAPSE_STORAGE_KEY, String(this.uiState.hudCollapsed));
-    } catch {
-      // Ignore storage failures.
     }
   }
 

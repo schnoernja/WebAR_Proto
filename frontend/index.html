@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
   />
-  <title>Stable WebXR AR Placement</title>
+  <title>EPARtwin WebAR</title>
   <link rel="stylesheet" href="./styles.css" />
   <script type="importmap">
     {
@@ -22,268 +22,512 @@
     <div id="render-root" aria-label="3D viewport"></div>
 
     <div id="ui-container">
+      <button
+        id="menu-button"
+        class="floating-menu-button"
+        type="button"
+        aria-expanded="false"
+        aria-controls="menu-overlay"
+        aria-label="Menue oeffnen"
+      >
+        <span class="menu-icon" aria-hidden="true">
+          <span></span>
+          <span></span>
+          <span></span>
+        </span>
+      </button>
+
+      <div id="menu-overlay" class="menu-overlay" hidden>
+        <div id="menu-panel" class="panel menu-panel" role="dialog" aria-modal="false" aria-label="Menue">
+          <div class="menu-header">
+            <div>
+              <p class="menu-eyebrow">Steuerung</p>
+              <h2>Menue</h2>
+            </div>
+            <button
+              id="menu-close-button"
+              class="menu-close-button"
+              type="button"
+              aria-label="Menue schliessen"
+            >
+              X
+            </button>
+          </div>
+
+          <div class="menu-tabs" role="tablist" aria-label="Menuebereiche">
+            <button
+              id="menu-tab-placement"
+              class="menu-tab"
+              type="button"
+              data-menu-tab="placement"
+              role="tab"
+              aria-selected="true"
+            >
+              Platzierung
+            </button>
+            <button
+              id="menu-tab-developer"
+              class="menu-tab"
+              type="button"
+              data-menu-tab="developer"
+              role="tab"
+              aria-selected="false"
+            >
+              Entwickler
+            </button>
+            <button
+              id="menu-tab-help"
+              class="menu-tab"
+              type="button"
+              data-menu-tab="help"
+              role="tab"
+              aria-selected="false"
+            >
+              Hilfe
+            </button>
+          </div>
+
+          <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">
+            <p class="menu-copy">Sichtbarkeit der Hauptkacheln im Overlay steuern.</p>
+            <div class="menu-option-list">
+              <label class="menu-option">
+                <input type="checkbox" data-card-visibility-toggle="placement" checked />
+                <span>Objektplatzierung</span>
+              </label>
+              <label class="menu-option">
+                <input type="checkbox" data-card-visibility-toggle="coord" />
+                <span>Modus und Geo-Ziel</span>
+              </label>
+              <label class="menu-option">
+                <input type="checkbox" data-card-visibility-toggle="state" />
+                <span>Status</span>
+              </label>
+              <label class="menu-option">
+                <input type="checkbox" data-card-visibility-toggle="note" />
+                <span>Ablauf</span>
+              </label>
+              <label class="menu-option">
+                <input type="checkbox" data-card-visibility-toggle="geo" checked />
+                <span>Geolocation</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="menu-tab-panel" data-menu-panel="developer" role="tabpanel" hidden>
+            <p class="menu-copy">Entwickleransicht und Debug-Kacheln separat einblenden.</p>
+            <div class="menu-option-list">
+              <label class="menu-option">
+                <input type="checkbox" data-card-visibility-toggle="debug" />
+                <span>Geo Debug anzeigen</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="menu-tab-panel" data-menu-panel="help" role="tabpanel" hidden>
+            <p class="menu-copy">Die Hilfskachel laesst sich jederzeit erneut einblenden.</p>
+            <button id="open-help-card-button" class="button" type="button">
+              Hilfskachel oeffnen
+            </button>
+          </section>
+        </div>
+      </div>
+
       <div id="hud" class="hud" aria-live="polite">
         <div class="hud-shell">
-        <div class="panel hud-toolbar">
-          <div class="hud-toolbar-main">
-            <span class="hud-caption">AR-Steuerung</span>
-            <div class="hud-mini-summary">
-              <span id="mini-session" class="mini-pill" data-status="idle">AR: Inaktiv</span>
-              <span id="mini-surface" class="mini-pill" data-status="idle">Flaeche: Suche</span>
-              <span id="mini-placement" class="mini-pill" data-status="idle">Objekt: Wartet</span>
+          <div class="panel hud-toolbar">
+            <div class="hud-toolbar-main">
+              <span class="hud-caption">EPARtwin WebAR</span>
+              <div class="hud-mini-summary">
+                <span id="mini-session" class="mini-pill" data-status="idle">AR: Inaktiv</span>
+                <span id="mini-surface" class="mini-pill" data-status="idle">Flaeche: Suche</span>
+                <span id="mini-placement" class="mini-pill" data-status="idle">Objekt: Wartet</span>
+              </div>
             </div>
           </div>
 
-          <button
-            id="hud-toggle-button"
-            class="hud-toggle"
-            type="button"
-            aria-expanded="true"
-            aria-controls="hud-body"
-            aria-label="Bedienfeld minimieren"
-            title="Bedienfeld minimieren"
-          >
-            <span id="hud-toggle-icon" class="hud-toggle-icon">-</span>
-          </button>
-        </div>
+          <div id="hud-body" class="hud-body">
+            <section id="card-placement" class="panel card-panel hero-panel" data-card="placement">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <p class="eyebrow">EPARtwin WebAR</p>
+                  <h1>Objektplatzierung</h1>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="toggle-placement-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="placement"
+                    aria-expanded="true"
+                    aria-controls="card-placement-content"
+                    aria-label="Objektplatzierung auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="placement">-</span>
+                  </button>
+                </div>
+              </div>
 
-        <div id="hud-body" class="hud-body">
-          <section class="panel hero-panel">
-            <p class="eyebrow">Markerlose WebXR AR</p>
-            <h1>Stable Surface Placement</h1>
-            <p class="panel-intro">
-              Waehle zwischen freier Platzierung per stabilisiertem Reticle und Geo-Platzierung per Latitude/Longitude.
-            </p>
-            <p id="status-message" class="status-message">
-              Browser und WebXR-Support werden geprueft.
-            </p>
+              <div id="card-placement-content" class="card-content" data-card-content="placement">
+                <p class="panel-intro">
+                  Waehle zwischen freier Platzierung per stabilisiertem Reticle und Geo-Platzierung per Latitude/Longitude.
+                </p>
+                <p id="status-message" class="status-message">
+                  Browser und WebXR-Support werden geprueft.
+                </p>
 
-            <div class="button-row">
-              <button id="start-ar-button" class="button button-primary" type="button">
-                AR starten
-              </button>
-              <button id="place-button" class="button" type="button">
-                Objekt setzen
-              </button>
-              <button id="reset-button" class="button" type="button">
-                Neu platzieren
-              </button>
-              <button id="stop-ar-button" class="button button-ghost" type="button">
-                AR beenden
-              </button>
-            </div>
-          </section>
+                <div class="button-row">
+                  <button id="start-ar-button" class="button button-primary" type="button">
+                    AR starten
+                  </button>
+                  <button id="place-button" class="button" type="button">
+                    Objekt setzen
+                  </button>
+                  <button id="reset-button" class="button" type="button">
+                    Neu platzieren
+                  </button>
+                  <button id="stop-ar-button" class="button button-ghost" type="button">
+                    AR beenden
+                  </button>
+                </div>
+              </div>
+            </section>
 
-          <section class="panel coord-panel">
-            <div class="section-header">
-              <h2>Modus und Geo-Ziel</h2>
-              <span id="mode-badge" class="panel-tag">Freie Platzierung</span>
-            </div>
+            <section id="card-help" class="panel card-panel help-panel" data-card="help">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Hilfe</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="close-help-button"
+                    class="card-close-button"
+                    type="button"
+                    aria-label="Hilfskachel schliessen"
+                  >
+                    X
+                  </button>
+                  <button
+                    id="toggle-help-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="help"
+                    aria-expanded="true"
+                    aria-controls="card-help-content"
+                    aria-label="Hilfskachel auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="help">-</span>
+                  </button>
+                </div>
+              </div>
 
-            <div class="coord-grid">
-              <label class="field field-full">
-                <span class="field-label">Mode</span>
-                <select id="placement-mode-select" class="field-input">
-                  <option value="free">Freie Platzierung</option>
-                  <option value="geo">Koordinaten</option>
-                </select>
-              </label>
-              <label class="field">
-                <span class="field-label">Latitude</span>
-                <input
-                  id="geo-target-latitude"
-                  class="field-input"
-                  type="number"
-                  step="0.000001"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  autocorrect="off"
-                  spellcheck="false"
-                />
-              </label>
-              <label class="field">
-                <span class="field-label">Longitude</span>
-                <input
-                  id="geo-target-longitude"
-                  class="field-input"
-                  type="number"
-                  step="0.000001"
-                  inputmode="decimal"
-                  autocomplete="off"
-                  autocorrect="off"
-                  spellcheck="false"
-                />
-              </label>
-            </div>
+              <div id="card-help-content" class="card-content" data-card-content="help">
+                <div class="help-copy">
+                  <p>1. Starte AR ueber die Aktionskachel oben.</p>
+                  <p>2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.</p>
+                  <p>3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.</p>
+                  <p>4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude lokal in den AR-Raum uebertragen.</p>
+                </div>
+              </div>
+            </section>
 
-            <div class="coord-actions">
-              <button id="apply-geo-target-button" class="button" type="button">
-                Koordinaten uebernehmen
-              </button>
-            </div>
+            <section id="card-coord" class="panel card-panel coord-panel" data-card="coord" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Modus und Geo-Ziel</h2>
+                </div>
+                <div class="card-header-actions">
+                  <span id="mode-badge" class="panel-tag">Freie Platzierung</span>
+                  <button
+                    id="toggle-coord-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="coord"
+                    aria-expanded="false"
+                    aria-controls="card-coord-content"
+                    aria-label="Modus und Geo-Ziel auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="coord">+</span>
+                  </button>
+                </div>
+              </div>
 
-            <p id="geo-target-feedback" class="hint-text">
-              Im Koordinaten-Modus wird das Objekt nur innerhalb von 100 m angezeigt.
-            </p>
-          </section>
+              <div id="card-coord-content" class="card-content" data-card-content="coord" hidden>
+                <div class="coord-grid">
+                  <label class="field field-full">
+                    <span class="field-label">Mode</span>
+                    <select id="placement-mode-select" class="field-input">
+                      <option value="free">Freie Platzierung</option>
+                      <option value="geo">Koordinaten</option>
+                    </select>
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Latitude</span>
+                    <input
+                      id="geo-target-latitude"
+                      class="field-input"
+                      type="number"
+                      step="0.000001"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Longitude</span>
+                    <input
+                      id="geo-target-longitude"
+                      class="field-input"
+                      type="number"
+                      step="0.000001"
+                      inputmode="decimal"
+                      autocomplete="off"
+                      autocorrect="off"
+                      spellcheck="false"
+                    />
+                  </label>
+                </div>
 
-          <section class="panel state-panel">
-            <div class="section-header">
-              <h2>Status</h2>
-              <span id="asset-name" class="asset-badge">Modell laedt</span>
-            </div>
+                <div class="coord-actions">
+                  <button id="apply-geo-target-button" class="button" type="button">
+                    Koordinaten uebernehmen
+                  </button>
+                </div>
 
-            <div class="state-grid">
-              <article class="state-item" data-state="support" data-status="idle">
-                <span class="state-label">WebXR</span>
-                <strong id="state-support" class="state-value">Pruefung</strong>
-              </article>
-              <article class="state-item" data-state="session" data-status="idle">
-                <span class="state-label">AR aktiv</span>
-                <strong id="state-session" class="state-value">Nein</strong>
-              </article>
-              <article class="state-item" data-state="tracking" data-status="idle">
-                <span class="state-label">Tracking</span>
-                <strong id="state-tracking" class="state-value">Wartet</strong>
-              </article>
-              <article class="state-item" data-state="surface" data-status="idle">
-                <span class="state-label">Flaeche</span>
-                <strong id="state-surface" class="state-value">Suche</strong>
-              </article>
-              <article class="state-item" data-state="stability" data-status="idle">
-                <span class="state-label">Stabilitaet</span>
-                <strong id="state-stability" class="state-value">Wartet</strong>
-              </article>
-              <article class="state-item" data-state="placement" data-status="idle">
-                <span class="state-label">Objekt</span>
-                <strong id="state-placement" class="state-value">Nicht platziert</strong>
-              </article>
-            </div>
-          </section>
+                <p id="geo-target-feedback" class="hint-text">
+                  Im Koordinaten-Modus wird das Objekt nur innerhalb von 100 m angezeigt.
+                </p>
+              </div>
+            </section>
 
-          <section class="panel note-panel">
-            <h2>Ablauf</h2>
-            <p id="interaction-hint" class="hint-text">
-              Fallback-3D-Ansicht aktiv. Im AR-Modus wird zuerst eine stabile Referenzflaeche gesucht.
-            </p>
-          </section>
+            <section id="card-state" class="panel card-panel state-panel" data-card="state" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Status</h2>
+                </div>
+                <div class="card-header-actions">
+                  <span id="asset-name" class="asset-badge">Modell laedt</span>
+                  <button
+                    id="toggle-state-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="state"
+                    aria-expanded="false"
+                    aria-controls="card-state-content"
+                    aria-label="Status auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="state">+</span>
+                  </button>
+                </div>
+              </div>
 
-          <section class="panel geo-panel">
-            <div class="section-header">
-              <h2>Geolocation</h2>
-              <span id="geo-status-badge" class="panel-tag">Bereit</span>
-            </div>
+              <div id="card-state-content" class="card-content" data-card-content="state" hidden>
+                <div class="state-grid">
+                  <article class="state-item" data-state="support" data-status="idle">
+                    <span class="state-label">WebXR</span>
+                    <strong id="state-support" class="state-value">Pruefung</strong>
+                  </article>
+                  <article class="state-item" data-state="session" data-status="idle">
+                    <span class="state-label">AR aktiv</span>
+                    <strong id="state-session" class="state-value">Nein</strong>
+                  </article>
+                  <article class="state-item" data-state="tracking" data-status="idle">
+                    <span class="state-label">Tracking</span>
+                    <strong id="state-tracking" class="state-value">Wartet</strong>
+                  </article>
+                  <article class="state-item" data-state="surface" data-status="idle">
+                    <span class="state-label">Flaeche</span>
+                    <strong id="state-surface" class="state-value">Suche</strong>
+                  </article>
+                  <article class="state-item" data-state="stability" data-status="idle">
+                    <span class="state-label">Stabilitaet</span>
+                    <strong id="state-stability" class="state-value">Wartet</strong>
+                  </article>
+                  <article class="state-item" data-state="placement" data-status="idle">
+                    <span class="state-label">Objekt</span>
+                    <strong id="state-placement" class="state-value">Nicht platziert</strong>
+                  </article>
+                </div>
+              </div>
+            </section>
 
-            <div class="geo-actions">
-              <button id="activate-geolocation-button" class="button" type="button">
-                Standort aktivieren
-              </button>
-            </div>
+            <section id="card-note" class="panel card-panel note-panel" data-card="note" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Ablauf</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="toggle-note-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="note"
+                    aria-expanded="false"
+                    aria-controls="card-note-content"
+                    aria-label="Ablauf auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="note">+</span>
+                  </button>
+                </div>
+              </div>
 
-            <div class="geo-grid">
-              <article class="geo-item geo-item-wide">
-                <span class="geo-label">Status</span>
-                <strong id="geo-status-text" class="geo-value">Not requested</strong>
-              </article>
-              <button
-                id="geo-copy-latitude-button"
-                class="geo-item geo-copy-trigger"
-                type="button"
-                data-copy-device-coords="true"
-                title="Aktuelle Geraetekoordinaten uebernehmen"
-              >
-                <span class="geo-label">Lat</span>
-                <strong id="geo-latitude" class="geo-value">-</strong>
-              </button>
-              <button
-                id="geo-copy-longitude-button"
-                class="geo-item geo-copy-trigger"
-                type="button"
-                data-copy-device-coords="true"
-                title="Aktuelle Geraetekoordinaten uebernehmen"
-              >
-                <span class="geo-label">Lon</span>
-                <strong id="geo-longitude" class="geo-value">-</strong>
-              </button>
-              <article class="geo-item">
-                <span class="geo-label">Accuracy</span>
-                <strong id="geo-accuracy" class="geo-value">-</strong>
-              </article>
-            </div>
+              <div id="card-note-content" class="card-content" data-card-content="note" hidden>
+                <p id="interaction-hint" class="hint-text">
+                  Fallback-3D-Ansicht aktiv. Im AR-Modus wird zuerst eine stabile Referenzflaeche gesucht.
+                </p>
+              </div>
+            </section>
 
-            <p id="geo-message" class="hint-text">
-              Standort noch nicht angefordert.
-            </p>
-            <p id="geo-help" class="hint-text geo-help">
-              Tippe auf "Standort aktivieren", damit der Browser die Freigabe anfragt.
-            </p>
-          </section>
+            <section id="card-geo" class="panel card-panel geo-panel" data-card="geo">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Geolocation</h2>
+                </div>
+                <div class="card-header-actions">
+                  <span id="geo-status-badge" class="panel-tag">Bereit</span>
+                  <button
+                    id="toggle-geo-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="geo"
+                    aria-expanded="false"
+                    aria-controls="card-geo-content"
+                    aria-label="Geolocation auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="geo">+</span>
+                  </button>
+                </div>
+              </div>
 
-          <section class="panel debug-panel">
-            <div class="section-header">
-              <h2>Geo Debug</h2>
-              <span class="panel-tag">Placement</span>
-            </div>
+              <div id="card-geo-content" class="card-content" data-card-content="geo" hidden>
+                <div class="geo-actions">
+                  <button id="activate-geolocation-button" class="button" type="button">
+                    Standort aktivieren
+                  </button>
+                </div>
 
-            <div class="debug-grid">
-              <article class="debug-item">
-                <span class="debug-label">Origin Lat</span>
-                <strong id="debug-origin-latitude" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Origin Lon</span>
-                <strong id="debug-origin-longitude" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Target Lat</span>
-                <strong id="debug-target-latitude" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Target Lon</span>
-                <strong id="debug-target-longitude" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Delta Lat</span>
-                <strong id="debug-delta-latitude" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Delta Lon</span>
-                <strong id="debug-delta-longitude" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">X (m)</span>
-                <strong id="debug-x-meters" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Z (m)</span>
-                <strong id="debug-z-meters" class="debug-value">-</strong>
-              </article>
-              <article class="debug-item debug-item-wide">
-                <span class="debug-label">Distance (m)</span>
-                <strong id="debug-distance-meters" class="debug-value">-</strong>
-              </article>
-            </div>
+                <div class="geo-grid">
+                  <article class="geo-item geo-item-wide">
+                    <span class="geo-label">Status</span>
+                    <strong id="geo-status-text" class="geo-value">Not requested</strong>
+                  </article>
+                  <button
+                    id="geo-copy-latitude-button"
+                    class="geo-item geo-copy-trigger"
+                    type="button"
+                    data-copy-device-coords="true"
+                    title="Aktuelle Geraetekoordinaten uebernehmen"
+                  >
+                    <span class="geo-label">Lat</span>
+                    <strong id="geo-latitude" class="geo-value">-</strong>
+                  </button>
+                  <button
+                    id="geo-copy-longitude-button"
+                    class="geo-item geo-copy-trigger"
+                    type="button"
+                    data-copy-device-coords="true"
+                    title="Aktuelle Geraetekoordinaten uebernehmen"
+                  >
+                    <span class="geo-label">Lon</span>
+                    <strong id="geo-longitude" class="geo-value">-</strong>
+                  </button>
+                  <article class="geo-item">
+                    <span class="geo-label">Accuracy</span>
+                    <strong id="geo-accuracy" class="geo-value">-</strong>
+                  </article>
+                </div>
 
-            <div class="debug-grid debug-grid-secondary">
-              <article class="debug-item">
-                <span class="debug-label">Object Placed</span>
-                <strong id="debug-object-placed" class="debug-value">false</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Distance &gt; 100m</span>
-                <strong id="debug-distance-too-far" class="debug-value">false</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Has Stable Surface</span>
-                <strong id="debug-has-stable-surface" class="debug-value">false</strong>
-              </article>
-              <article class="debug-item">
-                <span class="debug-label">Object Behind Camera</span>
-                <strong id="debug-object-behind-camera" class="debug-value">false</strong>
-              </article>
-            </div>
-          </section>
-        </div>
+                <p id="geo-message" class="hint-text">
+                  Standort noch nicht angefordert.
+                </p>
+                <p id="geo-help" class="hint-text geo-help">
+                  Tippe auf "Standort aktivieren", damit der Browser die Freigabe anfragt.
+                </p>
+              </div>
+            </section>
+
+            <section id="card-debug" class="panel card-panel debug-panel" data-card="debug" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2>Geo Debug</h2>
+                </div>
+                <div class="card-header-actions">
+                  <span class="panel-tag">Placement</span>
+                  <button
+                    id="toggle-debug-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="debug"
+                    aria-expanded="false"
+                    aria-controls="card-debug-content"
+                    aria-label="Geo Debug auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="debug">+</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="card-debug-content" class="card-content" data-card-content="debug" hidden>
+                <div class="debug-grid">
+                  <article class="debug-item">
+                    <span class="debug-label">Origin Lat</span>
+                    <strong id="debug-origin-latitude" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Origin Lon</span>
+                    <strong id="debug-origin-longitude" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Target Lat</span>
+                    <strong id="debug-target-latitude" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Target Lon</span>
+                    <strong id="debug-target-longitude" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Delta Lat</span>
+                    <strong id="debug-delta-latitude" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Delta Lon</span>
+                    <strong id="debug-delta-longitude" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">X (m)</span>
+                    <strong id="debug-x-meters" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Z (m)</span>
+                    <strong id="debug-z-meters" class="debug-value">-</strong>
+                  </article>
+                  <article class="debug-item debug-item-wide">
+                    <span class="debug-label">Distance (m)</span>
+                    <strong id="debug-distance-meters" class="debug-value">-</strong>
+                  </article>
+                </div>
+
+                <div class="debug-grid debug-grid-secondary">
+                  <article class="debug-item">
+                    <span class="debug-label">Object Placed</span>
+                    <strong id="debug-object-placed" class="debug-value">false</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Distance &gt; 100m</span>
+                    <strong id="debug-distance-too-far" class="debug-value">false</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Has Stable Surface</span>
+                    <strong id="debug-has-stable-surface" class="debug-value">false</strong>
+                  </article>
+                  <article class="debug-item">
+                    <span class="debug-label">Object Behind Camera</span>
+                    <strong id="debug-object-behind-camera" class="debug-value">false</strong>
+                  </article>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </div>
