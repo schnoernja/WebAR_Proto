@@ -1,10 +1,13 @@
 import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
+import { HeadingService } from "./HeadingService.js";
 import { applyPose, disposeObject3D } from "./utils.js";
 
 const METERS_PER_DEGREE_LAT = 111320;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const DEFAULT_GEO_FORWARD = new THREE.Vector3(0, 0, -1);
+const MIN_GEO_VISIBILITY_DISTANCE_METERS = 150;
+const HEADING_FALLBACK_DELAY_MS = 1500;
 
 export const PlacementMode = Object.freeze({
   FREE: "free",
@@ -69,8 +72,16 @@ export class PlacementController {
     this.geoOrigin = null;
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
-    this.maxVisibleDistanceMeters = APP_CONFIG.placement.maxVisibleDistanceMeters;
-    this.debugClampDistanceMeters = APP_CONFIG.placement.debugClampDistanceMeters;
+    this.maxVisibleDistanceMeters = Math.max(
+      APP_CONFIG.placement.maxVisibleDistanceMeters,
+      MIN_GEO_VISIBILITY_DISTANCE_METERS
+    );
+    this.debugClampDistanceMeters = Math.max(
+      APP_CONFIG.placement.debugClampDistanceMeters,
+      this.maxVisibleDistanceMeters
+    );
+    this.headingService = new HeadingService();
+    this.geoReferenceCapturedAt = 0;
 
     this.reticle = this.createReticle();
     this.reticle.visible = false;
@@ -237,7 +248,16 @@ export class PlacementController {
       return false;
     }
 
-    this.geoReferenceForward = groundedDirection;
+    if (this.geoReferenceCapturedAt === 0) {
+      this.geoReferenceCapturedAt = Date.now();
+    }
+
+    const northAlignedDirection = this.createNorthAlignedDirection(groundedDirection);
+    if (!northAlignedDirection && Date.now() - this.geoReferenceCapturedAt < HEADING_FALLBACK_DELAY_MS) {
+      return false;
+    }
+
+    this.geoReferenceForward = northAlignedDirection || groundedDirection;
     this.geoReferenceRight = new THREE.Vector3()
       .crossVectors(this.geoReferenceForward, WORLD_UP)
       .normalize();
@@ -265,7 +285,26 @@ export class PlacementController {
   clearGeoReferenceDirection() {
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
+    this.geoReferenceCapturedAt = 0;
     this.clearGeoComputation();
+  }
+
+  createNorthAlignedDirection(groundedDirection) {
+    const headingRad = this.headingService.getHeadingRad();
+    if (!Number.isFinite(headingRad)) {
+      return null;
+    }
+
+    const northAlignedDirection = groundedDirection
+      .clone()
+      .applyAxisAngle(WORLD_UP, -headingRad);
+
+    if (northAlignedDirection.lengthSq() < 1e-6) {
+      return null;
+    }
+
+    northAlignedDirection.normalize();
+    return northAlignedDirection;
   }
 
   computeGeoPosition(floorPose, cameraState = null) {
@@ -489,6 +528,7 @@ export class PlacementController {
   }
 
   dispose() {
+    this.headingService.dispose();
     this.scene.remove(this.objectRoot);
     this.scene.remove(this.reticle);
 
