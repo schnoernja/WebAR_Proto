@@ -45,6 +45,45 @@ function toMessage(error, fallbackMessage = "unbekannter Fehler") {
   return fallbackMessage;
 }
 
+function toCameraStartFeedback(error) {
+  const detail = toMessage(error);
+  if (error && typeof error === "object" && "name" in error) {
+    switch (error.name) {
+      case "NotAllowedError":
+      case "SecurityError":
+        return {
+          message: "Kamerazugriff verweigert.",
+          hint: "Bitte Kamera-Berechtigung im Browser aktivieren und den Geo-Modus erneut starten."
+        };
+      case "NotFoundError":
+      case "DevicesNotFoundError":
+        return {
+          message: "Keine Kamera verfuegbar.",
+          hint: "Auf diesem Geraet wurde keine geeignete Kamera gefunden."
+        };
+      case "NotReadableError":
+      case "TrackStartError":
+        return {
+          message: "Kamera kann aktuell nicht verwendet werden.",
+          hint: "Pruefe, ob die Kamera bereits von einer anderen App oder Browser-Ansicht genutzt wird."
+        };
+      case "OverconstrainedError":
+      case "ConstraintNotSatisfiedError":
+        return {
+          message: "Kamera-Start fehlgeschlagen.",
+          hint: "Die angeforderte Rueckkamera konnte mit diesem Browser nicht geoeffnet werden."
+        };
+      default:
+        break;
+    }
+  }
+
+  return {
+    message: `Kamerazugriff fehlgeschlagen: ${detail}`,
+    hint: "Der Geo-Modus benoetigt eine funktionierende Kamerafreigabe."
+  };
+}
+
 function toGeoCoord(position) {
   if (!position) {
     return null;
@@ -217,7 +256,14 @@ export class ARApp {
     }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
-      return this.startGeoSensorMode();
+      const cameraReady = await this.requestGeoCameraFromUserGesture();
+      if (!cameraReady) {
+        return false;
+      }
+
+      return this.startGeoSensorMode({
+        cameraReady: true
+      });
     }
 
     return this.startAR();
@@ -240,7 +286,25 @@ export class ARApp {
     }
   }
 
-  async startGeoSensorMode() {
+  async requestGeoCameraFromUserGesture() {
+    this.ui.setMessage("Starte Geo-Sensor-Modus...");
+
+    try {
+      await this.sceneManager.startCameraVideo();
+      this.sceneManager.setGeoMode(true);
+      return true;
+    } catch (error) {
+      const feedback = toCameraStartFeedback(error);
+      console.error("Geo camera start failed:", error);
+      this.sceneManager.stopCameraVideo();
+      this.sceneManager.setGeoMode(false);
+      this.ui.setSessionState(false, feedback.message);
+      this.ui.setHint(feedback.hint);
+      return false;
+    }
+  }
+
+  async startGeoSensorMode({ cameraReady = false } = {}) {
     if (!this.siteConfig) {
       this.ui.setMessage("Geo-Sensor-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
       this.ui.setHint("Oeffne die App mit einem gueltigen ?site=... Parameter.");
@@ -254,14 +318,11 @@ export class ARApp {
 
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
-    this.ui.setMessage("Starte Geo-Sensor-Modus...");
-
-    try {
-      await this.sceneManager.startCameraVideo();
-    } catch (error) {
-      this.ui.setSessionState(false, `Kamera-Start fehlgeschlagen: ${toMessage(error)}`);
-      this.ui.setHint("Geo-Sensor-Modus benoetigt Kamerazugriff.");
-      return false;
+    if (!cameraReady) {
+      const startedCamera = await this.requestGeoCameraFromUserGesture();
+      if (!startedCamera) {
+        return false;
+      }
     }
 
     const started = await this.sensorFusion.start({
@@ -269,7 +330,10 @@ export class ARApp {
     });
 
     if (!started) {
+      console.error("Geo sensor start failed:", this.sensorFusion.getSnapshot());
       this.sceneManager.stopCameraVideo();
+      this.sceneManager.setGeoMode(false);
+      this.sceneManager.resetFallbackView();
       const sensorSnapshot = this.sensorFusion.getSnapshot();
       this.ui.setSessionState(false, sensorSnapshot.message);
       this.ui.setHint("Geo-Sensor-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.");
@@ -277,7 +341,6 @@ export class ARApp {
     }
 
     this.geoSensorActive = true;
-    this.sceneManager.setGeoMode(true);
     this.syncPresentationVisibility();
     this.ui.setSessionState(true, `Geo-Sensor-Modus aktiv. Site '${this.siteConfig.id}' geladen.`);
     this.ui.setTrackingState(false);
