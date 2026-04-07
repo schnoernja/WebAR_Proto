@@ -84,6 +84,41 @@ function toCameraStartFeedback(error) {
   };
 }
 
+function toGeolocationStartFeedback(snapshot) {
+  switch (snapshot ? snapshot.issue : null) {
+    case "geolocation-denied":
+      return {
+        message: "Standortzugriff verweigert.",
+        hint: "Bitte Standort-Berechtigung im Browser aktivieren und den Geo-Modus erneut starten."
+      };
+    case "geolocation-unavailable":
+      return {
+        message: "Standort nicht verfuegbar.",
+        hint: "Pruefe GPS, Netzverbindung und freie Sicht zum Himmel."
+      };
+    case "geolocation-timeout":
+      return {
+        message: "Standort konnte nicht rechtzeitig gelesen werden.",
+        hint: "Bewege dich an einen Ort mit besserem GPS-Empfang und starte den Geo-Modus erneut."
+      };
+    case "https-required":
+      return {
+        message: snapshot.message || "Standortzugriff ist hier nicht verfuegbar.",
+        hint: "Der Geo-Modus benoetigt HTTPS oder localhost."
+      };
+    case "geolocation-unsupported":
+      return {
+        message: snapshot.message || "Geolocation ist in diesem Browser nicht verfuegbar.",
+        hint: "Der Geo-Modus benoetigt einen Browser mit Geolocation-API."
+      };
+    default:
+      return {
+        message: snapshot && snapshot.message ? snapshot.message : "Standort nicht verfuegbar.",
+        hint: "Der Geo-Modus benoetigt eine verfuegbare Standortfreigabe."
+      };
+  }
+}
+
 function toGeoCoord(position) {
   if (!position) {
     return null;
@@ -256,13 +291,28 @@ export class ARApp {
     }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
-      const cameraReady = await this.requestGeoCameraFromUserGesture();
-      if (!cameraReady) {
+      if (!this.siteConfig) {
+        this.ui.setMessage("Geo-Sensor-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+        this.ui.setHint("Oeffne die App mit einem gueltigen ?site=... Parameter.");
+        return false;
+      }
+
+      const [cameraReady, locationReady] = await Promise.all([
+        this.requestGeoCameraFromUserGesture(),
+        this.requestGeoLocationFromUserGesture()
+      ]);
+
+      if (!cameraReady || !locationReady) {
+        this.sensorFusion.stop();
+        this.sceneManager.stopCameraVideo();
+        this.sceneManager.setGeoMode(false);
+        this.sceneManager.resetFallbackView();
         return false;
       }
 
       return this.startGeoSensorMode({
-        cameraReady: true
+        cameraReady: true,
+        locationReady: true
       });
     }
 
@@ -304,7 +354,28 @@ export class ARApp {
     }
   }
 
-  async startGeoSensorMode({ cameraReady = false } = {}) {
+  async requestGeoLocationFromUserGesture() {
+    try {
+      const started = await this.sensorFusion.requestLocationPermissionFromUserGesture({
+        origin: this.siteConfig ? this.siteConfig.origin : null
+      });
+
+      if (started) {
+        return true;
+      }
+    } catch (error) {
+      console.error("Geo geolocation start failed:", error);
+    }
+
+    const sensorSnapshot = this.sensorFusion.getSnapshot();
+    const feedback = toGeolocationStartFeedback(sensorSnapshot);
+    console.error("Geo geolocation permission failed:", sensorSnapshot);
+    this.ui.setSessionState(false, feedback.message);
+    this.ui.setHint(feedback.hint);
+    return false;
+  }
+
+  async startGeoSensorMode({ cameraReady = false, locationReady = false } = {}) {
     if (!this.siteConfig) {
       this.ui.setMessage("Geo-Sensor-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
       this.ui.setHint("Oeffne die App mit einem gueltigen ?site=... Parameter.");
@@ -325,12 +396,25 @@ export class ARApp {
       }
     }
 
+    if (!locationReady) {
+      const startedLocation = await this.requestGeoLocationFromUserGesture();
+      if (!startedLocation) {
+        this.sceneManager.stopCameraVideo();
+        this.sceneManager.setGeoMode(false);
+        this.sceneManager.resetFallbackView();
+        this.sensorFusion.stop();
+        return false;
+      }
+    }
+
     const started = await this.sensorFusion.start({
-      origin: this.siteConfig.origin
+      origin: this.siteConfig.origin,
+      locationReady
     });
 
     if (!started) {
       console.error("Geo sensor start failed:", this.sensorFusion.getSnapshot());
+      this.sensorFusion.stop();
       this.sceneManager.stopCameraVideo();
       this.sceneManager.setGeoMode(false);
       this.sceneManager.resetFallbackView();

@@ -2,6 +2,11 @@ import * as THREE from "three";
 import { smoothFactor } from "../utils.js";
 import { wgs84ToEnuVector3 } from "./GeoENU.js";
 
+const INITIAL_REQUEST_OPTIONS = {
+  enableHighAccuracy: true,
+  maximumAge: 0,
+  timeout: 15000
+};
 const WATCH_OPTIONS = {
   enableHighAccuracy: true,
   maximumAge: 1000,
@@ -146,6 +151,7 @@ export class SensorFusion {
     this.message = "Geo-Sensor-Modus ist bereit.";
     this.motionPermissionState = typeof DeviceOrientationEvent === "undefined" ? "unsupported" : "unknown";
     this.locationActive = false;
+    this.initialLocationRequestPending = false;
     this.lastPositionSample = null;
     this.filteredHeadingDeg = null;
     this.calibrationOffsetDeg = 0;
@@ -201,12 +207,12 @@ export class SensorFusion {
     this.notify();
   }
 
-  async start({ origin } = {}) {
+  async start({ origin, locationReady = false } = {}) {
     if (origin) {
       this.setOrigin(origin);
     }
 
-    if (!window.isSecureContext) {
+    if (!this.window.isSecureContext) {
       this.issue = "https-required";
       this.message = "Geo-Sensor-Modus benoetigt HTTPS oder localhost.";
       this.notify();
@@ -220,6 +226,20 @@ export class SensorFusion {
       return false;
     }
 
+    if (!locationReady) {
+      const locationGranted = await this.requestLocationPermissionFromUserGesture();
+      if (!locationGranted) {
+        this.notify();
+        return false;
+      }
+    } else if (this.watchId === null) {
+      const watchStarted = this.startGeolocationWatch();
+      if (!watchStarted) {
+        this.notify();
+        return false;
+      }
+    }
+
     const motionGranted = await this.requestMotionPermission();
     if (!motionGranted) {
       this.notify();
@@ -227,12 +247,6 @@ export class SensorFusion {
     }
 
     this.attachOrientationListeners();
-    const watchStarted = this.startGeolocationWatch();
-    if (!watchStarted) {
-      this.detachOrientationListeners();
-      this.notify();
-      return false;
-    }
     this.issue = null;
     this.message = "Geo-Sensor-Modus aktiv. Warte auf GPS und IMU.";
     this.running = true;
@@ -243,6 +257,7 @@ export class SensorFusion {
   stop() {
     this.running = false;
     this.locationActive = false;
+    this.initialLocationRequestPending = false;
 
     if (this.watchId !== null && this.navigator.geolocation) {
       this.navigator.geolocation.clearWatch(this.watchId);
@@ -251,6 +266,84 @@ export class SensorFusion {
 
     this.detachOrientationListeners();
     this.notify();
+  }
+
+  async requestLocationPermissionFromUserGesture({ origin } = {}) {
+    if (origin) {
+      this.setOrigin(origin);
+    }
+
+    if (!this.window.isSecureContext) {
+      this.issue = "https-required";
+      this.message = "Geo-Sensor-Modus benoetigt HTTPS oder localhost.";
+      this.notify();
+      return false;
+    }
+
+    if (!this.navigator.geolocation) {
+      this.issue = "geolocation-unsupported";
+      this.message = "Geolocation ist in diesem Browser nicht verfuegbar.";
+      this.notify();
+      return false;
+    }
+
+    if (this.watchId !== null) {
+      this.locationActive = true;
+      this.issue = null;
+      this.message = this.lastPositionSample
+        ? "GPS- und Sensordaten werden aktualisiert."
+        : "Standortfreigabe vorhanden. Warte auf GPS-Position.";
+      this.notify();
+      return true;
+    }
+
+    if (this.initialLocationRequestPending) {
+      this.notify();
+      return false;
+    }
+
+    this.initialLocationRequestPending = true;
+    this.issue = null;
+    this.message = "Warte auf Standortfreigabe.";
+    this.notify();
+
+    try {
+      const permissionGranted = await new Promise((resolve) => {
+        this.navigator.geolocation.getCurrentPosition(
+          (position) => {
+            this.initialLocationRequestPending = false;
+            this.handleGeoSuccess(position);
+            resolve(true);
+          },
+          (error) => {
+            this.initialLocationRequestPending = false;
+            this.handleGeoError(error);
+            resolve(false);
+          },
+          INITIAL_REQUEST_OPTIONS
+        );
+      });
+
+      if (!permissionGranted) {
+        return false;
+      }
+
+      const watchStarted = this.startGeolocationWatch();
+      if (!watchStarted) {
+        this.locationActive = false;
+        this.notify();
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      this.initialLocationRequestPending = false;
+      this.locationActive = false;
+      this.issue = "geolocation-error";
+      this.message = `Standort konnte nicht gestartet werden: ${toMessage(error, "unbekannter Fehler")}`;
+      this.notify();
+      return false;
+    }
   }
 
   async requestMotionPermission() {
