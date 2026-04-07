@@ -30,6 +30,9 @@ export class SceneManager {
     this.controls = null;
     this.fallbackStage = null;
     this.isARMode = false;
+    this.presentationMode = "fallback";
+    this.cameraVideo = null;
+    this.cameraStream = null;
     this.handleResize = this.handleResize.bind(this);
   }
 
@@ -44,6 +47,8 @@ export class SceneManager {
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, APP_CONFIG.renderer.pixelRatioCap));
+    this.cameraVideo = this.createCameraVideoElement();
+    this.container.appendChild(this.cameraVideo);
     this.renderer.domElement.id = "ar-canvas";
     this.renderer.domElement.setAttribute("aria-hidden", "true");
     this.container.appendChild(this.renderer.domElement);
@@ -71,6 +76,18 @@ export class SceneManager {
 
     window.addEventListener("resize", this.handleResize);
     this.handleResize();
+  }
+
+  createCameraVideoElement() {
+    const video = document.createElement("video");
+    video.id = "camera-video";
+    video.className = "camera-video";
+    video.autoplay = true;
+    video.muted = true;
+    video.playsInline = true;
+    video.setAttribute("aria-hidden", "true");
+    video.hidden = true;
+    return video;
   }
 
   createLights() {
@@ -238,10 +255,92 @@ export class SceneManager {
   }
 
   setARMode(isActive) {
-    this.isARMode = isActive;
-    this.fallbackStage.visible = !isActive;
+    this.isARMode = Boolean(isActive);
+    this.setPresentationMode(this.isARMode ? "xr" : "fallback");
+  }
+
+  setGeoMode(isActive) {
+    this.setPresentationMode(isActive ? "geo" : "fallback");
+  }
+
+  setPresentationMode(mode) {
+    this.presentationMode = mode === "geo" ? "geo" : mode === "xr" ? "xr" : "fallback";
+    this.isARMode = this.presentationMode === "xr";
+    this.fallbackStage.visible = this.presentationMode === "fallback";
+    if (this.cameraVideo) {
+      this.cameraVideo.hidden = this.presentationMode !== "geo";
+    }
     if (this.controls) {
-      this.controls.enabled = !isActive;
+      this.controls.enabled = this.presentationMode === "fallback";
+    }
+  }
+
+  async startCameraVideo() {
+    if (this.cameraStream) {
+      return true;
+    }
+
+    if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== "function") {
+      throw new Error("Kamera-Stream wird von diesem Browser nicht unterstuetzt.");
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: {
+        facingMode: {
+          ideal: "environment"
+        }
+      }
+    });
+
+    this.cameraStream = stream;
+    if (this.cameraVideo) {
+      this.cameraVideo.srcObject = stream;
+      await this.cameraVideo.play();
+    }
+
+    return true;
+  }
+
+  stopCameraVideo() {
+    if (this.cameraStream) {
+      for (const track of this.cameraStream.getTracks()) {
+        track.stop();
+      }
+    }
+
+    this.cameraStream = null;
+    if (this.cameraVideo) {
+      this.cameraVideo.pause();
+      this.cameraVideo.srcObject = null;
+      this.cameraVideo.hidden = true;
+    }
+  }
+
+  setGeoCameraPose(pose) {
+    if (!pose) {
+      return;
+    }
+
+    this.camera.position.copy(pose.position);
+    this.camera.quaternion.copy(pose.quaternion);
+  }
+
+  resetFallbackView() {
+    this.camera.position.set(
+      APP_CONFIG.fallback.cameraPosition.x,
+      APP_CONFIG.fallback.cameraPosition.y,
+      APP_CONFIG.fallback.cameraPosition.z
+    );
+    this.camera.quaternion.identity();
+
+    if (this.controls) {
+      this.controls.target.set(
+        APP_CONFIG.fallback.controlsTarget.x,
+        APP_CONFIG.fallback.controlsTarget.y,
+        APP_CONFIG.fallback.controlsTarget.z
+      );
+      this.controls.update();
     }
   }
 
@@ -275,6 +374,10 @@ export class SceneManager {
     return this.renderer;
   }
 
+  getCamera() {
+    return this.camera;
+  }
+
   getCanvasElement() {
     return this.renderer ? this.renderer.domElement : null;
   }
@@ -290,6 +393,7 @@ export class SceneManager {
   dispose() {
     window.removeEventListener("resize", this.handleResize);
     this.renderer.setAnimationLoop(null);
+    this.stopCameraVideo();
 
     if (this.controls) {
       this.controls.dispose();

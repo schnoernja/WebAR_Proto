@@ -94,6 +94,7 @@ export class PlacementController {
     this.inARMode = false;
     this.placed = false;
     this.textInputActive = false;
+    this.presentationVisible = true;
     this.lastGeoComputation = this.createGeoDebugSnapshot("idle");
 
     this.showFallbackPreview();
@@ -181,7 +182,7 @@ export class PlacementController {
   updateSurfaceState(surfaceState) {
     this.currentSurfaceState = surfaceState;
 
-    if (this.textInputActive || !this.inARMode || this.placed || !surfaceState.displayPose) {
+    if (!this.presentationVisible || this.textInputActive || !this.inARMode || this.placed || !surfaceState.displayPose) {
       this.reticle.visible = false;
       return;
     }
@@ -418,7 +419,7 @@ export class PlacementController {
     }
 
     applyPose(this.objectRoot, pose);
-    this.objectRoot.visible = true;
+    this.objectRoot.visible = this.presentationVisible;
     this.reticle.visible = false;
     this.placed = true;
     return true;
@@ -431,7 +432,7 @@ export class PlacementController {
 
     this.objectRoot.position.copy(pose.position);
     this.objectRoot.quaternion.copy(this.createGeoPlacementQuaternion(cameraState));
-    this.objectRoot.visible = true;
+    this.objectRoot.visible = this.presentationVisible;
     this.reticle.visible = false;
     this.placed = true;
     return true;
@@ -505,7 +506,7 @@ export class PlacementController {
 
   showFallbackPreview() {
     this.reticle.visible = false;
-    this.objectRoot.visible = true;
+    this.objectRoot.visible = this.presentationVisible;
     this.objectRoot.position.set(0, 0, 0);
     this.objectRoot.quaternion.identity();
   }
@@ -525,6 +526,26 @@ export class PlacementController {
     if (this.currentSurfaceState) {
       this.updateSurfaceState(this.currentSurfaceState);
     }
+  }
+
+  setPresentationVisible(visible) {
+    this.presentationVisible = Boolean(visible);
+
+    if (!this.presentationVisible) {
+      this.reticle.visible = false;
+      this.objectRoot.visible = false;
+      return;
+    }
+
+    if (this.inARMode) {
+      this.objectRoot.visible = this.placed;
+      if (this.currentSurfaceState) {
+        this.updateSurfaceState(this.currentSurfaceState);
+      }
+      return;
+    }
+
+    this.showFallbackPreview();
   }
 
   dispose() {

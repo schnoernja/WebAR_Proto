@@ -251,6 +251,15 @@
                 <p class="panel-intro">
                   Waehle zwischen freier Platzierung per stabilisiertem Reticle und Geo-Platzierung per Latitude/Longitude.
                 </p>
+                <div class="coord-grid">
+                  <label class="field field-full">
+                    <span class="field-label">Hauptmodus</span>
+                    <select id="experience-mode-select" class="field-input">
+                      <option value="xr">AR (WebXR)</option>
+                      <option value="geo-sensor">Geo (Sensor)</option>
+                    </select>
+                  </label>
+                </div>
                 <p id="status-message" class="status-message">
                   Browser und WebXR-Support werden geprueft.
                 </p>
@@ -456,7 +465,8 @@
                     <span class="field-label">Mode</span>
                     <select id="placement-mode-select" class="field-input">
                       <option value="free">Freie Platzierung</option>
-                      <option value="geo">Koordinaten</option>
+                      <option value="geo-local">Geo-Local</option>
+                      <option value="geo-global">Geo-Global</option>
                     </select>
                   </label>
                   <label class="field">
@@ -603,6 +613,9 @@
                   <button id="activate-geolocation-button" class="button" type="button">
                     Standort aktivieren
                   </button>
+                  <button id="calibrate-heading-button" class="button button-ghost" type="button">
+                    Ausrichtung kalibrieren
+                  </button>
                 </div>
 
                 <div class="geo-grid">
@@ -633,6 +646,10 @@
                   <article class="geo-item">
                     <span class="geo-label">Accuracy</span>
                     <strong id="geo-accuracy" class="geo-value">-</strong>
+                  </article>
+                  <article class="geo-item">
+                    <span class="geo-label">Heading</span>
+                    <strong id="geo-heading" class="geo-value">-</strong>
                   </article>
                 </div>
 

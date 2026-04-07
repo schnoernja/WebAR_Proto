@@ -188,12 +188,19 @@ const DE_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
-    intro: "Waehle zwischen freier Platzierung per stabilisiertem Reticle und Geo-Platzierung per Latitude/Longitude.",
+    intro: "Waehle zwischen WebXR-Placement mit stabilisiertem Reticle und sensorbasiertem Geo-Rendering mit GNSS, IMU und Kompass.",
+    modeLabel: "Hauptmodus",
+    modeOptions: {
+      xr: "AR (WebXR)",
+      geoSensor: "Geo (Sensor)"
+    },
     buttons: {
-      start: "AR starten",
+      startXR: "AR starten",
+      startGeo: "Geo starten",
       place: "Objekt setzen",
       reset: "Neu platzieren",
-      stop: "AR beenden"
+      stopXR: "AR beenden",
+      stopGeo: "Geo stoppen"
     }
   },
   welcome: {
@@ -264,7 +271,8 @@ const DE_TRANSLATIONS = Object.freeze({
     longitudeLabel: "Longitude",
     options: {
       free: "Freie Platzierung",
-      geo: "Koordinaten"
+      geoLocal: "Geo-Local",
+      geoGlobal: "Geo-Global"
     },
     apply: "Koordinaten uebernehmen",
     feedbackDefault: "Im Koordinaten-Modus wird das Objekt nur im gueltigen Umkreis angezeigt."
@@ -273,7 +281,7 @@ const DE_TRANSLATIONS = Object.freeze({
     title: "Status",
     labels: {
       support: "WebXR",
-      session: "AR aktiv",
+      session: "Modus aktiv",
       tracking: "Tracking",
       surface: "Flaeche",
       stability: "Stabilitaet",
@@ -299,12 +307,16 @@ const DE_TRANSLATIONS = Object.freeze({
   },
   geo: {
     title: "Geolocation",
-    button: "Standort aktivieren",
+    buttons: {
+      location: "Standort aktivieren",
+      calibrate: "Ausrichtung kalibrieren"
+    },
     labels: {
       status: "Status",
       latitude: "Lat",
       longitude: "Lon",
-      accuracy: "Accuracy"
+      accuracy: "Accuracy",
+      heading: "Heading"
     },
     badges: {
       checking: "Pruefung",
@@ -364,10 +376,10 @@ const DE_TRANSLATIONS = Object.freeze({
   },
   mini: {
     session: {
-      active: "AR: Aktiv",
-      checking: "AR: Pruefung",
-      ready: "AR: Bereit",
-      inactive: "AR: Inaktiv"
+      active: "Modus: Aktiv",
+      checking: "Modus: Pruefung",
+      ready: "Modus: Bereit",
+      inactive: "Modus: Inaktiv"
     },
     surface: {
       stable: "Flaeche: Stabil",
@@ -435,12 +447,19 @@ const EN_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Object Placement",
-    intro: "Choose between free placement via a stabilized reticle and geo placement via latitude/longitude.",
+    intro: "Choose between WebXR placement with the stabilized reticle and sensor-based geo rendering using GNSS, IMU and compass.",
+    modeLabel: "Main mode",
+    modeOptions: {
+      xr: "AR (WebXR)",
+      geoSensor: "Geo (Sensor)"
+    },
     buttons: {
-      start: "Start AR",
+      startXR: "Start AR",
+      startGeo: "Start Geo",
       place: "Place object",
       reset: "Reposition",
-      stop: "Stop AR"
+      stopXR: "Stop AR",
+      stopGeo: "Stop Geo"
     }
   },
   welcome: {
@@ -511,7 +530,8 @@ const EN_TRANSLATIONS = Object.freeze({
     longitudeLabel: "Longitude",
     options: {
       free: "Free placement",
-      geo: "Coordinates"
+      geoLocal: "Geo-Local",
+      geoGlobal: "Geo-Global"
     },
     apply: "Apply coordinates",
     feedbackDefault: "In coordinate mode the object is only shown within the valid radius."
@@ -520,7 +540,7 @@ const EN_TRANSLATIONS = Object.freeze({
     title: "Status",
     labels: {
       support: "WebXR",
-      session: "AR active",
+      session: "Mode active",
       tracking: "Tracking",
       surface: "Surface",
       stability: "Stability",
@@ -546,12 +566,16 @@ const EN_TRANSLATIONS = Object.freeze({
   },
   geo: {
     title: "Geolocation",
-    button: "Enable location",
+    buttons: {
+      location: "Enable location",
+      calibrate: "Calibrate heading"
+    },
     labels: {
       status: "Status",
       latitude: "Lat",
       longitude: "Lon",
-      accuracy: "Accuracy"
+      accuracy: "Accuracy",
+      heading: "Heading"
     },
     badges: {
       checking: "Checking",
@@ -611,10 +635,10 @@ const EN_TRANSLATIONS = Object.freeze({
   },
   mini: {
     session: {
-      active: "AR: Active",
-      checking: "AR: Checking",
-      ready: "AR: Ready",
-      inactive: "AR: Inactive"
+      active: "Mode: Active",
+      checking: "Mode: Checking",
+      ready: "Mode: Ready",
+      inactive: "Mode: Inactive"
     },
     surface: {
       stable: "Surface: Stable",
@@ -730,6 +754,25 @@ function createGeoSnapshotDefaults() {
   };
 }
 
+function createSensorSnapshotDefaults() {
+  return {
+    running: false,
+    ready: false,
+    issue: null,
+    message: "",
+    motionPermissionState: "unknown",
+    locationActive: false,
+    position: null,
+    headingDeg: null,
+    pitchDeg: null,
+    rollDeg: null
+  };
+}
+
+function formatHeading(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} deg` : "-";
+}
+
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
@@ -759,6 +802,7 @@ export class UIController {
     this.stopButton = this.document.getElementById("stop-ar-button");
     this.applyGeoTargetButton = this.document.getElementById("apply-geo-target-button");
     this.activateGeoButton = this.document.getElementById("activate-geolocation-button");
+    this.calibrateHeadingButton = this.document.getElementById("calibrate-heading-button");
     this.closeWelcomeButton = this.document.getElementById("close-welcome-button");
     this.closeHelpButton = this.document.getElementById("close-help-button");
     this.closeSurveyButton = this.document.getElementById("close-survey-button");
@@ -769,6 +813,7 @@ export class UIController {
       en: this.document.getElementById("language-en-button")
     };
 
+    this.experienceModeSelect = this.document.getElementById("experience-mode-select");
     this.modeSelect = this.document.getElementById("placement-mode-select");
     this.geoTargetInputs = {
       latitude: this.document.getElementById("geo-target-latitude"),
@@ -781,6 +826,7 @@ export class UIController {
       latitude: this.document.getElementById("geo-latitude"),
       longitude: this.document.getElementById("geo-longitude"),
       accuracy: this.document.getElementById("geo-accuracy"),
+      heading: this.document.getElementById("geo-heading"),
       message: this.document.getElementById("geo-message"),
       help: this.document.getElementById("geo-help")
     };
@@ -861,6 +907,9 @@ export class UIController {
       placementEyebrow: this.document.querySelector("#card-placement .eyebrow"),
       placementTitle: this.document.querySelector("#card-placement h1"),
       placementIntro: this.document.querySelector("#card-placement .panel-intro"),
+      placementModeLabel: this.experienceModeSelect
+        ? this.experienceModeSelect.closest("label")?.querySelector(".field-label")
+        : null,
       welcomeTitle: this.document.getElementById("welcome-card-title"),
       welcomeHeadline: this.document.getElementById("welcome-card-headline"),
       welcomeSubheading: this.document.getElementById("welcome-card-subheading"),
@@ -895,7 +944,8 @@ export class UIController {
         status: this.geoRefs.statusText ? this.geoRefs.statusText.closest(".geo-item")?.querySelector(".geo-label") : null,
         latitude: this.geoRefs.latitude ? this.geoRefs.latitude.closest(".geo-item")?.querySelector(".geo-label") : null,
         longitude: this.geoRefs.longitude ? this.geoRefs.longitude.closest(".geo-item")?.querySelector(".geo-label") : null,
-        accuracy: this.geoRefs.accuracy ? this.geoRefs.accuracy.closest(".geo-item")?.querySelector(".geo-label") : null
+        accuracy: this.geoRefs.accuracy ? this.geoRefs.accuracy.closest(".geo-item")?.querySelector(".geo-label") : null,
+        heading: this.geoRefs.heading ? this.geoRefs.heading.closest(".geo-item")?.querySelector(".geo-label") : null
       },
       debugLabels: {
         originLatitude: this.getDebugLabel(this.geoDebugRefs.originLatitude),
@@ -921,6 +971,7 @@ export class UIController {
       surfaceDetected: false,
       stableSurface: false,
       placed: false,
+      experienceMode: "xr",
       placementMode: "free",
       geoStatus: "not-requested",
       geoWatchActive: false,
@@ -944,6 +995,7 @@ export class UIController {
     };
     this.latestGeoPosition = null;
     this.lastGeoSnapshot = createGeoSnapshotDefaults();
+    this.lastSensorSnapshot = createSensorSnapshotDefaults();
     this.uiInteracting = false;
     this.textInputActive = false;
     this.uiInteractionChangeHandler = null;
@@ -957,9 +1009,11 @@ export class UIController {
     this.applyMenuTabState();
     this.applyAllCardStates();
     this.applyStaticTexts();
+    this.setExperienceMode(this.uiState.experienceMode);
     this.setPlacementMode(this.uiState.placementMode);
     this.renderSystemStates();
     this.renderGeoSnapshot(this.lastGeoSnapshot);
+    this.renderSensorSnapshot(this.lastSensorSnapshot);
     this.setGeoDebug({});
     this.setPlacementDebug({});
     this.syncCanvasPointerEvents();
@@ -1012,7 +1066,9 @@ export class UIController {
     onStopAR,
     onApplyGeoTarget,
     onModeChange,
+    onExperienceModeChange,
     onRequestGeolocation,
+    onCalibrateHeading,
     onUIInteractionChange,
     onTextInputActiveChange
   }) {
@@ -1026,6 +1082,7 @@ export class UIController {
     this.bindButton(this.stopButton, onStopAR);
     this.bindButton(this.applyGeoTargetButton, () => this.handleApplyGeoTarget(onApplyGeoTarget));
     this.bindButton(this.activateGeoButton, onRequestGeolocation);
+    this.bindButton(this.calibrateHeadingButton, onCalibrateHeading);
     this.bindButton(this.closeWelcomeButton, () => this.closeCard("welcome"));
     this.bindButton(this.closeHelpButton, () => this.closeCard("help"));
     this.bindButton(this.closeSurveyButton, () => this.closeCard("survey"));
@@ -1033,6 +1090,7 @@ export class UIController {
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
+    this.bindSelect(this.experienceModeSelect, () => this.handleExperienceModeChange(onExperienceModeChange));
     this.bindSelect(this.modeSelect, () => this.handleModeChange(onModeChange));
 
     this.bindCardToggleButtons();
@@ -1060,6 +1118,21 @@ export class UIController {
 
     const unsubscribe = service.subscribe((snapshot) => {
       this.renderGeoSnapshot(snapshot);
+    });
+
+    this.cleanupCallbacks.push(() => {
+      unsubscribe();
+    });
+  }
+
+  bindSensorFusion(service) {
+    if (!service || typeof service.subscribe !== "function") {
+      this.renderSensorSnapshot(createSensorSnapshotDefaults());
+      return;
+    }
+
+    const unsubscribe = service.subscribe((snapshot) => {
+      this.renderSensorSnapshot(snapshot);
     });
 
     this.cleanupCallbacks.push(() => {
@@ -1496,10 +1569,9 @@ export class UIController {
     this.setElementText(this.staticRefs.placementEyebrow, text.placement.eyebrow);
     this.setElementText(this.staticRefs.placementTitle, text.placement.title);
     this.setElementText(this.staticRefs.placementIntro, text.placement.intro);
-    this.setElementText(this.startButton, text.placement.buttons.start);
+    this.setElementText(this.staticRefs.placementModeLabel, text.placement.modeLabel);
     this.setElementText(this.placeButton, text.placement.buttons.place);
     this.setElementText(this.resetButton, text.placement.buttons.reset);
-    this.setElementText(this.stopButton, text.placement.buttons.stop);
 
     this.setElementText(this.staticRefs.welcomeTitle, text.welcome.title);
     this.setElementText(this.staticRefs.welcomeHeadline, text.welcome.headline);
@@ -1540,11 +1612,13 @@ export class UIController {
 
     this.setElementText(this.staticRefs.noteTitle, text.note.title);
     this.setElementText(this.staticRefs.geoTitle, text.geo.title);
-    this.setElementText(this.activateGeoButton, text.geo.button);
+    this.setElementText(this.activateGeoButton, text.geo.buttons.location);
+    this.setElementText(this.calibrateHeadingButton, text.geo.buttons.calibrate);
     this.setElementText(this.staticRefs.geoLabels.status, text.geo.labels.status);
     this.setElementText(this.staticRefs.geoLabels.latitude, text.geo.labels.latitude);
     this.setElementText(this.staticRefs.geoLabels.longitude, text.geo.labels.longitude);
     this.setElementText(this.staticRefs.geoLabels.accuracy, text.geo.labels.accuracy);
+    this.setElementText(this.staticRefs.geoLabels.heading, text.geo.labels.heading);
 
     this.setElementText(this.staticRefs.debugTitle, text.debug.title);
     this.setElementText(this.staticRefs.debugTag, text.debug.tag);
@@ -1562,13 +1636,26 @@ export class UIController {
     this.setElementText(this.staticRefs.debugLabels.hasStableSurface, text.debug.labels.hasStableSurface);
     this.setElementText(this.staticRefs.debugLabels.objectBehindCamera, text.debug.labels.objectBehindCamera);
 
+    if (this.experienceModeSelect) {
+      const [xrOption, geoSensorOption] = this.experienceModeSelect.options;
+      if (xrOption) {
+        xrOption.textContent = text.placement.modeOptions.xr;
+      }
+      if (geoSensorOption) {
+        geoSensorOption.textContent = text.placement.modeOptions.geoSensor;
+      }
+    }
+
     if (this.modeSelect) {
-      const [freeOption, geoOption] = this.modeSelect.options;
+      const [freeOption, geoLocalOption, geoGlobalOption] = this.modeSelect.options;
       if (freeOption) {
         freeOption.textContent = text.coord.options.free;
       }
-      if (geoOption) {
-        geoOption.textContent = text.coord.options.geo;
+      if (geoLocalOption) {
+        geoLocalOption.textContent = text.coord.options.geoLocal;
+      }
+      if (geoGlobalOption) {
+        geoGlobalOption.textContent = text.coord.options.geoGlobal;
       }
     }
 
@@ -1591,6 +1678,7 @@ export class UIController {
     }
 
     this.updateLanguageButtons();
+    this.renderExperienceModeUI();
     this.renderPlacementModeUI();
     this.renderSystemStates();
     this.renderMessageText();
@@ -1598,6 +1686,7 @@ export class UIController {
     this.renderGeoTargetFeedback();
     this.renderAssetLabel();
     this.renderGeoSnapshot(this.lastGeoSnapshot);
+    this.renderSensorSnapshot(this.lastSensorSnapshot);
   }
 
   updateLanguageButtons() {
@@ -1670,17 +1759,54 @@ export class UIController {
     );
   }
 
+  renderExperienceModeUI() {
+    const text = this.getText();
+    const experienceMode = this.uiState.experienceMode === "geo-sensor" ? "geo-sensor" : "xr";
+
+    if (this.experienceModeSelect) {
+      this.experienceModeSelect.value = experienceMode;
+    }
+
+    if (this.startButton) {
+      this.startButton.textContent =
+        experienceMode === "geo-sensor" ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
+    }
+
+    if (this.stopButton) {
+      this.stopButton.textContent =
+        experienceMode === "geo-sensor" ? text.placement.buttons.stopGeo : text.placement.buttons.stopXR;
+    }
+  }
+
   renderPlacementModeUI() {
     const text = this.getText();
-    const mode = this.uiState.placementMode === "geo" ? "geo" : "free";
+    const mode =
+      this.uiState.placementMode === "geo-local"
+        ? "geo-local"
+        : this.uiState.placementMode === "geo-global"
+          ? "geo-global"
+          : "free";
 
     if (this.modeSelect) {
       this.modeSelect.value = mode;
     }
 
     if (this.modeBadgeEl) {
-      this.modeBadgeEl.textContent = text.coord.options[mode];
+      const badgeText =
+        mode === "geo-local"
+          ? text.coord.options.geoLocal
+          : mode === "geo-global"
+            ? text.coord.options.geoGlobal
+            : text.coord.options.free;
+      this.modeBadgeEl.textContent = badgeText;
     }
+  }
+
+  setExperienceMode(mode) {
+    this.uiState.experienceMode = mode === "geo-sensor" ? "geo-sensor" : "xr";
+    this.renderExperienceModeUI();
+    this.renderGeoSnapshot(this.lastGeoSnapshot);
+    this.refreshButtons();
   }
 
   setAssetLabel(label) {
@@ -1717,7 +1843,8 @@ export class UIController {
   }
 
   setPlacementMode(mode) {
-    this.uiState.placementMode = mode === "geo" ? "geo" : "free";
+    this.uiState.placementMode =
+      mode === "geo-local" ? "geo-local" : mode === "geo-global" ? "geo-global" : "free";
     this.renderPlacementModeUI();
     this.refreshButtons();
   }
@@ -1791,6 +1918,18 @@ export class UIController {
 
     this.setGeoTargetInputs(parsedCoord);
     this.setGeoTargetFeedback("Koordinaten uebernommen. Sie greifen bei der naechsten Platzierung.");
+  }
+
+  handleExperienceModeChange(handler) {
+    const nextMode = this.experienceModeSelect ? this.experienceModeSelect.value : "xr";
+    const accepted = typeof handler === "function" ? handler(nextMode) : false;
+
+    if (accepted === false) {
+      this.setExperienceMode(this.uiState.experienceMode);
+      return;
+    }
+
+    this.setExperienceMode(nextMode);
   }
 
   handleModeChange(handler) {
@@ -1911,11 +2050,15 @@ export class UIController {
 
   refreshButtons() {
     if (this.startButton) {
-      this.startButton.disabled = !this.uiState.supportAvailable || this.uiState.sessionActive;
+      this.startButton.disabled =
+        this.uiState.experienceMode === "geo-sensor"
+          ? this.uiState.sessionActive
+          : !this.uiState.supportAvailable || this.uiState.sessionActive;
     }
 
     if (this.placeButton) {
       this.placeButton.disabled =
+        this.uiState.experienceMode !== "xr" ||
         this.uiState.placementMode !== "free" ||
         !this.uiState.sessionActive ||
         !this.uiState.stableSurface ||
@@ -1923,7 +2066,8 @@ export class UIController {
     }
 
     if (this.resetButton) {
-      this.resetButton.disabled = !this.uiState.sessionActive && !this.uiState.placed;
+      this.resetButton.disabled =
+        this.uiState.experienceMode === "geo-sensor" || (!this.uiState.sessionActive && !this.uiState.placed);
     }
 
     if (this.stopButton) {
@@ -1934,20 +2078,30 @@ export class UIController {
   refreshMiniSummary() {
     const text = this.getText();
 
-    const sessionText = this.uiState.sessionActive
-      ? text.mini.session.active
-      : this.uiState.supportAvailable === null
-        ? text.mini.session.checking
-        : this.uiState.supportAvailable
-          ? text.mini.session.ready
-          : text.mini.session.inactive;
-    const sessionStatus = this.uiState.sessionActive
-      ? "active"
-      : this.uiState.supportAvailable === null
-        ? "idle"
-        : this.uiState.supportAvailable
-          ? "ok"
-          : "error";
+    const sessionText =
+      this.uiState.experienceMode === "geo-sensor"
+        ? this.uiState.sessionActive
+          ? text.mini.session.active
+          : text.mini.session.ready
+        : this.uiState.sessionActive
+          ? text.mini.session.active
+          : this.uiState.supportAvailable === null
+            ? text.mini.session.checking
+            : this.uiState.supportAvailable
+              ? text.mini.session.ready
+              : text.mini.session.inactive;
+    const sessionStatus =
+      this.uiState.experienceMode === "geo-sensor"
+        ? this.uiState.sessionActive
+          ? "active"
+          : "ok"
+        : this.uiState.sessionActive
+          ? "active"
+          : this.uiState.supportAvailable === null
+            ? "idle"
+            : this.uiState.supportAvailable
+              ? "ok"
+              : "error";
 
     const surfaceText = this.uiState.stableSurface
       ? text.mini.surface.stable
@@ -1984,55 +2138,105 @@ export class UIController {
       ...(snapshot || {})
     };
 
-    const text = this.getText();
-    const position = this.lastGeoSnapshot.position ? this.lastGeoSnapshot.position : null;
-    const severity = toGeoSeverity(this.lastGeoSnapshot);
+    this.renderGeoPanel();
+  }
 
-    this.uiState.geoStatus = this.lastGeoSnapshot.status || "not-requested";
-    this.uiState.geoWatchActive = Boolean(this.lastGeoSnapshot.watchActive);
-    this.latestGeoPosition = position
+  renderSensorSnapshot(snapshot) {
+    this.lastSensorSnapshot = {
+      ...createSensorSnapshotDefaults(),
+      ...(snapshot || {})
+    };
+
+    this.renderGeoPanel();
+  }
+
+  renderGeoPanel() {
+    const text = this.getText();
+    const usesSensorData = this.uiState.experienceMode === "geo-sensor" || this.lastSensorSnapshot.running;
+    const geoPosition = this.lastGeoSnapshot.position ? this.lastGeoSnapshot.position : null;
+    const sensorPosition = this.lastSensorSnapshot.position ? this.lastSensorSnapshot.position : null;
+    const mergedPosition = usesSensorData
+      ? sensorPosition
+        ? {
+            latitude: sensorPosition.lat,
+            longitude: sensorPosition.lon,
+            accuracyMeters: sensorPosition.accuracyMeters
+          }
+        : null
+      : geoPosition;
+    const severity = usesSensorData ? this.getSensorSeverity(this.lastSensorSnapshot) : toGeoSeverity(this.lastGeoSnapshot);
+
+    this.uiState.geoStatus = usesSensorData
+      ? this.lastSensorSnapshot.ready
+        ? "granted"
+        : this.lastSensorSnapshot.running
+          ? "waiting"
+          : "not-requested"
+      : this.lastGeoSnapshot.status || "not-requested";
+    this.uiState.geoWatchActive = usesSensorData
+      ? Boolean(this.lastSensorSnapshot.running)
+      : Boolean(this.lastGeoSnapshot.watchActive);
+    this.latestGeoPosition = mergedPosition
       ? {
-          latitude: position.latitude,
-          longitude: position.longitude
+          latitude: mergedPosition.latitude,
+          longitude: mergedPosition.longitude
         }
       : null;
 
     if (this.geoRefs.statusBadge) {
-      this.geoRefs.statusBadge.textContent = this.getGeoBadgeLabel(this.lastGeoSnapshot, text);
+      this.geoRefs.statusBadge.textContent = usesSensorData
+        ? this.getSensorBadgeLabel(this.lastSensorSnapshot, text)
+        : this.getGeoBadgeLabel(this.lastGeoSnapshot, text);
       this.geoRefs.statusBadge.dataset.status = severity;
     }
 
     if (this.geoRefs.statusText) {
-      this.geoRefs.statusText.textContent = this.getGeoStatusText(this.lastGeoSnapshot, text);
+      this.geoRefs.statusText.textContent = usesSensorData
+        ? this.getSensorStatusText(this.lastSensorSnapshot, text)
+        : this.getGeoStatusText(this.lastGeoSnapshot, text);
     }
 
     if (this.geoRefs.latitude) {
-      this.geoRefs.latitude.textContent = position ? position.latitude.toFixed(6) : "-";
+      this.geoRefs.latitude.textContent = mergedPosition ? mergedPosition.latitude.toFixed(6) : "-";
     }
 
     if (this.geoRefs.longitude) {
-      this.geoRefs.longitude.textContent = position ? position.longitude.toFixed(6) : "-";
+      this.geoRefs.longitude.textContent = mergedPosition ? mergedPosition.longitude.toFixed(6) : "-";
     }
 
     if (this.geoRefs.accuracy) {
-      this.geoRefs.accuracy.textContent = position ? `+/- ${Math.round(position.accuracyMeters)} m` : "-";
+      this.geoRefs.accuracy.textContent = mergedPosition ? `+/- ${Math.round(mergedPosition.accuracyMeters)} m` : "-";
+    }
+
+    if (this.geoRefs.heading) {
+      this.geoRefs.heading.textContent = usesSensorData ? formatHeading(this.lastSensorSnapshot.headingDeg) : "-";
     }
 
     if (this.geoRefs.message) {
-      this.geoRefs.message.textContent = this.getGeoMessage(this.lastGeoSnapshot, text);
+      this.geoRefs.message.textContent = usesSensorData
+        ? this.getSensorMessage(this.lastSensorSnapshot, text)
+        : this.getGeoMessage(this.lastGeoSnapshot, text);
     }
 
     if (this.geoRefs.help) {
-      const helpText = this.getGeoHelp(this.lastGeoSnapshot, text);
+      const helpText = usesSensorData
+        ? this.getSensorHelp(this.lastSensorSnapshot, text)
+        : this.getGeoHelp(this.lastGeoSnapshot, text);
       this.geoRefs.help.textContent = helpText;
       this.geoRefs.help.hidden = !helpText;
     }
 
     if (this.activateGeoButton) {
-      this.activateGeoButton.disabled =
-        this.uiState.geoStatus === "waiting" ||
-        this.uiState.geoWatchActive ||
-        (this.lastGeoSnapshot.issue === "https-required" || this.lastGeoSnapshot.issue === "unsupported");
+      this.activateGeoButton.disabled = usesSensorData
+        ? Boolean(this.lastSensorSnapshot.running)
+        : this.uiState.geoStatus === "waiting" ||
+          this.uiState.geoWatchActive ||
+          (this.lastGeoSnapshot.issue === "https-required" || this.lastGeoSnapshot.issue === "unsupported");
+    }
+
+    if (this.calibrateHeadingButton) {
+      this.calibrateHeadingButton.disabled =
+        !usesSensorData || !this.lastSensorSnapshot.running || !Number.isFinite(this.lastSensorSnapshot.headingDeg);
     }
   }
 
@@ -2148,6 +2352,98 @@ export class UIController {
     }
 
     return text.geo.help.none;
+  }
+
+  getSensorSeverity(snapshot) {
+    if (!snapshot) {
+      return "idle";
+    }
+
+    if (snapshot.issue) {
+      return "error";
+    }
+
+    if (snapshot.ready) {
+      return "ok";
+    }
+
+    if (snapshot.running) {
+      return "warning";
+    }
+
+    return "idle";
+  }
+
+  getSensorBadgeLabel(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.badges.checking;
+    }
+
+    if (snapshot.issue === "https-required") {
+      return text.geo.badges.https;
+    }
+
+    if (snapshot.issue === "geolocation-unsupported" || snapshot.issue === "orientation-unsupported") {
+      return text.geo.badges.unsupported;
+    }
+
+    if (snapshot.ready) {
+      return text.geo.badges.granted;
+    }
+
+    if (snapshot.running) {
+      return text.geo.badges.waiting;
+    }
+
+    return text.geo.badges.ready;
+  }
+
+  getSensorStatusText(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.statusTexts.notRequested;
+    }
+
+    if (snapshot.ready) {
+      return text.geo.statusTexts.granted;
+    }
+
+    if (snapshot.running) {
+      return text.geo.statusTexts.waiting;
+    }
+
+    if (snapshot.issue) {
+      return text.geo.statusTexts.denied;
+    }
+
+    return text.geo.statusTexts.notRequested;
+  }
+
+  getSensorMessage(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.messages.notRequested;
+    }
+
+    return snapshot.message || text.geo.messages.notRequested;
+  }
+
+  getSensorHelp(snapshot, text) {
+    if (!snapshot) {
+      return text.geo.help.notRequested;
+    }
+
+    switch (snapshot.issue) {
+      case "https-required":
+        return text.geo.help.httpsRequired;
+      case "orientation-denied":
+      case "geolocation-denied":
+        return text.geo.help.denied;
+      case "geolocation-unavailable":
+        return text.geo.help.positionUnavailable;
+      case "geolocation-timeout":
+        return text.geo.help.timeout;
+      default:
+        return text.geo.help.none;
+    }
   }
 
   setGeoDebug(debug) {

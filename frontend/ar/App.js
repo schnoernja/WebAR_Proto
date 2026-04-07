@@ -6,6 +6,36 @@ import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js";
 import { UIController } from "./UIController.js";
 import { GeoLocationService } from "./GeoLocationService.js";
+import { SiteLoader } from "./geo/SiteLoader.js";
+import { SensorFusion } from "./geo/SensorFusion.js";
+import { GeoSceneManager } from "./geo/GeoSceneManager.js";
+
+const ExperienceMode = Object.freeze({
+  XR: "xr",
+  GEO_SENSOR: "geo-sensor"
+});
+
+const PlacementUIModel = Object.freeze({
+  FREE: "free",
+  GEO_LOCAL: "geo-local",
+  GEO_GLOBAL: "geo-global"
+});
+
+function normalizeExperienceMode(mode) {
+  return mode === ExperienceMode.GEO_SENSOR ? ExperienceMode.GEO_SENSOR : ExperienceMode.XR;
+}
+
+function normalizePlacementUiMode(mode) {
+  if (mode === PlacementUIModel.GEO_LOCAL || mode === PlacementUIModel.GEO_GLOBAL) {
+    return mode;
+  }
+
+  return PlacementUIModel.FREE;
+}
+
+function mapPlacementUiModeToControllerMode(mode) {
+  return mode === PlacementUIModel.GEO_LOCAL ? PlacementMode.GEO : PlacementMode.FREE;
+}
 
 function toMessage(error, fallbackMessage = "unbekannter Fehler") {
   if (error instanceof Error && error.message) {
@@ -31,17 +61,28 @@ function buildCameraState(viewerPose) {
     return null;
   }
 
-  const position = new THREE.Vector3(
-    viewerPose.transform.position.x,
-    viewerPose.transform.position.y,
-    viewerPose.transform.position.z
-  );
-  const orientation = new THREE.Quaternion(
-    viewerPose.transform.orientation.x,
-    viewerPose.transform.orientation.y,
-    viewerPose.transform.orientation.z,
-    viewerPose.transform.orientation.w
-  );
+  return buildCameraStateFromPose({
+    position: new THREE.Vector3(
+      viewerPose.transform.position.x,
+      viewerPose.transform.position.y,
+      viewerPose.transform.position.z
+    ),
+    quaternion: new THREE.Quaternion(
+      viewerPose.transform.orientation.x,
+      viewerPose.transform.orientation.y,
+      viewerPose.transform.orientation.z,
+      viewerPose.transform.orientation.w
+    )
+  });
+}
+
+function buildCameraStateFromPose(pose) {
+  if (!pose || !pose.position || !pose.quaternion) {
+    return null;
+  }
+
+  const position = pose.position.clone();
+  const orientation = pose.quaternion.clone();
   const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(orientation).normalize();
 
   return {
@@ -58,15 +99,25 @@ export class ARApp {
     this.sceneManager = new SceneManager({
       container: this.container
     });
+    this.geoSceneManager = new GeoSceneManager({
+      scene: this.sceneManager.getScene()
+    });
     this.hitTestManager = new HitTestManager();
     this.poseStabilizer = new PoseStabilizer();
     this.geoLocationService = new GeoLocationService();
+    this.siteLoader = new SiteLoader();
+    this.sensorFusion = new SensorFusion();
     this.placementController = null;
     this.arSessionManager = null;
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
     this.isUIInteracting = false;
     this.isTextInputActive = false;
+    this.siteConfig = null;
+    this.selectedExperienceMode = ExperienceMode.XR;
+    this.selectedPlacementMode = PlacementUIModel.FREE;
+    this.lastXRPlacementMode = PlacementUIModel.FREE;
+    this.geoSensorActive = false;
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -75,6 +126,7 @@ export class ARApp {
 
   async init() {
     await this.sceneManager.initialize();
+    await this.loadSiteConfiguration();
 
     this.placementController = new PlacementController({
       scene: this.sceneManager.getScene()
@@ -84,9 +136,11 @@ export class ARApp {
     this.placementController.setAsset(assetInfo.object);
 
     this.ui.setAssetLabel(assetInfo.label);
-    this.ui.setPlacementMode(this.placementController.getMode());
+    this.ui.setExperienceMode(this.selectedExperienceMode);
+    this.ui.setPlacementMode(this.selectedPlacementMode);
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
+    this.ui.bindSensorFusion(this.sensorFusion);
 
     if (assetInfo.usedPlaceholder) {
       this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
@@ -102,13 +156,15 @@ export class ARApp {
     });
 
     this.ui.bindActions({
-      onStartAR: () => this.startAR(),
+      onStartAR: () => this.startSelectedExperience(),
       onPlace: () => this.placeFreeObject(),
       onResetPlacement: () => this.resetPlacement(),
-      onStopAR: () => this.stopAR(),
+      onStopAR: () => this.stopActiveExperience(),
       onApplyGeoTarget: (coord) => this.applyGeoTarget(coord),
       onModeChange: (mode) => this.applyPlacementMode(mode),
+      onExperienceModeChange: (mode) => this.applyExperienceMode(mode),
       onRequestGeolocation: () => this.requestGeoLocation(),
+      onCalibrateHeading: () => this.calibrateGeoHeading(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
@@ -122,10 +178,144 @@ export class ARApp {
     this.syncDebugPanels();
     this.syncCanvasPointerState();
 
+    if (this.siteConfig) {
+      this.ui.setMessage(`Site '${this.siteConfig.id}' geladen.`);
+      this.ui.setHint("Geo (Sensor) ist vorausgewaehlt. Starte den Modus, um die Site-Szene direkt ueber der Kamera zu sehen.");
+    }
+
     this.sceneManager.setAnimationLoop(this.handleFrame);
   }
 
+  async loadSiteConfiguration() {
+    try {
+      this.siteConfig = await this.siteLoader.loadFromQuery();
+    } catch (error) {
+      this.siteConfig = null;
+      this.ui.setMessage(`Site-Laden fehlgeschlagen: ${toMessage(error)}`);
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. Geo-Global-Modus ist ohne gueltige Site-Konfiguration nicht verfuegbar.");
+      return;
+    }
+
+    if (!this.siteConfig) {
+      return;
+    }
+
+    try {
+      await this.geoSceneManager.loadSite(this.siteConfig);
+      this.selectedExperienceMode = ExperienceMode.GEO_SENSOR;
+      this.selectedPlacementMode = PlacementUIModel.GEO_GLOBAL;
+    } catch (error) {
+      this.siteConfig = null;
+      this.ui.setMessage(`Site-Szene konnte nicht geladen werden: ${toMessage(error)}`);
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. Geo-Global-Modus bleibt deaktiviert.");
+    }
+  }
+
+  async startSelectedExperience() {
+    if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
+      return false;
+    }
+
+    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
+      return this.startGeoSensorMode();
+    }
+
+    return this.startAR();
+  }
+
+  async stopActiveExperience() {
+    if (this.geoSensorActive) {
+      return this.stopGeoSensorMode();
+    }
+
+    return this.stopAR();
+  }
+
+  syncPresentationVisibility() {
+    const showGeoGlobalScene = this.geoSensorActive && this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL;
+    this.geoSceneManager.setVisible(showGeoGlobalScene);
+
+    if (this.placementController) {
+      this.placementController.setPresentationVisible(!showGeoGlobalScene);
+    }
+  }
+
+  async startGeoSensorMode() {
+    if (!this.siteConfig) {
+      this.ui.setMessage("Geo-Sensor-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+      this.ui.setHint("Oeffne die App mit einem gueltigen ?site=... Parameter.");
+      return false;
+    }
+
+    if (this.arSessionManager && this.arSessionManager.isActive()) {
+      this.ui.setMessage("WebXR laeuft bereits. Beende zuerst den AR-Modus.");
+      return false;
+    }
+
+    this.lastFrameTimeMs = 0;
+    this.activeSurfaceState = null;
+    this.ui.setMessage("Starte Geo-Sensor-Modus...");
+
+    try {
+      await this.sceneManager.startCameraVideo();
+    } catch (error) {
+      this.ui.setSessionState(false, `Kamera-Start fehlgeschlagen: ${toMessage(error)}`);
+      this.ui.setHint("Geo-Sensor-Modus benoetigt Kamerazugriff.");
+      return false;
+    }
+
+    const started = await this.sensorFusion.start({
+      origin: this.siteConfig.origin
+    });
+
+    if (!started) {
+      this.sceneManager.stopCameraVideo();
+      const sensorSnapshot = this.sensorFusion.getSnapshot();
+      this.ui.setSessionState(false, sensorSnapshot.message);
+      this.ui.setHint("Geo-Sensor-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.");
+      return false;
+    }
+
+    this.geoSensorActive = true;
+    this.sceneManager.setGeoMode(true);
+    this.syncPresentationVisibility();
+    this.ui.setSessionState(true, `Geo-Sensor-Modus aktiv. Site '${this.siteConfig.id}' geladen.`);
+    this.ui.setTrackingState(false);
+    this.ui.setSurfaceState(false, false);
+    this.ui.setPlacementState(false);
+    this.syncDebugPanels();
+    this.syncCanvasPointerState();
+    this.ui.setHint("Geo-Sensor-Modus aktiv. Warte auf GPS und Heading; danach folgt die Szene deiner ENU-Position.");
+    return true;
+  }
+
+  async stopGeoSensorMode() {
+    if (!this.geoSensorActive) {
+      return false;
+    }
+
+    this.lastFrameTimeMs = 0;
+    this.geoSensorActive = false;
+    this.sensorFusion.stop();
+    this.sceneManager.stopCameraVideo();
+    this.sceneManager.setGeoMode(false);
+    this.sceneManager.resetFallbackView();
+    this.syncPresentationVisibility();
+    this.ui.setSessionState(false, "Geo-Sensor-Modus beendet. Fallback-3D-Ansicht aktiv.");
+    this.ui.setTrackingState(false);
+    this.ui.setSurfaceState(false, false);
+    this.ui.setPlacementState(false);
+    this.syncDebugPanels();
+    this.ui.setHint("Fallback-3D-Ansicht aktiv. Geo-Sensor-Modus kann jederzeit erneut gestartet werden.");
+    return true;
+  }
+
   async startAR() {
+    if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
+      this.ui.setMessage("Geo-Global-Modus nutzt den Sensor-Pfad. Waehle 'Geo (Sensor)' und starte diesen Modus.");
+      return false;
+    }
+
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
     this.ui.setMessage("Starte immersive AR...");
@@ -158,8 +348,10 @@ export class ARApp {
     this.placementController.clearGeoOrigin();
     this.placementController.enterARMode();
     this.placementController.setTextInputActive(this.isTextInputActive);
+    this.placementController.setMode(mapPlacementUiModeToControllerMode(this.selectedPlacementMode));
     this.captureGeoOriginFromDevice();
     this.sceneManager.setARMode(true);
+    this.syncPresentationVisibility();
     this.ui.setSessionState(true, result.message);
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
@@ -169,10 +361,11 @@ export class ARApp {
 
     if (this.placementController.getMode() === PlacementMode.GEO && !this.placementController.hasGeoOrigin()) {
       this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.");
-      return;
+      return true;
     }
 
     this.ui.setHint("Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.");
+    return true;
   }
 
   async stopAR() {
@@ -186,6 +379,7 @@ export class ARApp {
     this.poseStabilizer.reset();
     this.sceneManager.setARMode(false);
     this.placementController.exitARMode();
+    this.syncPresentationVisibility();
     this.handleTextInputActiveChange(false);
     this.ui.setSessionState(false, "AR beendet. Fallback-3D-Ansicht aktiv.");
     this.ui.setTrackingState(false);
@@ -238,9 +432,28 @@ export class ARApp {
       this.ui.setPlacementState(this.placementController.isPlaced());
       this.syncDebugPanels(surfaceState, cameraState);
       this.updateInteractionHint(surfaceState, tracking, cameraState);
+    } else if (this.geoSensorActive) {
+      this.updateGeoSensorFrame(deltaSeconds);
     }
 
     this.sceneManager.render();
+  }
+
+  updateGeoSensorFrame(deltaSeconds) {
+    const pose = this.sensorFusion.update(deltaSeconds);
+    const sensorSnapshot = this.sensorFusion.getSnapshot();
+    const cameraState = buildCameraStateFromPose(pose);
+    const tracking = Boolean(pose);
+
+    if (pose) {
+      this.sceneManager.setGeoCameraPose(pose);
+    }
+
+    this.ui.setTrackingState(tracking);
+    this.ui.setSurfaceState(false, false);
+    this.ui.setPlacementState(Boolean(sensorSnapshot.ready));
+    this.syncDebugPanels(null, cameraState, sensorSnapshot);
+    this.updateInteractionHint(null, tracking, cameraState, sensorSnapshot);
   }
 
   handleSelect() {
@@ -254,20 +467,86 @@ export class ARApp {
   }
 
   applyPlacementMode(mode) {
-    const accepted = this.placementController.setMode(mode);
-    if (!accepted) {
+    const normalizedMode = normalizePlacementUiMode(mode);
+    if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
+      this.ui.setMessage("Moduswechsel ist nur moeglich, wenn kein AR- oder Geo-Sensor-Modus laeuft.");
+      return false;
+    }
+
+    if (normalizedMode === PlacementUIModel.GEO_GLOBAL && !this.siteConfig) {
+      this.ui.setMessage("Geo-Global-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+      return false;
+    }
+
+    this.selectedPlacementMode = normalizedMode;
+
+    if (normalizedMode === PlacementUIModel.GEO_GLOBAL) {
+      this.selectedExperienceMode = ExperienceMode.GEO_SENSOR;
+    } else {
+      this.selectedExperienceMode = ExperienceMode.XR;
+      this.lastXRPlacementMode = normalizedMode;
+    }
+
+    const controllerAccepted =
+      normalizedMode === PlacementUIModel.GEO_GLOBAL
+        ? true
+        : this.placementController.setMode(mapPlacementUiModeToControllerMode(normalizedMode));
+
+    if (!controllerAccepted) {
       this.ui.setMessage("Platzierungsmodus konnte nicht gewechselt werden.");
       return false;
     }
 
-    this.ui.setPlacementMode(this.placementController.getMode());
+    this.ui.setExperienceMode(this.selectedExperienceMode);
+    this.ui.setPlacementMode(this.selectedPlacementMode);
 
     if (this.placementController.isPlaced()) {
       this.ui.setHint("Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.");
-    } else if (this.placementController.getMode() === PlacementMode.GEO) {
+    } else if (normalizedMode === PlacementUIModel.GEO_LOCAL) {
       this.ui.setHint("Koordinaten-Modus aktiv. Bei stabiler Flaeche wird das Objekt relativ zur Geo-Position gesetzt.");
+    } else if (normalizedMode === PlacementUIModel.GEO_GLOBAL) {
+      this.ui.setHint("Geo-Global-Modus aktiv. Beim Start werden GNSS, IMU und Kompass fuer die Szene genutzt.");
     } else {
       this.ui.setHint("Freie Platzierung aktiv. Sobald das Reticle stabil ist, kannst du das Objekt setzen.");
+    }
+
+    return true;
+  }
+
+  applyExperienceMode(mode) {
+    const normalizedMode = normalizeExperienceMode(mode);
+    if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
+      this.ui.setMessage("Hauptmodus kann nur gewechselt werden, wenn kein laufender Modus aktiv ist.");
+      return false;
+    }
+
+    if (normalizedMode === ExperienceMode.GEO_SENSOR && !this.siteConfig) {
+      this.ui.setMessage("Geo (Sensor) ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+      return false;
+    }
+
+    this.selectedExperienceMode = normalizedMode;
+
+    if (normalizedMode === ExperienceMode.GEO_SENSOR) {
+      this.selectedPlacementMode = PlacementUIModel.GEO_GLOBAL;
+    } else if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
+      this.selectedPlacementMode = this.lastXRPlacementMode;
+      this.placementController.setMode(mapPlacementUiModeToControllerMode(this.selectedPlacementMode));
+    }
+
+    if (this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+      this.placementController.setMode(mapPlacementUiModeToControllerMode(this.selectedPlacementMode));
+    }
+
+    this.ui.setExperienceMode(this.selectedExperienceMode);
+    this.ui.setPlacementMode(this.selectedPlacementMode);
+
+    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
+      this.ui.setHint("Geo (Sensor) ausgewaehlt. Beim Start wird die Site-Szene per GNSS/IMU ueber das Kamerabild gelegt.");
+    } else if (this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL) {
+      this.ui.setHint("AR (WebXR) ausgewaehlt. Geo-Local nutzt weiter die bestehende Hit-Test- und Stabilizer-Kette.");
+    } else {
+      this.ui.setHint("AR (WebXR) ausgewaehlt. Freie Platzierung bleibt unveraendert.");
     }
 
     return true;
@@ -303,6 +582,18 @@ export class ARApp {
 
   requestGeoLocation() {
     return this.geoLocationService.requestPermissionAndStart();
+  }
+
+  calibrateGeoHeading() {
+    const calibrated = this.sensorFusion.calibrateHeading();
+    if (!calibrated) {
+      this.ui.setMessage("Kalibrierung ist erst moeglich, sobald ein Heading verfuegbar ist.");
+      return false;
+    }
+
+    this.ui.setMessage("Ausrichtung kalibriert.");
+    this.ui.setHint("Kompass-Referenz gespeichert. Die Geo-Szene bleibt relativ zu dieser Ausrichtung stabil.");
+    return true;
   }
 
   placeFreeObject(source = "ui") {
@@ -403,8 +694,28 @@ export class ARApp {
     this.sceneManager.setCanvasPointerEvents(this.isTextInputActive ? "none" : "auto");
   }
 
-  syncDebugPanels(surfaceState = null, cameraState = null) {
+  syncDebugPanels(surfaceState = null, cameraState = null, geoSensorSnapshot = null) {
     if (!this.placementController) {
+      return;
+    }
+
+    if (this.geoSensorActive) {
+      const enuPosition = geoSensorSnapshot && geoSensorSnapshot.enuPosition ? geoSensorSnapshot.enuPosition : null;
+      this.ui.setGeoDebug({
+        originLatitude: this.siteConfig ? this.siteConfig.origin.lat : null,
+        originLongitude: this.siteConfig ? this.siteConfig.origin.lon : null,
+        targetLatitude: geoSensorSnapshot && geoSensorSnapshot.position ? geoSensorSnapshot.position.lat : null,
+        targetLongitude: geoSensorSnapshot && geoSensorSnapshot.position ? geoSensorSnapshot.position.lon : null,
+        xMeters: enuPosition ? enuPosition.e : null,
+        zMeters: enuPosition ? enuPosition.n : null,
+        distanceMeters: enuPosition ? Math.hypot(enuPosition.e, enuPosition.n) : null
+      });
+      this.ui.setPlacementDebug({
+        objectPlaced: Boolean(geoSensorSnapshot && geoSensorSnapshot.ready),
+        distanceOverLimit: false,
+        hasStableSurface: Boolean(geoSensorSnapshot && geoSensorSnapshot.ready),
+        objectBehindCamera: false
+      });
       return;
     }
 
@@ -417,7 +728,37 @@ export class ARApp {
     );
   }
 
-  updateInteractionHint(surfaceState, tracking, cameraState) {
+  updateInteractionHint(surfaceState, tracking, cameraState, geoSensorSnapshot = null) {
+    if (this.geoSensorActive) {
+      if (!this.siteConfig) {
+        this.ui.setHint("Keine Site geladen. Geo-Sensor-Modus benoetigt einen QR-Link mit ?site=...");
+        return;
+      }
+
+      if (geoSensorSnapshot && geoSensorSnapshot.issue) {
+        this.ui.setHint(geoSensorSnapshot.message || "Geo-Sensor-Daten sind aktuell nicht verfuegbar.");
+        return;
+      }
+
+      if (!geoSensorSnapshot || !geoSensorSnapshot.position) {
+        this.ui.setHint("Warte auf GPS-Fix fuer die ENU-Position.");
+        return;
+      }
+
+      if (!Number.isFinite(geoSensorSnapshot.headingDeg)) {
+        this.ui.setHint("Warte auf Kompass/IMU. Halte das Geraet kurz ruhig und kalibriere bei Bedarf.");
+        return;
+      }
+
+      if (!tracking) {
+        this.ui.setHint("Sensoren laufen, die Pose wird noch geglaettet.");
+        return;
+      }
+
+      this.ui.setHint("Geo-Sensor-Modus aktiv. Szene und Marker folgen jetzt stabil deiner ENU-Position.");
+      return;
+    }
+
     const geoDebug = this.placementController.getGeoDebugSnapshot();
     const placementDebug = this.placementController.getPlacementDebugSnapshot({
       hasStableSurface: Boolean(surfaceState && surfaceState.isStable),
@@ -499,6 +840,12 @@ export class ARApp {
   }
 
   resetPlacement() {
+    if (this.geoSensorActive) {
+      this.ui.setMessage("Geo-Sensor-Modus nutzt kein hit-test-basiertes Placement.");
+      this.ui.setHint("Nutze 'Ausrichtung kalibrieren', wenn die Szene neu ausgerichtet werden soll.");
+      return;
+    }
+
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
     this.poseStabilizer.reset();
@@ -534,6 +881,9 @@ export class ARApp {
   }
 
   dispose() {
+    this.geoSensorActive = false;
+    this.sensorFusion.stop();
+
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       this.arSessionManager.endSession().catch(() => {
         // Ignore unload-time errors.
@@ -549,6 +899,7 @@ export class ARApp {
     }
 
     this.ui.dispose();
+    this.geoSceneManager.dispose();
     this.sceneManager.dispose();
   }
 }

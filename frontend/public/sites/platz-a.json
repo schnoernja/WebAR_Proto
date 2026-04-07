@@ -1,0 +1,31 @@
+{
+  "origin": {
+    "lat": 50.984,
+    "lon": 11.029,
+    "h": 280
+  },
+  "orientation": {
+    "yawDeg": 35
+  },
+  "scene": {
+    "asset": "/assets/platz-a/scene.glb"
+  },
+  "objects": [
+    {
+      "id": "tree_01",
+      "enu": {
+        "e": 10,
+        "n": 5,
+        "u": 0
+      }
+    },
+    {
+      "id": "info_01",
+      "enu": {
+        "e": -6,
+        "n": 12,
+        "u": 0
+      }
+    }
+  ]
+}

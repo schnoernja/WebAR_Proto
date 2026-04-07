@@ -1,0 +1,14 @@
+{
+  "origin": {
+    "lat": 50.984751,
+    "lon": 11.044106,
+    "h": 0
+  },
+  "orientation": {
+    "yawDeg": 0
+  },
+  "scene": {
+    "asset": "/assets/EFH.glb"
+  },
+  "objects": []
+}

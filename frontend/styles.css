@@ -89,6 +89,18 @@ body.ar-active {
   z-index: 0;
 }
 
+#camera-video,
+.camera-video {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+  pointer-events: none;
+}
+
 #ar-canvas,
 #render-root canvas {
   position: fixed;
@@ -794,6 +806,12 @@ body.ar-active .field-input {
 .coord-actions,
 .geo-actions {
   margin-top: 14px;
+}
+
+.geo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .geo-item,
