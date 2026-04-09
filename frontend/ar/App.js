@@ -20,6 +20,11 @@ const PlacementUIModel = Object.freeze({
   GEO_LOCAL: "geo-local",
   GEO_GLOBAL: "geo-global"
 });
+const GEOLOCATION_PERMISSION_OPTIONS = {
+  enableHighAccuracy: true,
+  maximumAge: 0,
+  timeout: 15000
+};
 
 function normalizeExperienceMode(mode) {
   return mode === ExperienceMode.GEO_SENSOR ? ExperienceMode.GEO_SENSOR : ExperienceMode.XR;
@@ -84,36 +89,43 @@ function toCameraStartFeedback(error) {
   };
 }
 
-function toGeolocationStartFeedback(snapshot) {
-  switch (snapshot ? snapshot.issue : null) {
-    case "geolocation-denied":
+function toGeolocationStartFeedback(error) {
+  if (error && typeof error === "object" && "issue" in error) {
+    switch (error.issue) {
+      case "https-required":
+        return {
+          message: "Standortzugriff fehlgeschlagen.",
+          hint: "Der Geo-Modus benoetigt HTTPS oder localhost."
+        };
+      case "geolocation-unsupported":
+        return {
+          message: "Standortzugriff fehlgeschlagen.",
+          hint: "Geolocation ist in diesem Browser nicht verfuegbar."
+        };
+      default:
+        break;
+    }
+  }
+
+  switch (error ? error.code : null) {
+    case 1:
       return {
         message: "Standortzugriff verweigert.",
         hint: "Bitte Standort-Berechtigung im Browser aktivieren und den Geo-Modus erneut starten."
       };
-    case "geolocation-unavailable":
+    case 2:
       return {
-        message: "Standort nicht verfuegbar.",
+        message: "Standortzugriff fehlgeschlagen.",
         hint: "Pruefe GPS, Netzverbindung und freie Sicht zum Himmel."
       };
-    case "geolocation-timeout":
+    case 3:
       return {
-        message: "Standort konnte nicht rechtzeitig gelesen werden.",
+        message: "Standortzugriff fehlgeschlagen.",
         hint: "Bewege dich an einen Ort mit besserem GPS-Empfang und starte den Geo-Modus erneut."
-      };
-    case "https-required":
-      return {
-        message: snapshot.message || "Standortzugriff ist hier nicht verfuegbar.",
-        hint: "Der Geo-Modus benoetigt HTTPS oder localhost."
-      };
-    case "geolocation-unsupported":
-      return {
-        message: snapshot.message || "Geolocation ist in diesem Browser nicht verfuegbar.",
-        hint: "Der Geo-Modus benoetigt einen Browser mit Geolocation-API."
       };
     default:
       return {
-        message: snapshot && snapshot.message ? snapshot.message : "Standort nicht verfuegbar.",
+        message: "Standortzugriff fehlgeschlagen.",
         hint: "Der Geo-Modus benoetigt eine verfuegbare Standortfreigabe."
       };
   }
@@ -355,24 +367,47 @@ export class ARApp {
   }
 
   async requestGeoLocationFromUserGesture() {
-    try {
-      const started = await this.sensorFusion.requestLocationPermissionFromUserGesture({
-        origin: this.siteConfig ? this.siteConfig.origin : null
+    if (!window.isSecureContext) {
+      const feedback = toGeolocationStartFeedback({
+        issue: "https-required"
       });
-
-      if (started) {
-        return true;
-      }
-    } catch (error) {
-      console.error("Geo geolocation start failed:", error);
+      console.error("Geo geolocation start failed:", feedback.message);
+      this.ui.setSessionState(false, feedback.message);
+      this.ui.setHint(feedback.hint);
+      return false;
     }
 
-    const sensorSnapshot = this.sensorFusion.getSnapshot();
-    const feedback = toGeolocationStartFeedback(sensorSnapshot);
-    console.error("Geo geolocation permission failed:", sensorSnapshot);
-    this.ui.setSessionState(false, feedback.message);
-    this.ui.setHint(feedback.hint);
-    return false;
+    if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== "function") {
+      const feedback = toGeolocationStartFeedback({
+        issue: "geolocation-unsupported"
+      });
+      console.error("Geo geolocation start failed:", feedback.message);
+      this.ui.setSessionState(false, feedback.message);
+      this.ui.setHint(feedback.hint);
+      return false;
+    }
+
+    try {
+      await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          () => {
+            resolve(true);
+          },
+          (error) => {
+            reject(error);
+          },
+          GEOLOCATION_PERMISSION_OPTIONS
+        );
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Geo geolocation start failed:", error);
+      const feedback = toGeolocationStartFeedback(error);
+      this.ui.setSessionState(false, feedback.message);
+      this.ui.setHint(feedback.hint);
+      return false;
+    }
   }
 
   async startGeoSensorMode({ cameraReady = false, locationReady = false } = {}) {
@@ -408,8 +443,7 @@ export class ARApp {
     }
 
     const started = await this.sensorFusion.start({
-      origin: this.siteConfig.origin,
-      locationReady
+      origin: this.siteConfig.origin
     });
 
     if (!started) {
