@@ -309,23 +309,7 @@ export class ARApp {
         return false;
       }
 
-      const [cameraReady, locationReady] = await Promise.all([
-        this.requestGeoCameraFromUserGesture(),
-        this.requestGeoLocationFromUserGesture()
-      ]);
-
-      if (!cameraReady || !locationReady) {
-        this.sensorFusion.stop();
-        this.sceneManager.stopCameraVideo();
-        this.sceneManager.setGeoMode(false);
-        this.sceneManager.resetFallbackView();
-        return false;
-      }
-
-      return this.startGeoSensorMode({
-        cameraReady: true,
-        locationReady: true
-      });
+      return this.startGeoSensorMode();
     }
 
     return this.startAR();
