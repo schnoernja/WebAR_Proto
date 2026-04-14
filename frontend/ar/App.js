@@ -354,7 +354,7 @@ export class ARApp {
 
   async requestGeoCameraPermissionViaARFlow() {
     if (!navigator.xr || typeof navigator.xr.requestSession !== "function") {
-      return true;
+      return false;
     }
 
     const overlayRoot = this.document.getElementById("hud");
@@ -373,8 +373,8 @@ export class ARApp {
     } catch (firstError) {
       try {
         session = await navigator.xr.requestSession(APP_CONFIG.ar.sessionMode, fallbackInit);
-      } catch (secondError) {
-        throw secondError || firstError;
+      } catch {
+        return false;
       }
     }
 
@@ -386,7 +386,7 @@ export class ARApp {
       }
     }
 
-    return true;
+    return Boolean(session);
   }
 
   async requestGeoLocationFromUserGesture() {
@@ -447,22 +447,23 @@ export class ARApp {
 
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
-    if (!cameraReady) {
-      const startedCamera = await this.requestGeoCameraFromUserGesture();
-      if (!startedCamera) {
-        return false;
-      }
+
+    let startedLocation = Boolean(locationReady);
+    if (!startedLocation) {
+      startedLocation = await this.requestGeoLocationFromUserGesture();
     }
 
-    if (!locationReady) {
-      const startedLocation = await this.requestGeoLocationFromUserGesture();
-      if (!startedLocation) {
-        this.sceneManager.stopCameraVideo();
-        this.sceneManager.setGeoMode(false);
-        this.sceneManager.resetFallbackView();
-        this.sensorFusion.stop();
-        return false;
-      }
+    let startedCamera = Boolean(cameraReady);
+    if (!startedCamera) {
+      startedCamera = await this.requestGeoCameraFromUserGesture();
+    }
+
+    if (!startedCamera || !startedLocation) {
+      this.sceneManager.stopCameraVideo();
+      this.sceneManager.setGeoMode(false);
+      this.sceneManager.resetFallbackView();
+      this.sensorFusion.stop();
+      return false;
     }
 
     const started = await this.sensorFusion.start({

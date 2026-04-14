@@ -85,15 +85,16 @@ body.ar-active {
 
 #app-version {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 4px);
-  left: calc(env(safe-area-inset-left, 0px) + 8px);
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  left: calc(env(safe-area-inset-left, 0px) + 12px);
   z-index: 1300;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 999px;
-  border: 1px solid rgba(19, 35, 38, 0.08);
-  background: rgba(248, 243, 233, 0.34);
-  color: rgba(19, 35, 38, 0.62);
-  font-size: 0.64rem;
+  border: 1px solid rgba(19, 35, 38, 0.14);
+  background: rgba(248, 243, 233, 0.58);
+  color: rgba(19, 35, 38, 0.8);
+  font-size: 0.7rem;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: 0.04em;
   pointer-events: none;
@@ -101,9 +102,9 @@ body.ar-active {
 }
 
 body.ar-active #app-version {
-  border-color: rgba(244, 241, 231, 0.14);
-  background: rgba(17, 26, 28, 0.24);
-  color: rgba(244, 241, 231, 0.72);
+  border-color: rgba(244, 241, 231, 0.2);
+  background: rgba(17, 26, 28, 0.42);
+  color: rgba(244, 241, 231, 0.86);
 }
 
 #render-root {
@@ -950,9 +951,9 @@ body.ar-active .state-item {
 
 @media (max-width: 720px) {
   #app-version {
-    top: calc(env(safe-area-inset-top, 0px) + 3px);
-    left: calc(env(safe-area-inset-left, 0px) + 6px);
-    font-size: 0.6rem;
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    left: calc(env(safe-area-inset-left, 0px) + 8px);
+    font-size: 0.68rem;
   }
 
   .floating-menu-button {
