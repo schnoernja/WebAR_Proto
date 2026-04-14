@@ -36,8 +36,35 @@ const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
   "tree.glb konnte nicht geladen werden. Platzhalter aktiv.": "Could not load tree.glb. Placeholder active.",
   "Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Modus per Latitude/Longitude.":
     "Fallback 3D view active. In free mode you place via the reticle, in coordinate mode via latitude/longitude.",
+  "Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Local-Modus per Latitude/Longitude.":
+    "Fallback 3D view active. In free mode you place via the reticle, in Geo-Local mode via latitude/longitude.",
+  "Geo (WebXR) ist vorausgewaehlt. Starte den Modus, um WebXR mit Standort und IMU/Kompass zu nutzen.":
+    "Geo (WebXR) is preselected. Start the mode to use WebXR with location and IMU/compass.",
+  "Geo-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.":
+    "Geo mode is not available without a site QR configuration.",
+  "Starte Geo-Modus...": "Starting geo mode...",
   "Starte immersive AR...": "Starting immersive AR...",
   "Fallback-3D-Ansicht bleibt aktiv.": "Fallback 3D view remains active.",
+  "Geo-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.":
+    "Geo mode requires GPS plus compass/IMU access.",
+  "Geo-Modus beendet. Fallback-3D-Ansicht aktiv.": "Geo mode ended. Fallback 3D view active.",
+  "Fallback-3D-Ansicht aktiv. Geo-Modus kann jederzeit erneut gestartet werden.":
+    "Fallback 3D view active. Geo mode can be started again at any time.",
+  "Geo-Global-Modus nutzt den Geo-WebXR-Flow. Waehle 'Geo (WebXR)' und starte diesen Modus.":
+    "Geo-Global mode uses the Geo WebXR flow. Select 'Geo (WebXR)' and start that mode.",
+  "Moduswechsel ist nur moeglich, wenn kein AR- oder Geo-Modus laeuft.":
+    "You can only switch modes when neither AR nor Geo mode is running.",
+  "Geo (WebXR) ist ohne Site-QR-Konfiguration nicht verfuegbar.":
+    "Geo (WebXR) is not available without a site QR configuration.",
+  "Geo (WebXR) ausgewaehlt. Beim Start werden WebXR, Standort und IMU/Kompass gemeinsam aktiviert.":
+    "Geo (WebXR) selected. On start, WebXR, location, and IMU/compass are activated together.",
+  "Keine Site geladen. Geo-Modus benoetigt einen QR-Link mit ?site=...":
+    "No site loaded. Geo mode needs a QR link with ?site=...",
+  "Geo-Daten sind aktuell nicht verfuegbar.": "Geo data is currently unavailable.",
+  "Geo-Modus aktiv. Szene und Marker folgen jetzt stabil deiner ENU-Position.":
+    "Geo mode active. Scene and markers now follow your ENU position stably.",
+  "Dieser Fallback-Geo-Modus nutzt kein hit-test-basiertes Placement.":
+    "This fallback geo mode does not use hit-test-based placement.",
   "Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.":
     "Coordinate mode active. Waiting for device location and a stable surface.",
   "Bewege das Geraet langsam ueber Boden oder Tisch, bis eine stabile Referenzflaeche erkannt wird.":
@@ -188,15 +215,16 @@ const DE_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
-    intro: "Waehle zwischen WebXR-Placement mit stabilisiertem Reticle und sensorbasiertem Geo-Rendering mit GNSS, IMU und Kompass.",
+    intro: "Waehle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.",
     modeLabel: "Hauptmodus",
     modeOptions: {
       xr: "AR (WebXR)",
-      geoSensor: "Geo (Sensor)"
+      geoSensor: "Geo (WebXR)"
     },
     buttons: {
       startXR: "AR starten",
-      startGeo: "Geo starten",
+      startGeo: "Geo-Modus starten",
+      activateLocation: "Standort aktivieren",
       place: "Objekt setzen",
       reset: "Neu platzieren",
       stopXR: "AR beenden",
@@ -209,18 +237,18 @@ const DE_TRANSLATIONS = Object.freeze({
     subheading: "Anforderungen",
     items: [
       "Ein mobiles Geraet mit WebXR-Unterstuetzung",
-      "Kamerafreigabe fuer den AR-Modus",
-      "Standortfreigabe fuer den Koordinatenmodus",
+      "Kamerafreigabe fuer den AR- und Geo-Modus (WebXR)",
+      "Standortfreigabe fuer Geo-Placement",
       "Eine erkennbare Boden- oder Tischflaeche fuer stabiles Placement"
     ]
   },
   help: {
     title: "Hilfe",
     steps: [
-      "1. Starte AR ueber die Aktionskachel oben.",
+      "1. Starte AR oder Geo ueber die Aktionskachel oben.",
       "2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.",
       "3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.",
-      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude lokal in den AR-Raum uebertragen."
+      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum uebertragen und auf der stabilen Bodenflaeche verankert."
     ]
   },
   survey: {
@@ -447,15 +475,16 @@ const EN_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Object Placement",
-    intro: "Choose between WebXR placement with the stabilized reticle and sensor-based geo rendering using GNSS, IMU and compass.",
+    intro: "Choose between free WebXR placement with the stabilized reticle and geo placement in the same WebXR flow with location, IMU, and compass.",
     modeLabel: "Main mode",
     modeOptions: {
       xr: "AR (WebXR)",
-      geoSensor: "Geo (Sensor)"
+      geoSensor: "Geo (WebXR)"
     },
     buttons: {
       startXR: "Start AR",
-      startGeo: "Start Geo",
+      startGeo: "Start Geo Mode",
+      activateLocation: "Enable location",
       place: "Place object",
       reset: "Reposition",
       stopXR: "Stop AR",
@@ -468,18 +497,18 @@ const EN_TRANSLATIONS = Object.freeze({
     subheading: "Requirements",
     items: [
       "A mobile device with WebXR support",
-      "Camera permission for AR mode",
-      "Location permission for coordinate mode",
+      "Camera permission for AR and Geo mode (WebXR)",
+      "Location permission for geo placement",
       "A visible floor or table surface for stable placement"
     ]
   },
   help: {
     title: "Help",
     steps: [
-      "1. Start AR from the action card above.",
+      "1. Start AR or Geo from the action card above.",
       "2. Move the device slowly until a stable surface is detected.",
       "3. In free mode you place the object directly on the stable surface.",
-      "4. In coordinate mode the target latitude and longitude are mapped into the local AR space."
+      "4. In coordinate mode the target latitude and longitude are mapped into WebXR space and anchored on the stable ground surface."
     ]
   },
   survey: {
@@ -797,6 +826,7 @@ export class UIController {
     this.modeBadgeEl = this.document.getElementById("mode-badge");
 
     this.startButton = this.document.getElementById("start-ar-button");
+    this.geoActivateLocationButton = this.document.getElementById("geo-activate-location-button");
     this.placeButton = this.document.getElementById("place-button");
     this.resetButton = this.document.getElementById("reset-button");
     this.stopButton = this.document.getElementById("stop-ar-button");
@@ -1077,6 +1107,7 @@ export class UIController {
       typeof onTextInputActiveChange === "function" ? onTextInputActiveChange : null;
 
     this.bindButton(this.startButton, onStartAR);
+    this.bindButton(this.geoActivateLocationButton, onRequestGeolocation);
     this.bindButton(this.placeButton, onPlace);
     this.bindButton(this.resetButton, onResetPlacement);
     this.bindButton(this.stopButton, onStopAR);
@@ -1570,6 +1601,7 @@ export class UIController {
     this.setElementText(this.staticRefs.placementTitle, text.placement.title);
     this.setElementText(this.staticRefs.placementIntro, text.placement.intro);
     this.setElementText(this.staticRefs.placementModeLabel, text.placement.modeLabel);
+    this.setElementText(this.geoActivateLocationButton, text.placement.buttons.activateLocation);
     this.setElementText(this.placeButton, text.placement.buttons.place);
     this.setElementText(this.resetButton, text.placement.buttons.reset);
 
@@ -1762,6 +1794,7 @@ export class UIController {
   renderExperienceModeUI() {
     const text = this.getText();
     const experienceMode = this.uiState.experienceMode === "geo-sensor" ? "geo-sensor" : "xr";
+    const isGeoSensorMode = experienceMode === "geo-sensor";
 
     if (this.experienceModeSelect) {
       this.experienceModeSelect.value = experienceMode;
@@ -1769,12 +1802,17 @@ export class UIController {
 
     if (this.startButton) {
       this.startButton.textContent =
-        experienceMode === "geo-sensor" ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
+        isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
+    }
+
+    if (this.geoActivateLocationButton) {
+      this.geoActivateLocationButton.hidden = !isGeoSensorMode;
+      this.geoActivateLocationButton.textContent = text.placement.buttons.activateLocation;
     }
 
     if (this.stopButton) {
       this.stopButton.textContent =
-        experienceMode === "geo-sensor" ? text.placement.buttons.stopGeo : text.placement.buttons.stopXR;
+        isGeoSensorMode ? text.placement.buttons.stopGeo : text.placement.buttons.stopXR;
     }
   }
 
@@ -2054,6 +2092,14 @@ export class UIController {
         this.uiState.experienceMode === "geo-sensor"
           ? this.uiState.sessionActive
           : !this.uiState.supportAvailable || this.uiState.sessionActive;
+    }
+
+    if (this.geoActivateLocationButton) {
+      this.geoActivateLocationButton.disabled =
+        this.uiState.experienceMode !== "geo-sensor" ||
+        this.uiState.sessionActive ||
+        this.uiState.geoStatus === "waiting" ||
+        this.uiState.geoWatchActive;
     }
 
     if (this.placeButton) {

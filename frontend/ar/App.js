@@ -39,7 +39,9 @@ function normalizePlacementUiMode(mode) {
 }
 
 function mapPlacementUiModeToControllerMode(mode) {
-  return mode === PlacementUIModel.GEO_LOCAL ? PlacementMode.GEO : PlacementMode.FREE;
+  return mode === PlacementUIModel.GEO_LOCAL || mode === PlacementUIModel.GEO_GLOBAL
+    ? PlacementMode.GEO
+    : PlacementMode.FREE;
 }
 
 function toMessage(error, fallbackMessage = "unbekannter Fehler") {
@@ -231,7 +233,7 @@ export class ARApp {
     if (assetInfo.usedPlaceholder) {
       this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
     } else {
-      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Modus per Latitude/Longitude.");
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Local-Modus per Latitude/Longitude.");
     }
 
     this.arSessionManager = new ARSessionManager({
@@ -266,7 +268,7 @@ export class ARApp {
 
     if (this.siteConfig) {
       this.ui.setMessage(`Site '${this.siteConfig.id}' geladen.`);
-      this.ui.setHint("Geo (Sensor) ist vorausgewaehlt. Starte den Modus, um die Site-Szene direkt ueber der Kamera zu sehen.");
+      this.ui.setHint("Geo (WebXR) ist vorausgewaehlt. Starte den Modus, um WebXR mit Standort und IMU/Kompass zu nutzen.");
     }
 
     this.sceneManager.setAnimationLoop(this.handleFrame);
@@ -304,7 +306,7 @@ export class ARApp {
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       if (!this.siteConfig) {
-        this.ui.setMessage("Geo-Sensor-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+        this.ui.setMessage("Geo-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
         this.ui.setHint("Oeffne die App mit einem gueltigen ?site=... Parameter.");
         return false;
       }
@@ -324,7 +326,11 @@ export class ARApp {
   }
 
   syncPresentationVisibility() {
-    const showGeoGlobalScene = this.geoSensorActive && this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL;
+    const hasARSession = this.arSessionManager && this.arSessionManager.isActive();
+    const showGeoGlobalScene =
+      this.geoSensorActive &&
+      !hasARSession &&
+      this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL;
     this.geoSceneManager.setVisible(showGeoGlobalScene);
 
     if (this.placementController) {
@@ -333,7 +339,7 @@ export class ARApp {
   }
 
   async requestGeoCameraFromUserGesture() {
-    this.ui.setMessage("Starte Geo-Sensor-Modus...");
+    this.ui.setMessage("Starte Geo-Modus...");
 
     try {
       await this.sceneManager.startCameraVideo();
@@ -394,9 +400,9 @@ export class ARApp {
     }
   }
 
-  async startGeoSensorMode({ cameraReady = false, locationReady = false } = {}) {
+  async startGeoSensorMode() {
     if (!this.siteConfig) {
-      this.ui.setMessage("Geo-Sensor-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+      this.ui.setMessage("Geo-Modus ist ohne Site-QR-Konfiguration nicht verfuegbar.");
       this.ui.setHint("Oeffne die App mit einem gueltigen ?site=... Parameter.");
       return false;
     }
@@ -406,27 +412,22 @@ export class ARApp {
       return false;
     }
 
-    this.lastFrameTimeMs = 0;
-    this.activeSurfaceState = null;
+    this.ui.setMessage("Starte Geo-Modus in WebXR...");
+    const arStarted = await this.startAR({
+      allowGeoGlobal: true
+    });
 
-    let startedCamera = Boolean(cameraReady);
-    if (!startedCamera) {
-      startedCamera = await this.requestGeoCameraFromUserGesture();
-    }
-
-    let startedLocation = Boolean(locationReady);
-    if (!startedLocation) {
-      startedLocation = await this.requestGeoLocationFromUserGesture();
-    }
-
-    if (!startedCamera || !startedLocation) {
-      this.sceneManager.stopCameraVideo();
-      this.sceneManager.setGeoMode(false);
-      this.sceneManager.resetFallbackView();
-      this.sensorFusion.stop();
+    if (!arStarted) {
       return false;
     }
 
+    const locationReady = await this.requestGeoLocationFromUserGesture();
+    if (!locationReady) {
+      await this.stopAR();
+      return false;
+    }
+
+    this.requestGeoLocation();
     const started = await this.sensorFusion.start({
       origin: this.siteConfig.origin
     });
@@ -434,24 +435,19 @@ export class ARApp {
     if (!started) {
       console.error("Geo sensor start failed:", this.sensorFusion.getSnapshot());
       this.sensorFusion.stop();
-      this.sceneManager.stopCameraVideo();
-      this.sceneManager.setGeoMode(false);
-      this.sceneManager.resetFallbackView();
       const sensorSnapshot = this.sensorFusion.getSnapshot();
       this.ui.setSessionState(false, sensorSnapshot.message);
-      this.ui.setHint("Geo-Sensor-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.");
+      this.ui.setHint("Geo-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.");
+      await this.stopAR();
       return false;
     }
 
     this.geoSensorActive = true;
+    this.captureGeoOriginFromDevice();
     this.syncPresentationVisibility();
-    this.ui.setSessionState(true, `Geo-Sensor-Modus aktiv. Site '${this.siteConfig.id}' geladen.`);
-    this.ui.setTrackingState(false);
-    this.ui.setSurfaceState(false, false);
-    this.ui.setPlacementState(false);
-    this.syncDebugPanels();
-    this.syncCanvasPointerState();
-    this.ui.setHint("Geo-Sensor-Modus aktiv. Warte auf GPS und Heading; danach folgt die Szene deiner ENU-Position.");
+    this.ui.setSessionState(true, `Geo-Modus aktiv. Site '${this.siteConfig.id}' geladen.`);
+    this.syncDebugPanels(this.activeSurfaceState, null, this.sensorFusion.getSnapshot());
+    this.ui.setHint("Geo-Modus aktiv. Warte auf stabile Flaeche und Sensoren; das Objekt wird geobasiert am Boden platziert.");
     return true;
   }
 
@@ -461,24 +457,34 @@ export class ARApp {
     }
 
     this.lastFrameTimeMs = 0;
+    const hasARSession = this.arSessionManager && this.arSessionManager.isActive();
+
+    if (hasARSession) {
+      this.sensorFusion.stop();
+      this.geoLocationService.stop();
+      await this.stopAR();
+      return true;
+    }
+
     this.geoSensorActive = false;
     this.sensorFusion.stop();
+    this.geoLocationService.stop();
     this.sceneManager.stopCameraVideo();
     this.sceneManager.setGeoMode(false);
     this.sceneManager.resetFallbackView();
     this.syncPresentationVisibility();
-    this.ui.setSessionState(false, "Geo-Sensor-Modus beendet. Fallback-3D-Ansicht aktiv.");
+    this.ui.setSessionState(false, "Geo-Modus beendet. Fallback-3D-Ansicht aktiv.");
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
     this.syncDebugPanels();
-    this.ui.setHint("Fallback-3D-Ansicht aktiv. Geo-Sensor-Modus kann jederzeit erneut gestartet werden.");
+    this.ui.setHint("Fallback-3D-Ansicht aktiv. Geo-Modus kann jederzeit erneut gestartet werden.");
     return true;
   }
 
-  async startAR() {
-    if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
-      this.ui.setMessage("Geo-Global-Modus nutzt den Sensor-Pfad. Waehle 'Geo (Sensor)' und starte diesen Modus.");
+  async startAR({ allowGeoGlobal = false } = {}) {
+    if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL && !allowGeoGlobal) {
+      this.ui.setMessage("Geo-Global-Modus nutzt den Geo-WebXR-Flow. Waehle 'Geo (WebXR)' und starte diesen Modus.");
       return false;
     }
 
@@ -539,20 +545,33 @@ export class ARApp {
   }
 
   handleSessionEnded() {
+    const wasGeoSensor = this.geoSensorActive;
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
+    this.geoSensorActive = false;
+    if (wasGeoSensor) {
+      this.sensorFusion.stop();
+      this.geoLocationService.stop();
+    }
     this.hitTestManager.dispose();
     this.poseStabilizer.reset();
     this.sceneManager.setARMode(false);
     this.placementController.exitARMode();
     this.syncPresentationVisibility();
     this.handleTextInputActiveChange(false);
-    this.ui.setSessionState(false, "AR beendet. Fallback-3D-Ansicht aktiv.");
+    this.ui.setSessionState(
+      false,
+      wasGeoSensor ? "Geo-Modus beendet. Fallback-3D-Ansicht aktiv." : "AR beendet. Fallback-3D-Ansicht aktiv."
+    );
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
     this.syncDebugPanels();
-    this.ui.setHint("Fallback-3D-Ansicht aktiv. AR kann jederzeit erneut gestartet werden.");
+    this.ui.setHint(
+      wasGeoSensor
+        ? "Fallback-3D-Ansicht aktiv. Geo-Modus kann jederzeit erneut gestartet werden."
+        : "Fallback-3D-Ansicht aktiv. AR kann jederzeit erneut gestartet werden."
+    );
   }
 
   handleFrame(timeMs, frame) {
@@ -635,7 +654,7 @@ export class ARApp {
   applyPlacementMode(mode) {
     const normalizedMode = normalizePlacementUiMode(mode);
     if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
-      this.ui.setMessage("Moduswechsel ist nur moeglich, wenn kein AR- oder Geo-Sensor-Modus laeuft.");
+      this.ui.setMessage("Moduswechsel ist nur moeglich, wenn kein AR- oder Geo-Modus laeuft.");
       return false;
     }
 
@@ -687,7 +706,7 @@ export class ARApp {
     }
 
     if (normalizedMode === ExperienceMode.GEO_SENSOR && !this.siteConfig) {
-      this.ui.setMessage("Geo (Sensor) ist ohne Site-QR-Konfiguration nicht verfuegbar.");
+      this.ui.setMessage("Geo (WebXR) ist ohne Site-QR-Konfiguration nicht verfuegbar.");
       return false;
     }
 
@@ -708,7 +727,7 @@ export class ARApp {
     this.ui.setPlacementMode(this.selectedPlacementMode);
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
-      this.ui.setHint("Geo (Sensor) ausgewaehlt. Beim Start wird die Site-Szene per GNSS/IMU ueber das Kamerabild gelegt.");
+      this.ui.setHint("Geo (WebXR) ausgewaehlt. Beim Start werden WebXR, Standort und IMU/Kompass gemeinsam aktiviert.");
     } else if (this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL) {
       this.ui.setHint("AR (WebXR) ausgewaehlt. Geo-Local nutzt weiter die bestehende Hit-Test- und Stabilizer-Kette.");
     } else {
@@ -826,7 +845,19 @@ export class ARApp {
 
   captureGeoOriginFromDevice() {
     const devicePosition = this.geoLocationService.getCurrentPosition();
-    const geoCoord = toGeoCoord(devicePosition);
+    let geoCoord = toGeoCoord(devicePosition);
+    if (!geoCoord) {
+      const sensorSnapshot = this.sensorFusion.getSnapshot();
+      const sensorPosition =
+        sensorSnapshot && sensorSnapshot.position ? sensorSnapshot.position : null;
+      if (sensorPosition) {
+        geoCoord = {
+          latitude: sensorPosition.lat,
+          longitude: sensorPosition.lon
+        };
+      }
+    }
+
     if (!geoCoord) {
       return false;
     }
@@ -865,7 +896,9 @@ export class ARApp {
       return;
     }
 
-    if (this.geoSensorActive) {
+    const hasARSession = this.arSessionManager && this.arSessionManager.isActive();
+
+    if (this.geoSensorActive && !hasARSession) {
       const enuPosition = geoSensorSnapshot && geoSensorSnapshot.enuPosition ? geoSensorSnapshot.enuPosition : null;
       this.ui.setGeoDebug({
         originLatitude: this.siteConfig ? this.siteConfig.origin.lat : null,
@@ -895,14 +928,16 @@ export class ARApp {
   }
 
   updateInteractionHint(surfaceState, tracking, cameraState, geoSensorSnapshot = null) {
-    if (this.geoSensorActive) {
+    const hasARSession = this.arSessionManager && this.arSessionManager.isActive();
+
+    if (this.geoSensorActive && !hasARSession) {
       if (!this.siteConfig) {
-        this.ui.setHint("Keine Site geladen. Geo-Sensor-Modus benoetigt einen QR-Link mit ?site=...");
+        this.ui.setHint("Keine Site geladen. Geo-Modus benoetigt einen QR-Link mit ?site=...");
         return;
       }
 
       if (geoSensorSnapshot && geoSensorSnapshot.issue) {
-        this.ui.setHint(geoSensorSnapshot.message || "Geo-Sensor-Daten sind aktuell nicht verfuegbar.");
+        this.ui.setHint(geoSensorSnapshot.message || "Geo-Daten sind aktuell nicht verfuegbar.");
         return;
       }
 
@@ -921,7 +956,7 @@ export class ARApp {
         return;
       }
 
-      this.ui.setHint("Geo-Sensor-Modus aktiv. Szene und Marker folgen jetzt stabil deiner ENU-Position.");
+      this.ui.setHint("Geo-Modus aktiv. Szene und Marker folgen jetzt stabil deiner ENU-Position.");
       return;
     }
 
@@ -1006,8 +1041,10 @@ export class ARApp {
   }
 
   resetPlacement() {
-    if (this.geoSensorActive) {
-      this.ui.setMessage("Geo-Sensor-Modus nutzt kein hit-test-basiertes Placement.");
+    const hasARSession = this.arSessionManager && this.arSessionManager.isActive();
+
+    if (this.geoSensorActive && !hasARSession) {
+      this.ui.setMessage("Dieser Fallback-Geo-Modus nutzt kein hit-test-basiertes Placement.");
       this.ui.setHint("Nutze 'Ausrichtung kalibrieren', wenn die Szene neu ausgerichtet werden soll.");
       return;
     }

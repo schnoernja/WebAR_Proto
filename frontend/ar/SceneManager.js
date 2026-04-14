@@ -294,7 +294,15 @@ export class SceneManager {
     this.cameraStream = stream;
     if (this.cameraVideo) {
       this.cameraVideo.srcObject = stream;
-      await this.cameraVideo.play();
+      try {
+        await this.cameraVideo.play();
+      } catch (error) {
+        const errorName =
+          error && typeof error === "object" && "name" in error ? String(error.name) : "";
+        if (errorName !== "NotAllowedError" && errorName !== "AbortError") {
+          throw error;
+        }
+      }
     }
 
     return true;

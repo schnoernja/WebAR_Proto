@@ -88,12 +88,13 @@ body.ar-active {
   top: calc(env(safe-area-inset-top, 0px) + 12px);
   left: calc(env(safe-area-inset-left, 0px) + 12px);
   z-index: 1300;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 999px;
-  border: 1px solid rgba(19, 35, 38, 0.14);
-  background: rgba(248, 243, 233, 0.58);
-  color: rgba(19, 35, 38, 0.8);
-  font-size: 0.7rem;
+  border: 1px solid rgba(19, 35, 38, 0.2);
+  background: rgba(248, 243, 233, 0.9);
+  color: rgba(19, 35, 38, 0.9);
+  box-shadow: 0 10px 22px rgba(17, 27, 30, 0.14);
+  font-size: 0.74rem;
   font-weight: 600;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -102,9 +103,10 @@ body.ar-active {
 }
 
 body.ar-active #app-version {
-  border-color: rgba(244, 241, 231, 0.2);
-  background: rgba(17, 26, 28, 0.42);
-  color: rgba(244, 241, 231, 0.86);
+  border-color: rgba(244, 241, 231, 0.28);
+  background: rgba(17, 26, 28, 0.72);
+  color: rgba(244, 241, 231, 0.94);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
 }
 
 #render-root {
@@ -953,7 +955,7 @@ body.ar-active .state-item {
   #app-version {
     top: calc(env(safe-area-inset-top, 0px) + 8px);
     left: calc(env(safe-area-inset-left, 0px) + 8px);
-    font-size: 0.68rem;
+    font-size: 0.72rem;
   }
 
   .floating-menu-button {
