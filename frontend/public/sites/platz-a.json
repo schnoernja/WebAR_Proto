@@ -16,7 +16,12 @@
       "lat": 50.984,
       "lon": 11.029
     },
-    "maxDistanceMeters": 5
+    "calibration": {
+      "eastMeters": 0,
+      "northMeters": 0,
+      "yawDeg": 0
+    },
+    "maxDistanceMeters": 100
   },
   "objects": [
     {

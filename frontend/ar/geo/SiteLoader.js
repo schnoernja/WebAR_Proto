@@ -83,6 +83,26 @@ function normalizePlacementTarget(target) {
   };
 }
 
+function normalizePlacementCalibration(calibration) {
+  if (calibration == null) {
+    return null;
+  }
+
+  if (typeof calibration !== "object") {
+    throw new Error("Site-Konfiguration ungueltig: placement.calibration muss ein Objekt sein.");
+  }
+
+  const eastMeters = Number.isFinite(calibration.eastMeters) ? calibration.eastMeters : 0;
+  const northMeters = Number.isFinite(calibration.northMeters) ? calibration.northMeters : 0;
+  const yawDeg = Number.isFinite(calibration.yawDeg) ? calibration.yawDeg : 0;
+
+  return {
+    eastMeters,
+    northMeters,
+    yawDeg
+  };
+}
+
 function normalizePlacement(placement) {
   if (placement == null) {
     return null;
@@ -97,17 +117,19 @@ function normalizePlacement(placement) {
       ? placement.asset.trim()
       : null;
   const target = normalizePlacementTarget(placement.target);
+  const calibration = normalizePlacementCalibration(placement.calibration);
   const maxDistanceMeters = Number.isFinite(placement.maxDistanceMeters)
     ? placement.maxDistanceMeters
     : null;
 
-  if (!asset && !target && maxDistanceMeters === null) {
+  if (!asset && !target && !calibration && maxDistanceMeters === null) {
     return null;
   }
 
   return {
     asset,
     target,
+    calibration,
     maxDistanceMeters
   };
 }

@@ -59,6 +59,21 @@ function projectDirectionToGround(direction) {
   return groundedDirection;
 }
 
+function normalizeGeoCalibration(calibration) {
+  const source = calibration && typeof calibration === "object" ? calibration : null;
+  const eastMeters = source && Number.isFinite(source.eastMeters) ? source.eastMeters : 0;
+  const northMeters = source && Number.isFinite(source.northMeters) ? source.northMeters : 0;
+  const yawDeg = source && Number.isFinite(source.yawDeg) ? source.yawDeg : 0;
+  const yawRad = THREE.MathUtils.degToRad(yawDeg);
+
+  return {
+    eastMeters,
+    northMeters,
+    yawDeg,
+    yawRad
+  };
+}
+
 export class PlacementController {
   constructor({ scene }) {
     this.scene = scene;
@@ -70,6 +85,7 @@ export class PlacementController {
       : PlacementMode.FREE;
     this.geoTarget = { ...APP_CONFIG.placement.defaultGeoTarget };
     this.geoOrigin = null;
+    this.geoCalibration = normalizeGeoCalibration(null);
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
     this.maxVisibleDistanceMeters = Math.max(
@@ -230,6 +246,16 @@ export class PlacementController {
     return { ...this.geoTarget };
   }
 
+  setGeoCalibration(calibration) {
+    this.geoCalibration = normalizeGeoCalibration(calibration);
+    this.clearGeoComputation();
+    return true;
+  }
+
+  getGeoCalibration() {
+    return { ...this.geoCalibration };
+  }
+
   setGeoOrigin(coord) {
     if (!isValidGeoCoord(coord)) {
       return false;
@@ -328,9 +354,9 @@ export class PlacementController {
     const metersPerDegreeLon = Math.cos(originLatRad) * METERS_PER_DEGREE_LAT;
     const deltaLat = this.geoTarget.latitude - this.geoOrigin.latitude;
     const deltaLon = this.geoTarget.longitude - this.geoOrigin.longitude;
-    const eastMeters = deltaLon * metersPerDegreeLon;
-    const northMeters = deltaLat * METERS_PER_DEGREE_LAT;
-    const distanceMeters = Math.hypot(eastMeters, northMeters);
+    const baseEastMeters = deltaLon * metersPerDegreeLon;
+    const baseNorthMeters = deltaLat * METERS_PER_DEGREE_LAT;
+    const distanceMeters = Math.hypot(baseEastMeters, baseNorthMeters);
 
     if (distanceMeters > this.maxVisibleDistanceMeters) {
       this.lastGeoComputation = this.createGeoDebugSnapshot("too-far", {
@@ -342,8 +368,23 @@ export class PlacementController {
       return this.getLastGeoComputation();
     }
 
-    const clampedEastMeters = clamp(eastMeters, -this.debugClampDistanceMeters, this.debugClampDistanceMeters);
-    const clampedNorthMeters = clamp(northMeters, -this.debugClampDistanceMeters, this.debugClampDistanceMeters);
+    const cosYaw = Math.cos(this.geoCalibration.yawRad);
+    const sinYaw = Math.sin(this.geoCalibration.yawRad);
+    const rotatedEastMeters = baseEastMeters * cosYaw - baseNorthMeters * sinYaw;
+    const rotatedNorthMeters = baseEastMeters * sinYaw + baseNorthMeters * cosYaw;
+    const calibratedEastMeters = rotatedEastMeters + this.geoCalibration.eastMeters;
+    const calibratedNorthMeters = rotatedNorthMeters + this.geoCalibration.northMeters;
+
+    const clampedEastMeters = clamp(
+      calibratedEastMeters,
+      -this.debugClampDistanceMeters,
+      this.debugClampDistanceMeters
+    );
+    const clampedNorthMeters = clamp(
+      calibratedNorthMeters,
+      -this.debugClampDistanceMeters,
+      this.debugClampDistanceMeters
+    );
     const offset = this.geoReferenceRight
       .clone()
       .multiplyScalar(clampedEastMeters)
@@ -363,7 +404,7 @@ export class PlacementController {
       zMeters: pose.position.z,
       distanceMeters,
       distanceOverLimit: false,
-      debugClamped: clampedEastMeters !== eastMeters || clampedNorthMeters !== northMeters,
+      debugClamped: clampedEastMeters !== calibratedEastMeters || clampedNorthMeters !== calibratedNorthMeters,
       objectBehindCamera: visibilityDebug.objectBehindCamera,
       pose: clonePose(pose)
     });

@@ -19,7 +19,7 @@
 </head>
 <body>
   <div id="app-shell">
-    <div id="app-version" aria-label="Anwendungsversion">v.0.9</div>
+    <div id="app-version" aria-label="Anwendungsversion">v.0.12</div>
     <div id="render-root" aria-label="3D viewport"></div>
 
     <div id="ui-container">
@@ -131,6 +131,10 @@
                 <label class="menu-option">
                   <input type="checkbox" data-card-visibility-toggle="geo" checked />
                   <span>Geolocation</span>
+                </label>
+                <label class="menu-option">
+                  <input type="checkbox" data-card-visibility-toggle="offset" checked />
+                  <span>Geo Offset</span>
                 </label>
               </div>
             </section>
@@ -663,6 +667,76 @@
                 <p id="geo-help" class="hint-text geo-help">
                   Tippe auf "Standort aktivieren", damit der Browser die Freigabe anfragt.
                 </p>
+              </div>
+            </section>
+
+            <section id="card-offset" class="panel card-panel offset-panel" data-card="offset">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="offset-card-title">Geo Offset</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="toggle-offset-card"
+                    class="card-toggle-button"
+                    type="button"
+                    data-card-toggle="offset"
+                    aria-expanded="false"
+                    aria-controls="card-offset-content"
+                    aria-label="Geo Offset auf- oder zuklappen"
+                  >
+                    <span data-card-toggle-icon="offset">+</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="card-offset-content" class="card-content" data-card-content="offset" hidden>
+                <p id="geo-offset-description" class="hint-text">
+                  Test-Offset fuer Geo-Placement. Werte werden zur Site-Kalibrierung addiert.
+                </p>
+
+                <label class="offset-toggle-row" for="geo-offset-enabled">
+                  <span id="geo-offset-toggle-label" class="field-label">Offset aktivieren</span>
+                  <input id="geo-offset-enabled" class="offset-toggle-input" type="checkbox" />
+                </label>
+
+                <div class="offset-slider-block">
+                  <div class="offset-slider-head">
+                    <span id="geo-offset-east-label" class="field-label">X (Ost/West)</span>
+                    <strong id="geo-offset-east-value" class="offset-slider-value">0.0 m</strong>
+                  </div>
+                  <input
+                    id="geo-offset-east-range"
+                    class="offset-range-input"
+                    type="range"
+                    min="-20"
+                    max="20"
+                    step="0.1"
+                    value="0"
+                  />
+                </div>
+
+                <div class="offset-slider-block">
+                  <div class="offset-slider-head">
+                    <span id="geo-offset-north-label" class="field-label">Y (Nord/Sued)</span>
+                    <strong id="geo-offset-north-value" class="offset-slider-value">0.0 m</strong>
+                  </div>
+                  <input
+                    id="geo-offset-north-range"
+                    class="offset-range-input"
+                    type="range"
+                    min="-20"
+                    max="20"
+                    step="0.1"
+                    value="0"
+                  />
+                </div>
+
+                <div class="coord-actions">
+                  <button id="geo-offset-reset-button" class="button button-ghost" type="button">
+                    Offset reset
+                  </button>
+                </div>
               </div>
             </section>
 

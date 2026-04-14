@@ -26,8 +26,9 @@ const GEOLOCATION_PERMISSION_OPTIONS = {
   timeout: 15000
 };
 const MIN_GEO_SITE_TOLERANCE_METERS = 3;
-const MAX_GEO_SITE_TOLERANCE_METERS = 5;
-const DEFAULT_GEO_SITE_TOLERANCE_METERS = 5;
+const MAX_GEO_SITE_TOLERANCE_METERS = 100;
+const DEFAULT_GEO_SITE_TOLERANCE_METERS = 100;
+const GEO_OFFSET_LIMIT_METERS = 20;
 
 function normalizeExperienceMode(mode) {
   return mode === ExperienceMode.GEO_SENSOR ? ExperienceMode.GEO_SENSOR : ExperienceMode.XR;
@@ -184,6 +185,46 @@ function clampSiteToleranceMeters(value) {
   return Math.min(Math.max(value, MIN_GEO_SITE_TOLERANCE_METERS), MAX_GEO_SITE_TOLERANCE_METERS);
 }
 
+function clampGeoOffsetMeters(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(Math.max(value, -GEO_OFFSET_LIMIT_METERS), GEO_OFFSET_LIMIT_METERS);
+}
+
+function normalizeGeoCalibration(calibration) {
+  if (!calibration || typeof calibration !== "object") {
+    return {
+      eastMeters: 0,
+      northMeters: 0,
+      yawDeg: 0
+    };
+  }
+
+  return {
+    eastMeters: Number.isFinite(calibration.eastMeters) ? calibration.eastMeters : 0,
+    northMeters: Number.isFinite(calibration.northMeters) ? calibration.northMeters : 0,
+    yawDeg: Number.isFinite(calibration.yawDeg) ? calibration.yawDeg : 0
+  };
+}
+
+function mergeGeoCalibration(baseCalibration, offsetState) {
+  const base = normalizeGeoCalibration(baseCalibration);
+  const hasBaseCalibration = Boolean(baseCalibration && typeof baseCalibration === "object");
+  const hasOffset = Boolean(offsetState && offsetState.enabled);
+
+  if (!hasBaseCalibration && !hasOffset) {
+    return null;
+  }
+
+  return {
+    eastMeters: base.eastMeters + (hasOffset ? clampGeoOffsetMeters(offsetState.eastMeters) : 0),
+    northMeters: base.northMeters + (hasOffset ? clampGeoOffsetMeters(offsetState.northMeters) : 0),
+    yawDeg: base.yawDeg
+  };
+}
+
 function buildCameraState(viewerPose) {
   if (!viewerPose || !viewerPose.transform) {
     return null;
@@ -248,6 +289,11 @@ export class ARApp {
     this.lastXRPlacementMode = PlacementUIModel.FREE;
     this.geoSensorActive = false;
     this.activePlacementAssetSource = "default";
+    this.geoOffsetUiState = {
+      enabled: false,
+      eastMeters: 0,
+      northMeters: 0
+    };
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -270,6 +316,7 @@ export class ARApp {
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
     this.applySiteGeoTargetFromConfig({ force: true });
+    this.applySiteGeoCalibrationFromConfig({ force: true });
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
     this.ui.bindSensorFusion(this.sensorFusion);
@@ -297,9 +344,13 @@ export class ARApp {
       onExperienceModeChange: (mode) => this.applyExperienceMode(mode),
       onRequestGeolocation: () => this.requestGeoLocation(),
       onCalibrateHeading: () => this.calibrateGeoHeading(),
+      onGeoOffsetToggle: (state) => this.applyGeoOffsetState(state),
+      onGeoOffsetChange: (state) => this.applyGeoOffsetState(state),
+      onGeoOffsetReset: () => this.resetGeoOffsetState(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
+    this.ui.setGeoOffsetControlState(this.geoOffsetUiState);
 
     const support = await this.arSessionManager.checkSupport();
     this.ui.setSupportState(support.available, support.message);
@@ -389,6 +440,10 @@ export class ARApp {
       targetCoord,
       assetUrl,
       assetLabel: toAssetLabel(assetUrl),
+      calibration:
+        sitePlacement && sitePlacement.calibration && typeof sitePlacement.calibration === "object"
+          ? sitePlacement.calibration
+          : null,
       toleranceMeters
     };
   }
@@ -414,6 +469,65 @@ export class ARApp {
 
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     return true;
+  }
+
+  applySiteGeoCalibrationFromConfig({ force = false } = {}) {
+    if (!this.placementController) {
+      return false;
+    }
+
+    if (!force && this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+      this.placementController.setGeoCalibration(null);
+      return false;
+    }
+
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    const baseCalibration = placementConfig ? placementConfig.calibration : null;
+    const effectiveCalibration = mergeGeoCalibration(baseCalibration, this.geoOffsetUiState);
+    this.placementController.setGeoCalibration(effectiveCalibration);
+    return Boolean(effectiveCalibration);
+  }
+
+  applyGeoOffsetState(state = {}) {
+    const nextState = {
+      enabled:
+        typeof state.enabled === "boolean"
+          ? state.enabled
+          : this.geoOffsetUiState.enabled,
+      eastMeters:
+        state.eastMeters != null
+          ? clampGeoOffsetMeters(Number.parseFloat(state.eastMeters))
+          : this.geoOffsetUiState.eastMeters,
+      northMeters:
+        state.northMeters != null
+          ? clampGeoOffsetMeters(Number.parseFloat(state.northMeters))
+          : this.geoOffsetUiState.northMeters
+    };
+
+    this.geoOffsetUiState = nextState;
+    this.ui.setGeoOffsetControlState(nextState);
+    this.syncGeoCalibrationAfterOffsetChange();
+    return { ...nextState };
+  }
+
+  resetGeoOffsetState() {
+    return this.applyGeoOffsetState({
+      enabled: false,
+      eastMeters: 0,
+      northMeters: 0
+    });
+  }
+
+  syncGeoCalibrationAfterOffsetChange() {
+    if (!this.placementController) {
+      return;
+    }
+
+    if (this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+      return;
+    }
+
+    this.applySiteGeoCalibrationFromConfig({ force: true });
   }
 
   getGeoSiteToleranceMeters() {
@@ -485,6 +599,7 @@ export class ARApp {
       }
 
       this.applySiteGeoTargetFromConfig({ force: true });
+      this.applySiteGeoCalibrationFromConfig({ force: true });
       const siteAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.GEO_SENSOR);
       if (!siteAssetReady) {
         return false;
@@ -497,6 +612,8 @@ export class ARApp {
     if (!defaultAssetReady) {
       return false;
     }
+
+    this.applySiteGeoCalibrationFromConfig({ force: false });
 
     return this.startAR();
   }
@@ -597,6 +714,7 @@ export class ARApp {
     }
 
     this.applySiteGeoTargetFromConfig({ force: true });
+    this.applySiteGeoCalibrationFromConfig({ force: true });
     this.ui.setMessage("Starte Geo-Modus in WebXR...");
     const arStarted = await this.startAR({
       allowGeoGlobal: true
@@ -708,6 +826,11 @@ export class ARApp {
     this.placementController.enterARMode();
     this.placementController.setTextInputActive(this.isTextInputActive);
     this.placementController.setMode(mapPlacementUiModeToControllerMode(this.selectedPlacementMode));
+    if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
+      this.applySiteGeoCalibrationFromConfig({ force: true });
+    } else {
+      this.placementController.setGeoCalibration(null);
+    }
     this.captureGeoOriginFromDevice();
     this.sceneManager.setARMode(true);
     this.syncPresentationVisibility();
@@ -881,6 +1004,9 @@ export class ARApp {
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.applySiteGeoTargetFromConfig({ force: true });
+      this.applySiteGeoCalibrationFromConfig({ force: true });
+    } else {
+      this.placementController.setGeoCalibration(null);
     }
 
     if (this.placementController.isPlaced()) {
@@ -926,6 +1052,9 @@ export class ARApp {
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.applySiteGeoTargetFromConfig({ force: true });
+      this.applySiteGeoCalibrationFromConfig({ force: true });
+    } else {
+      this.placementController.setGeoCalibration(null);
     }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {

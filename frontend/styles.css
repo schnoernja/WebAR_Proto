@@ -854,6 +854,69 @@ body.ar-active .field-input {
   gap: 10px;
 }
 
+.offset-panel .card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.offset-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.42);
+  padding: 10px 12px;
+}
+
+body.ar-active .offset-toggle-row {
+  border-color: rgba(244, 241, 231, 0.12);
+  background: rgba(244, 241, 231, 0.06);
+}
+
+.offset-toggle-input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.offset-slider-block {
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.42);
+  padding: 10px 12px;
+}
+
+body.ar-active .offset-slider-block {
+  border-color: rgba(244, 241, 231, 0.12);
+  background: rgba(244, 241, 231, 0.06);
+}
+
+.offset-slider-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.offset-slider-value {
+  font-size: 0.95rem;
+  line-height: 1.2;
+}
+
+.offset-range-input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.offset-range-input:disabled {
+  opacity: 0.5;
+}
+
 .geo-item,
 .debug-item,
 .state-item {
