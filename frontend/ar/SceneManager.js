@@ -148,6 +148,65 @@ export class SceneManager {
     return stage;
   }
 
+  async loadPlacementCandidate(loader, candidate) {
+    const gltf = await loader.loadAsync(candidate.url);
+    const asset = this.normalizeAsset(gltf.scene);
+    return {
+      object: asset,
+      label: candidate.label,
+      sourceUrl: candidate.url,
+      usedPlaceholder: false
+    };
+  }
+
+  createAssetLabelFromUrl(url, fallbackLabel = "Site-Modell") {
+    if (typeof url !== "string") {
+      return fallbackLabel;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return fallbackLabel;
+    }
+
+    const normalized = trimmed.replace(/\\/g, "/");
+    const segments = normalized.split("/");
+    const filename = segments[segments.length - 1];
+    return filename || fallbackLabel;
+  }
+
+  normalizeAssetUrl(url) {
+    if (typeof url !== "string") {
+      return null;
+    }
+
+    const trimmed = url.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const hasProtocol = /^([a-z]+:)?\/\//i.test(trimmed);
+    if (hasProtocol || trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) {
+      return trimmed;
+    }
+
+    return `/${trimmed}`;
+  }
+
+  async createPlacementAssetFromUrl(url, label = null) {
+    const normalizedUrl = this.normalizeAssetUrl(url);
+    if (!normalizedUrl) {
+      throw new Error("Ungueltiger Modellpfad fuer das Geo-Placement.");
+    }
+
+    const loader = new GLTFLoader();
+    const candidate = {
+      url: normalizedUrl,
+      label: label || this.createAssetLabelFromUrl(normalizedUrl)
+    };
+    return this.loadPlacementCandidate(loader, candidate);
+  }
+
   async createPlacementAsset() {
     const loader = new GLTFLoader();
     const candidates = [
@@ -165,14 +224,7 @@ export class SceneManager {
 
     for (const candidate of candidates) {
       try {
-        const gltf = await loader.loadAsync(candidate.url);
-        const asset = this.normalizeAsset(gltf.scene);
-        return {
-          object: asset,
-          label: candidate.label,
-          sourceUrl: candidate.url,
-          usedPlaceholder: false
-        };
+        return await this.loadPlacementCandidate(loader, candidate);
       } catch (error) {
         lastError = error;
       }

@@ -65,6 +65,53 @@ function normalizeObjects(objects) {
   });
 }
 
+function normalizePlacementTarget(target) {
+  if (!target || typeof target !== "object") {
+    return null;
+  }
+
+  const latitude = Number.isFinite(target.lat) ? target.lat : target.latitude;
+  const longitude = Number.isFinite(target.lon) ? target.lon : target.longitude;
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    throw new Error("Site-Konfiguration ungueltig: placement.target.lat/lon fehlt oder ist keine Zahl.");
+  }
+
+  return {
+    lat: latitude,
+    lon: longitude
+  };
+}
+
+function normalizePlacement(placement) {
+  if (placement == null) {
+    return null;
+  }
+
+  if (typeof placement !== "object") {
+    throw new Error("Site-Konfiguration ungueltig: placement muss ein Objekt sein.");
+  }
+
+  const asset =
+    typeof placement.asset === "string" && placement.asset.trim()
+      ? placement.asset.trim()
+      : null;
+  const target = normalizePlacementTarget(placement.target);
+  const maxDistanceMeters = Number.isFinite(placement.maxDistanceMeters)
+    ? placement.maxDistanceMeters
+    : null;
+
+  if (!asset && !target && maxDistanceMeters === null) {
+    return null;
+  }
+
+  return {
+    asset,
+    target,
+    maxDistanceMeters
+  };
+}
+
 export class SiteLoader {
   constructor({ locationRef = window.location, fetchImpl = window.fetch.bind(window) } = {}) {
     this.location = locationRef;
@@ -87,7 +134,8 @@ export class SiteLoader {
       origin: normalizeOrigin(rawConfig.origin),
       orientation: normalizeOrientation(rawConfig.orientation),
       scene: normalizeScene(rawConfig.scene),
-      objects: normalizeObjects(rawConfig.objects)
+      objects: normalizeObjects(rawConfig.objects),
+      placement: normalizePlacement(rawConfig.placement)
     };
   }
 

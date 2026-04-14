@@ -10,6 +10,14 @@
   "scene": {
     "asset": "/assets/platz-a/scene.glb"
   },
+  "placement": {
+    "asset": "assets/platz-a/scene.glb",
+    "target": {
+      "lat": 50.984,
+      "lon": 11.029
+    },
+    "maxDistanceMeters": 5
+  },
   "objects": [
     {
       "id": "tree_01",

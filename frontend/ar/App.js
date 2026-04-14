@@ -25,6 +25,9 @@ const GEOLOCATION_PERMISSION_OPTIONS = {
   maximumAge: 0,
   timeout: 15000
 };
+const MIN_GEO_SITE_TOLERANCE_METERS = 3;
+const MAX_GEO_SITE_TOLERANCE_METERS = 5;
+const DEFAULT_GEO_SITE_TOLERANCE_METERS = 5;
 
 function normalizeExperienceMode(mode) {
   return mode === ExperienceMode.GEO_SENSOR ? ExperienceMode.GEO_SENSOR : ExperienceMode.XR;
@@ -144,6 +147,43 @@ function toGeoCoord(position) {
   };
 }
 
+function normalizeSiteAssetUrl(url) {
+  if (typeof url !== "string") {
+    return null;
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const hasProtocol = /^([a-z]+:)?\/\//i.test(trimmed);
+  if (hasProtocol || trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) {
+    return trimmed;
+  }
+
+  return `/${trimmed}`;
+}
+
+function toAssetLabel(url, fallbackLabel = "Site-Modell") {
+  const normalized = normalizeSiteAssetUrl(url);
+  if (!normalized) {
+    return fallbackLabel;
+  }
+
+  const parts = normalized.split("/");
+  const filename = parts[parts.length - 1];
+  return filename || fallbackLabel;
+}
+
+function clampSiteToleranceMeters(value) {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_GEO_SITE_TOLERANCE_METERS;
+  }
+
+  return Math.min(Math.max(value, MIN_GEO_SITE_TOLERANCE_METERS), MAX_GEO_SITE_TOLERANCE_METERS);
+}
+
 function buildCameraState(viewerPose) {
   if (!viewerPose || !viewerPose.transform) {
     return null;
@@ -207,6 +247,7 @@ export class ARApp {
     this.selectedPlacementMode = PlacementUIModel.FREE;
     this.lastXRPlacementMode = PlacementUIModel.FREE;
     this.geoSensorActive = false;
+    this.activePlacementAssetSource = "default";
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -225,8 +266,10 @@ export class ARApp {
     this.placementController.setAsset(assetInfo.object);
 
     this.ui.setAssetLabel(assetInfo.label);
+    this.activePlacementAssetSource = "default";
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
+    this.applySiteGeoTargetFromConfig({ force: true });
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
     this.ui.bindSensorFusion(this.sensorFusion);
@@ -300,6 +343,135 @@ export class ARApp {
     }
   }
 
+  getSiteGeoPlacementConfig() {
+    if (!this.siteConfig) {
+      return null;
+    }
+
+    const sitePlacement =
+      this.siteConfig.placement && typeof this.siteConfig.placement === "object"
+        ? this.siteConfig.placement
+        : null;
+    const targetSource =
+      sitePlacement && sitePlacement.target && typeof sitePlacement.target === "object"
+        ? sitePlacement.target
+        : this.siteConfig.origin;
+
+    if (!targetSource) {
+      return null;
+    }
+
+    const latitude = Number.isFinite(targetSource.lat) ? targetSource.lat : targetSource.latitude;
+    const longitude = Number.isFinite(targetSource.lon) ? targetSource.lon : targetSource.longitude;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null;
+    }
+
+    const targetCoord = {
+      latitude,
+      longitude
+    };
+
+    const preferredAssetUrl =
+      sitePlacement && typeof sitePlacement.asset === "string" && sitePlacement.asset.trim()
+        ? sitePlacement.asset.trim()
+        : this.siteConfig.scene && typeof this.siteConfig.scene.asset === "string"
+          ? this.siteConfig.scene.asset
+          : null;
+    const assetUrl = normalizeSiteAssetUrl(preferredAssetUrl);
+    const toleranceMeters = clampSiteToleranceMeters(
+      sitePlacement && Number.isFinite(sitePlacement.maxDistanceMeters)
+        ? sitePlacement.maxDistanceMeters
+        : DEFAULT_GEO_SITE_TOLERANCE_METERS
+    );
+
+    return {
+      targetCoord,
+      assetUrl,
+      assetLabel: toAssetLabel(assetUrl),
+      toleranceMeters
+    };
+  }
+
+  applySiteGeoTargetFromConfig({ force = false } = {}) {
+    if (!this.placementController || !this.siteConfig) {
+      return false;
+    }
+
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    if (!placementConfig || !placementConfig.targetCoord) {
+      return false;
+    }
+
+    if (!force && this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+      return false;
+    }
+
+    const accepted = this.placementController.setGeoTarget(placementConfig.targetCoord);
+    if (!accepted) {
+      return false;
+    }
+
+    this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
+    return true;
+  }
+
+  getGeoSiteToleranceMeters() {
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    return placementConfig ? placementConfig.toleranceMeters : DEFAULT_GEO_SITE_TOLERANCE_METERS;
+  }
+
+  isWithinGeoSiteTolerance(distanceMeters) {
+    return Number.isFinite(distanceMeters) && distanceMeters <= this.getGeoSiteToleranceMeters();
+  }
+
+  async ensurePlacementAssetForExperience(experienceMode) {
+    if (!this.placementController) {
+      return false;
+    }
+
+    if (experienceMode === ExperienceMode.GEO_SENSOR) {
+      const placementConfig = this.getSiteGeoPlacementConfig();
+      if (!placementConfig || !placementConfig.assetUrl) {
+        return true;
+      }
+
+      if (this.activePlacementAssetSource === placementConfig.assetUrl) {
+        return true;
+      }
+
+      try {
+        const assetInfo = await this.sceneManager.createPlacementAssetFromUrl(
+          placementConfig.assetUrl,
+          placementConfig.assetLabel
+        );
+        this.placementController.setAsset(assetInfo.object);
+        this.activePlacementAssetSource = placementConfig.assetUrl;
+        this.ui.setAssetLabel(assetInfo.label);
+        return true;
+      } catch (error) {
+        this.ui.setMessage(`Geo-Modell konnte nicht geladen werden: ${toMessage(error)}`);
+        this.ui.setHint("Pruefe den Modellpfad in der Site-JSON (placement.asset).");
+        return false;
+      }
+    }
+
+    if (this.activePlacementAssetSource === "default") {
+      return true;
+    }
+
+    try {
+      const defaultAssetInfo = await this.sceneManager.createPlacementAsset();
+      this.placementController.setAsset(defaultAssetInfo.object);
+      this.activePlacementAssetSource = "default";
+      this.ui.setAssetLabel(defaultAssetInfo.label);
+      return true;
+    } catch (error) {
+      this.ui.setMessage(`Standard-Modell konnte nicht geladen werden: ${toMessage(error)}`);
+      return false;
+    }
+  }
+
   async startSelectedExperience() {
     if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
       return false;
@@ -312,7 +484,18 @@ export class ARApp {
         return false;
       }
 
+      this.applySiteGeoTargetFromConfig({ force: true });
+      const siteAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.GEO_SENSOR);
+      if (!siteAssetReady) {
+        return false;
+      }
+
       return this.startGeoSensorMode();
+    }
+
+    const defaultAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
+    if (!defaultAssetReady) {
+      return false;
     }
 
     return this.startAR();
@@ -413,6 +596,7 @@ export class ARApp {
       return false;
     }
 
+    this.applySiteGeoTargetFromConfig({ force: true });
     this.ui.setMessage("Starte Geo-Modus in WebXR...");
     const arStarted = await this.startAR({
       allowGeoGlobal: true
@@ -448,7 +632,9 @@ export class ARApp {
     this.syncPresentationVisibility();
     this.ui.setSessionState(true, `Geo-Modus aktiv. Site '${this.siteConfig.id}' geladen.`);
     this.syncDebugPanels(this.activeSurfaceState, null, this.sensorFusion.getSnapshot());
-    this.ui.setHint("Geo-Modus aktiv. Warte auf stabile Flaeche und Sensoren; das Objekt wird geobasiert am Boden platziert.");
+    this.ui.setHint(
+      `Geo-Modus aktiv. Zielkoordinate aus Site geladen (Toleranz ${this.getGeoSiteToleranceMeters().toFixed(1)} m).`
+    );
     return true;
   }
 
@@ -693,6 +879,10 @@ export class ARApp {
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
 
+    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
+      this.applySiteGeoTargetFromConfig({ force: true });
+    }
+
     if (this.placementController.isPlaced()) {
       this.ui.setHint("Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.");
     } else if (normalizedMode === PlacementUIModel.GEO_LOCAL) {
@@ -733,6 +923,10 @@ export class ARApp {
 
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
+
+    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
+      this.applySiteGeoTargetFromConfig({ force: true });
+    }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.ui.setHint("Geo (WebXR) ausgewaehlt. Beim Start werden WebXR, Standort und IMU/Kompass gemeinsam aktiviert.");
@@ -897,6 +1091,15 @@ export class ARApp {
       return false;
     }
 
+    const siteToleranceMeters = this.getGeoSiteToleranceMeters();
+    if (!this.isWithinGeoSiteTolerance(computation.distanceMeters)) {
+      this.ui.setMessage(
+        `Du bist ${computation.distanceMeters.toFixed(1)} m vom Geo-Ziel entfernt. Fuer diese Site sind max. ${siteToleranceMeters.toFixed(1)} m erlaubt.`
+      );
+      this.ui.setHint("Bewege dich naeher an die Zielkoordinate und halte das Geraet ueber einer stabilen Flaeche.");
+      return false;
+    }
+
     const placed = this.placementController.placeGeoAtPose(computation.pose, cameraState);
     if (!placed) {
       return false;
@@ -924,6 +1127,10 @@ export class ARApp {
 
     const computation = this.placementController.computeGeoPosition(surfaceState.stablePose, cameraState);
     if (computation.status !== "ready" || !computation.pose) {
+      return;
+    }
+
+    if (!this.isWithinGeoSiteTolerance(computation.distanceMeters)) {
       return;
     }
 
@@ -1116,6 +1323,14 @@ export class ARApp {
 
     if (geoDebug.status === "too-far" && Number.isFinite(geoDebug.distanceMeters)) {
       this.ui.setHint(`Ziel zu weit entfernt: ${geoDebug.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`);
+      return;
+    }
+
+    const siteToleranceMeters = this.getGeoSiteToleranceMeters();
+    if (Number.isFinite(geoDebug.distanceMeters) && geoDebug.distanceMeters > siteToleranceMeters) {
+      this.ui.setHint(
+        `Zielkoordinate noch zu weit: ${geoDebug.distanceMeters.toFixed(1)} m. Fuer diese Site sind max. ${siteToleranceMeters.toFixed(1)} m erlaubt.`
+      );
       return;
     }
 
