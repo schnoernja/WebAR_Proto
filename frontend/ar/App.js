@@ -9,6 +9,7 @@ import { GeoLocationService } from "./GeoLocationService.js";
 import { SiteLoader } from "./geo/SiteLoader.js";
 import { SensorFusion } from "./geo/SensorFusion.js";
 import { GeoSceneManager } from "./geo/GeoSceneManager.js";
+import { APP_CONFIG } from "./config.js";
 
 const ExperienceMode = Object.freeze({
   XR: "xr",
@@ -336,6 +337,7 @@ export class ARApp {
     this.ui.setMessage("Starte Geo-Sensor-Modus...");
 
     try {
+      await this.requestGeoCameraPermissionViaARFlow();
       await this.sceneManager.startCameraVideo();
       this.sceneManager.setGeoMode(true);
       return true;
@@ -348,6 +350,43 @@ export class ARApp {
       this.ui.setHint(feedback.hint);
       return false;
     }
+  }
+
+  async requestGeoCameraPermissionViaARFlow() {
+    if (!navigator.xr || typeof navigator.xr.requestSession !== "function") {
+      return true;
+    }
+
+    const overlayRoot = this.document.getElementById("hud");
+    const preferredInit = {
+      requiredFeatures: APP_CONFIG.ar.requiredFeatures,
+      optionalFeatures: APP_CONFIG.ar.optionalFeatures,
+      domOverlay: overlayRoot ? { root: overlayRoot } : undefined
+    };
+    const fallbackInit = {
+      requiredFeatures: APP_CONFIG.ar.requiredFeatures
+    };
+
+    let session = null;
+    try {
+      session = await navigator.xr.requestSession(APP_CONFIG.ar.sessionMode, preferredInit);
+    } catch (firstError) {
+      try {
+        session = await navigator.xr.requestSession(APP_CONFIG.ar.sessionMode, fallbackInit);
+      } catch (secondError) {
+        throw secondError || firstError;
+      }
+    }
+
+    if (session) {
+      try {
+        await session.end();
+      } catch {
+        // Permission preflight only. Ignore end cleanup errors.
+      }
+    }
+
+    return true;
   }
 
   async requestGeoLocationFromUserGesture() {

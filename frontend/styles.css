@@ -83,6 +83,29 @@ body.ar-active {
   overflow: hidden;
 }
 
+#app-version {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 4px);
+  left: calc(env(safe-area-inset-left, 0px) + 8px);
+  z-index: 1300;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  background: rgba(248, 243, 233, 0.34);
+  color: rgba(19, 35, 38, 0.62);
+  font-size: 0.64rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  user-select: none;
+}
+
+body.ar-active #app-version {
+  border-color: rgba(244, 241, 231, 0.14);
+  background: rgba(17, 26, 28, 0.24);
+  color: rgba(244, 241, 231, 0.72);
+}
+
 #render-root {
   position: fixed;
   inset: 0;
@@ -926,6 +949,12 @@ body.ar-active .state-item {
 }
 
 @media (max-width: 720px) {
+  #app-version {
+    top: calc(env(safe-area-inset-top, 0px) + 3px);
+    left: calc(env(safe-area-inset-left, 0px) + 6px);
+    font-size: 0.6rem;
+  }
+
   .floating-menu-button {
     top: 10px;
     right: 10px;
