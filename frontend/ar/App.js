@@ -199,6 +199,7 @@ export class ARApp {
     this.arSessionManager = null;
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
+    this.lastCameraState = null;
     this.isUIInteracting = false;
     this.isTextInputActive = false;
     this.siteConfig = null;
@@ -245,7 +246,7 @@ export class ARApp {
 
     this.ui.bindActions({
       onStartAR: () => this.startSelectedExperience(),
-      onPlace: () => this.placeFreeObject(),
+      onPlace: () => this.placeObjectFromUI(),
       onResetPlacement: () => this.resetPlacement(),
       onStopAR: () => this.stopActiveExperience(),
       onApplyGeoTarget: (coord) => this.applyGeoTarget(coord),
@@ -548,6 +549,7 @@ export class ARApp {
     const wasGeoSensor = this.geoSensorActive;
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
+    this.lastCameraState = null;
     this.geoSensorActive = false;
     if (wasGeoSensor) {
       this.sensorFusion.stop();
@@ -590,6 +592,7 @@ export class ARApp {
           : null;
       const tracking = Boolean(viewerPose);
       const cameraState = buildCameraState(viewerPose);
+      this.lastCameraState = tracking && cameraState ? cameraState : null;
 
       this.ui.setTrackingState(tracking);
 
@@ -648,6 +651,11 @@ export class ARApp {
 
     if (this.placementController.getMode() === PlacementMode.FREE) {
       this.placeFreeObject("xr");
+      return;
+    }
+
+    if (this.placementController.getMode() === PlacementMode.GEO) {
+      this.placeGeoObject("xr");
     }
   }
 
@@ -781,6 +789,18 @@ export class ARApp {
     return true;
   }
 
+  placeObjectFromUI() {
+    if (!this.placementController) {
+      return false;
+    }
+
+    if (this.placementController.getMode() === PlacementMode.GEO) {
+      return this.placeGeoObject("ui");
+    }
+
+    return this.placeFreeObject("ui");
+  }
+
   placeFreeObject(source = "ui") {
     if (!this.arSessionManager || !this.arSessionManager.isActive()) {
       return false;
@@ -811,6 +831,82 @@ export class ARApp {
     this.ui.setPlacementState(true);
     this.ui.setMessage("Objekt stabil auf der erkannten Flaeche platziert.");
     this.ui.setHint("Placement-Lock aktiv. Neu platzieren nur per Reset.");
+    return true;
+  }
+
+  placeGeoObject(source = "ui") {
+    if (!this.arSessionManager || !this.arSessionManager.isActive()) {
+      return false;
+    }
+
+    if (this.isTextInputActive) {
+      return false;
+    }
+
+    if (source !== "ui" && this.isUIInteracting) {
+      return false;
+    }
+
+    if (this.placementController.getMode() !== PlacementMode.GEO) {
+      return false;
+    }
+
+    if (this.placementController.isPlaced()) {
+      return false;
+    }
+
+    if (!this.activeSurfaceState || !this.activeSurfaceState.isStable || !this.activeSurfaceState.stablePose) {
+      this.ui.setMessage("Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
+      return false;
+    }
+
+    const cameraState = this.lastCameraState;
+    if (!cameraState) {
+      this.ui.setMessage("Tracking pausiert. Halte das Geraet ruhig, bis WebXR wieder Viewer-Pose liefert.");
+      return false;
+    }
+
+    if (!this.placementController.hasGeoReferenceDirection()) {
+      this.captureGeoReferenceDirection(cameraState);
+    }
+
+    if (!this.placementController.hasGeoReferenceDirection()) {
+      this.ui.setMessage("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      return false;
+    }
+
+    if (!this.placementController.hasGeoOrigin()) {
+      const captured = this.captureGeoOriginFromDevice();
+      if (!captured) {
+        this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+        return false;
+      }
+    }
+
+    const computation = this.placementController.computeGeoPosition(this.activeSurfaceState.stablePose, cameraState);
+    if (computation.status !== "ready" || !computation.pose) {
+      if (computation.status === "too-far" && Number.isFinite(computation.distanceMeters)) {
+        this.ui.setMessage(
+          `Ziel zu weit entfernt: ${computation.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`
+        );
+      } else if (computation.status === "missing-origin") {
+        this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+      } else if (computation.status === "missing-reference") {
+        this.ui.setMessage("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      }
+      return false;
+    }
+
+    const placed = this.placementController.placeGeoAtPose(computation.pose, cameraState);
+    if (!placed) {
+      return false;
+    }
+
+    this.ui.setPlacementState(true);
+    this.ui.setMessage(
+      `Objekt im Koordinaten-Modus platziert. Distanz zum Startpunkt: ${computation.distanceMeters.toFixed(1)} m.`
+    );
+    this.ui.setHint("Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.");
     return true;
   }
 

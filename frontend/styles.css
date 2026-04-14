@@ -471,7 +471,7 @@ body.ar-active .welcome-headline {
   left: 14px;
   z-index: 1050;
   width: min(460px, calc(100vw - 20px));
-  max-height: 80vh;
+  max-height: 76vh;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -481,17 +481,25 @@ body.ar-active .welcome-headline {
 .hud-shell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding-bottom: 8px;
 }
 
 .hud-toolbar,
 .card-panel {
-  padding: 16px;
+  padding: 14px;
 }
 
 .card-panel {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: min(34vh, 320px);
+  overflow: hidden;
+}
+
+.hero-panel {
+  max-height: min(40vh, 380px);
 }
 
 .hud-toolbar-main {
@@ -578,7 +586,13 @@ body.ar-active .mini-pill {
 }
 
 .card-content {
-  margin-top: 14px;
+  margin-top: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 4px;
 }
 
 .card-panel.is-collapsed .card-content {
@@ -971,13 +985,21 @@ body.ar-active .state-item {
     top: 10px;
     left: 10px;
     width: calc(100vw - 20px);
-    max-height: 80vh;
+    max-height: 74vh;
   }
 
   .hud-toolbar,
   .card-panel,
   .menu-panel {
     padding: 14px;
+  }
+
+  .card-panel {
+    max-height: min(35vh, 280px);
+  }
+
+  .hero-panel {
+    max-height: min(42vh, 340px);
   }
 
   h1 {
@@ -1010,6 +1032,7 @@ body.ar-active .state-item {
 
   .hud {
     width: calc(100vw - 20px);
+    max-height: 72vh;
   }
 
   .card-header,

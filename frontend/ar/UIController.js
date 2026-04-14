@@ -2103,17 +2103,19 @@ export class UIController {
     }
 
     if (this.placeButton) {
+      const placementModeAllowsPlacement =
+        this.uiState.placementMode === "free" ||
+        this.uiState.placementMode === "geo-local" ||
+        this.uiState.placementMode === "geo-global";
       this.placeButton.disabled =
-        this.uiState.experienceMode !== "xr" ||
-        this.uiState.placementMode !== "free" ||
+        !placementModeAllowsPlacement ||
         !this.uiState.sessionActive ||
         !this.uiState.stableSurface ||
         this.uiState.placed;
     }
 
     if (this.resetButton) {
-      this.resetButton.disabled =
-        this.uiState.experienceMode === "geo-sensor" || (!this.uiState.sessionActive && !this.uiState.placed);
+      this.resetButton.disabled = !this.uiState.sessionActive && !this.uiState.placed;
     }
 
     if (this.stopButton) {
