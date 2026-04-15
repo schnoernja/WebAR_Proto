@@ -514,10 +514,11 @@ body.ar-active .welcome-headline {
 .hud {
   position: fixed;
   top: 14px;
+  bottom: 14px;
   left: 14px;
   z-index: 1050;
   width: min(460px, calc(100vw - 20px));
-  max-height: 76vh;
+  max-height: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
@@ -1092,9 +1093,10 @@ body.ar-active .state-item {
 
   .hud {
     top: 10px;
+    bottom: 10px;
     left: 10px;
     width: calc(100vw - 20px);
-    max-height: 74vh;
+    max-height: none;
   }
 
   .hud-toolbar,
@@ -1141,7 +1143,7 @@ body.ar-active .state-item {
 
   .hud {
     width: calc(100vw - 20px);
-    max-height: 72vh;
+    max-height: none;
   }
 
   .card-header,
