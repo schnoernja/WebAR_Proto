@@ -414,6 +414,7 @@ const DE_TRANSLATIONS = Object.freeze({
     title: "Geo Test-Anpassung",
     description: "Offset, Skalierung und Rotation fuer Geo-Placement live testen. Werte werden zu den JSON-Vorgaben addiert bzw. ueberlagert.",
     siteCalibrationToggle: "JSON-Offset aktivieren",
+    adoptAsSiteCalibration: "Test-Offset als JSON-Kalibrierung uebernehmen",
     toggle: "Offset aktivieren",
     eastLabel: "X (Ost/West)",
     northLabel: "Y (Nord/Sued)",
@@ -704,6 +705,7 @@ const EN_TRANSLATIONS = Object.freeze({
     title: "Geo Test Adjustments",
     description: "Live-test offset, scale, and rotation for geo placement. Values are added to or layered over JSON defaults.",
     siteCalibrationToggle: "Enable JSON offset",
+    adoptAsSiteCalibration: "Apply test offset as JSON calibration",
     toggle: "Enable offset",
     eastLabel: "X (East/West)",
     northLabel: "Y (North/South)",
@@ -977,6 +979,7 @@ export class UIController {
       rotationEnabled: this.document.getElementById("geo-rotation-enabled"),
       rotationRange: this.document.getElementById("geo-rotation-range"),
       rotationValue: this.document.getElementById("geo-rotation-value"),
+      adoptButton: this.document.getElementById("geo-offset-adopt-button"),
       resetButton: this.document.getElementById("geo-offset-reset-button")
     };
 
@@ -1272,6 +1275,7 @@ export class UIController {
     onCalibrateHeading,
     onGeoOffsetToggle,
     onGeoOffsetChange,
+    onGeoOffsetAdopt,
     onGeoOffsetReset,
     onUIInteractionChange,
     onTextInputActiveChange
@@ -1308,6 +1312,7 @@ export class UIController {
     this.bindGeoOffsetControls({
       onGeoOffsetToggle,
       onGeoOffsetChange,
+      onGeoOffsetAdopt,
       onGeoOffsetReset
     });
     this.bindTextInputActivity();
@@ -1630,7 +1635,7 @@ export class UIController {
     }
   }
 
-  bindGeoOffsetControls({ onGeoOffsetToggle, onGeoOffsetChange, onGeoOffsetReset } = {}) {
+  bindGeoOffsetControls({ onGeoOffsetToggle, onGeoOffsetChange, onGeoOffsetAdopt, onGeoOffsetReset } = {}) {
     const changeHandler = typeof onGeoOffsetChange === "function" ? onGeoOffsetChange : onGeoOffsetToggle;
 
     if (this.geoOffsetRefs.enabled) {
@@ -1701,6 +1706,14 @@ export class UIController {
       this.cleanupCallbacks.push(() =>
         this.geoOffsetRefs.rotationRange.removeEventListener("input", handleRotationInput)
       );
+    }
+
+    if (this.geoOffsetRefs.adoptButton) {
+      const handleAdopt = () => {
+        this.handleGeoOffsetAdopt(onGeoOffsetAdopt);
+      };
+      this.geoOffsetRefs.adoptButton.addEventListener("click", handleAdopt);
+      this.cleanupCallbacks.push(() => this.geoOffsetRefs.adoptButton.removeEventListener("click", handleAdopt));
     }
 
     if (this.geoOffsetRefs.resetButton) {
@@ -1848,6 +1861,17 @@ export class UIController {
             rotationDeg: 0
           };
     this.setGeoOffsetControlState(resetState);
+  }
+
+  handleGeoOffsetAdopt(handler) {
+    if (typeof handler !== "function") {
+      return;
+    }
+
+    const nextState = handler(this.getGeoOffsetControlState());
+    if (nextState && typeof nextState === "object") {
+      this.setGeoOffsetControlState(nextState);
+    }
   }
 
   setGeoOffsetControlState(state = {}) {
@@ -2380,6 +2404,7 @@ export class UIController {
     this.setElementText(this.staticRefs.scaleLabel, text.offset.scaleLabel);
     this.setElementText(this.staticRefs.rotationToggleLabel, text.offset.rotationToggle);
     this.setElementText(this.staticRefs.rotationLabel, text.offset.rotationLabel);
+    this.setElementText(this.geoOffsetRefs.adoptButton, text.offset.adoptAsSiteCalibration);
     this.setElementText(this.geoOffsetRefs.resetButton, text.offset.reset);
     this.setElementText(this.activateGeoButton, text.geo.buttons.location);
     this.setElementText(this.calibrateHeadingButton, text.geo.buttons.calibrate);

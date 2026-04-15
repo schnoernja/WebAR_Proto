@@ -412,6 +412,7 @@ export class ARApp {
       onCalibrateHeading: () => this.calibrateGeoHeading(),
       onGeoOffsetToggle: (state) => this.applyGeoOffsetState(state),
       onGeoOffsetChange: (state) => this.applyGeoOffsetState(state),
+      onGeoOffsetAdopt: (state) => this.adoptGeoOffsetAsSiteCalibration(state),
       onGeoOffsetReset: () => this.resetGeoOffsetState(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
@@ -628,6 +629,49 @@ export class ARApp {
       rotationEnabled: false,
       rotationDeg: 0
     });
+  }
+
+  adoptGeoOffsetAsSiteCalibration(offsetState = null) {
+    if (!this.siteConfig) {
+      this.ui.setMessage("Keine Site geladen. JSON-Kalibrierung kann nicht uebernommen werden.");
+      return null;
+    }
+
+    const state = offsetState && typeof offsetState === "object" ? offsetState : this.geoOffsetUiState;
+    if (!state.enabled) {
+      this.ui.setMessage("Aktiviere zuerst den Test-Offset, um ihn als JSON-Kalibrierung zu uebernehmen.");
+      return null;
+    }
+
+    const sitePlacement =
+      this.siteConfig.placement && typeof this.siteConfig.placement === "object"
+        ? this.siteConfig.placement
+        : {};
+    if (!this.siteConfig.placement || typeof this.siteConfig.placement !== "object") {
+      this.siteConfig.placement = sitePlacement;
+    }
+
+    const baseCalibration = normalizeGeoCalibration(sitePlacement.calibration);
+    const adoptedCalibration = {
+      eastMeters: baseCalibration.eastMeters + clampGeoOffsetMeters(state.eastMeters),
+      northMeters: baseCalibration.northMeters + clampGeoOffsetMeters(state.northMeters),
+      yawDeg: baseCalibration.yawDeg
+    };
+    this.siteConfig.placement.calibration = adoptedCalibration;
+
+    const nextState = this.applyGeoOffsetState({
+      ...this.geoOffsetUiState,
+      useSiteCalibration: true,
+      enabled: false,
+      eastMeters: 0,
+      northMeters: 0
+    });
+
+    this.ui.setMessage(
+      `JSON-Kalibrierung uebernommen: E ${adoptedCalibration.eastMeters.toFixed(2)} m, N ${adoptedCalibration.northMeters.toFixed(2)} m.`
+    );
+    this.ui.setHint("Druecke 'Neu platzieren', um mit der uebernommenen JSON-Kalibrierung zu testen.");
+    return nextState;
   }
 
   syncGeoAdjustmentsAfterOffsetChange() {
