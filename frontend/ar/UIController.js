@@ -34,6 +34,14 @@ const ACTION_MENU_TABS = Object.freeze({
   settings: "settings"
 });
 
+const UI_MODE = Object.freeze({
+  DEVELOPER: "developer",
+  USER: "user"
+});
+const UI_MODE_STORAGE_KEY = "epartwin-ui-mode";
+const USER_MODE_VISIBLE_CARDS = Object.freeze(["welcome", "placement", "help"]);
+const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze(["help"]);
+
 const MAX_GEO_OFFSET_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 1;
 const MAX_GEO_SCALE_FACTOR = 3;
@@ -206,6 +214,11 @@ const DE_TRANSLATIONS = Object.freeze({
     helpCopy: "Die Hilfskachel laesst sich jederzeit erneut einblenden.",
     surveyCopy: "Die Umfragekachel enthaelt einen Platzhalter fuer eine spaetere Nutzerumfrage.",
     settingsCopy: "Die Einstellungenkachel enthaelt die Sprachumschaltung fuer die UI.",
+    uiModeLabel: "Ansicht",
+    uiModes: {
+      user: "Benutzer",
+      developer: "Entwickler"
+    },
     openHelp: "Hilfskachel oeffnen",
     openSurvey: "Umfragekachel oeffnen",
     openSettings: "Einstellungen oeffnen",
@@ -256,6 +269,13 @@ const DE_TRANSLATIONS = Object.freeze({
       "2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.",
       "3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.",
       "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum uebertragen und auf der stabilen Bodenflaeche verankert."
+    ],
+    userSteps: [
+      "1. Zum Starten der WebAR-Anwendung mit dem Ruecken zum QR-Code stehen.",
+      "2. Standort aktivieren, dann AR starten klicken.",
+      "3. Zugriff auf Standort und AR/Kamera zulassen.",
+      "4. Handy auf den Boden richten, bis oben rechts 'Objekt: Platziert' angezeigt wird.",
+      "5. Dann umgucken."
     ]
   },
   survey: {
@@ -483,6 +503,11 @@ const EN_TRANSLATIONS = Object.freeze({
     helpCopy: "The help card can be opened again at any time.",
     surveyCopy: "The survey card contains a placeholder for a future user survey.",
     settingsCopy: "The settings card contains the language switch for the UI.",
+    uiModeLabel: "View",
+    uiModes: {
+      user: "User",
+      developer: "Developer"
+    },
     openHelp: "Open help card",
     openSurvey: "Open survey card",
     openSettings: "Open settings",
@@ -533,6 +558,13 @@ const EN_TRANSLATIONS = Object.freeze({
       "2. Move the device slowly until a stable surface is detected.",
       "3. In free mode you place the object directly on the stable surface.",
       "4. In coordinate mode the target latitude and longitude are mapped into WebXR space and anchored on the stable ground surface."
+    ],
+    userSteps: [
+      "1. Start the WebAR experience while standing with your back to the QR code.",
+      "2. Enable location, then tap Start AR.",
+      "3. Allow access to location and AR/camera.",
+      "4. Point the phone at the floor until the top-right status shows 'Object: Placed'.",
+      "5. Then look around."
     ]
   },
   survey: {
@@ -877,6 +909,8 @@ export class UIController {
     this.menuButton = this.document.getElementById("menu-button");
     this.menuOverlay = this.document.getElementById("menu-overlay");
     this.menuCloseButton = this.document.getElementById("menu-close-button");
+    this.uiModeUserButton = this.document.getElementById("ui-mode-user-button");
+    this.uiModeDeveloperButton = this.document.getElementById("ui-mode-developer-button");
     this.openHelpCardButton = this.document.getElementById("open-help-card-button");
     this.openSurveyCardButton = this.document.getElementById("open-survey-card-button");
     this.openSettingsCardButton = this.document.getElementById("open-settings-card-button");
@@ -909,7 +943,9 @@ export class UIController {
     };
 
     this.experienceModeSelect = this.document.getElementById("experience-mode-select");
+    this.experienceModeField = this.experienceModeSelect ? this.experienceModeSelect.closest("label") : null;
     this.modeSelect = this.document.getElementById("placement-mode-select");
+    this.placementModeField = this.modeSelect ? this.modeSelect.closest("label") : null;
     this.geoTargetInputs = {
       latitude: this.document.getElementById("geo-target-latitude"),
       longitude: this.document.getElementById("geo-target-longitude")
@@ -1006,6 +1042,7 @@ export class UIController {
         survey: this.document.querySelector('[data-menu-panel="survey"] .menu-copy'),
         settings: this.document.querySelector('[data-menu-panel="settings"] .menu-copy')
       },
+      menuUiModeLabel: this.document.getElementById("menu-ui-mode-label"),
       menuVisibilityLabels: {
         placement: this.getVisibilityToggleLabel("placement"),
         coord: this.getVisibilityToggleLabel("coord"),
@@ -1095,6 +1132,7 @@ export class UIController {
       placementMode: "free",
       geoStatus: "not-requested",
       geoWatchActive: false,
+      uiMode: this.readPersistedUIMode(),
       menuOpen: false,
       activeMenuTab: "placement",
       cardVisibility: { ...DEFAULT_CARD_VISIBILITY },
@@ -1132,12 +1170,14 @@ export class UIController {
     this.uiInteractionReleaseTimeoutId = null;
     this.textInputReleaseTimeoutId = null;
     this.cleanupCallbacks = [];
+    this.developerCardVisibilitySnapshot = null;
 
     this.configureTextInputs();
     this.applyMenuState();
     this.applyMenuTabState();
     this.applyAllCardStates();
     this.applyStaticTexts();
+    this.applyUIModeLayout();
     this.setExperienceMode(this.uiState.experienceMode);
     this.setPlacementMode(this.uiState.placementMode);
     this.setGeoOffsetControlState(this.geoOffsetDraft);
@@ -1151,6 +1191,27 @@ export class UIController {
 
   getText() {
     return getTranslations(this.uiState.language);
+  }
+
+  readPersistedUIMode() {
+    try {
+      const storedMode = window.localStorage.getItem(UI_MODE_STORAGE_KEY);
+      return storedMode === UI_MODE.USER ? UI_MODE.USER : UI_MODE.DEVELOPER;
+    } catch (_error) {
+      return UI_MODE.DEVELOPER;
+    }
+  }
+
+  persistUIMode(mode) {
+    try {
+      window.localStorage.setItem(UI_MODE_STORAGE_KEY, mode);
+    } catch (_error) {
+      // Ignore storage errors.
+    }
+  }
+
+  isUserMode() {
+    return this.uiState.uiMode === UI_MODE.USER;
   }
 
   getStateRef(key) {
@@ -1229,6 +1290,7 @@ export class UIController {
 
     this.bindCardToggleButtons();
     this.bindMenuControls();
+    this.bindUIModeControls(onExperienceModeChange);
     this.bindLanguageControls();
     this.bindInteractionSurface(this.uiContainer);
     this.bindInteractionSurface(this.hudRoot);
@@ -1341,6 +1403,9 @@ export class UIController {
       const handler = () => {
         const tabKey = tabButton.dataset.menuTab || "placement";
         if (tabKey === ACTION_MENU_TABS.help || tabKey === ACTION_MENU_TABS.survey || tabKey === ACTION_MENU_TABS.settings) {
+          if (this.isUserMode() && !USER_MODE_ALLOWED_ACTION_TABS.includes(tabKey)) {
+            return;
+          }
           this.openCard(tabKey);
           this.closeMenu();
           return;
@@ -1530,6 +1595,28 @@ export class UIController {
     for (const trigger of this.geoCopyTriggers) {
       trigger.addEventListener("click", handleCopy);
       this.cleanupCallbacks.push(() => trigger.removeEventListener("click", handleCopy));
+    }
+  }
+
+  bindUIModeControls(onExperienceModeChange) {
+    if (this.uiModeUserButton) {
+      const toUser = () => {
+        this.setUIMode(UI_MODE.USER, {
+          onExperienceModeChange
+        });
+      };
+      this.uiModeUserButton.addEventListener("click", toUser);
+      this.cleanupCallbacks.push(() => this.uiModeUserButton.removeEventListener("click", toUser));
+    }
+
+    if (this.uiModeDeveloperButton) {
+      const toDeveloper = () => {
+        this.setUIMode(UI_MODE.DEVELOPER, {
+          onExperienceModeChange
+        });
+      };
+      this.uiModeDeveloperButton.addEventListener("click", toDeveloper);
+      this.cleanupCallbacks.push(() => this.uiModeDeveloperButton.removeEventListener("click", toDeveloper));
     }
   }
 
@@ -1910,6 +1997,163 @@ export class UIController {
     }
   }
 
+  setUIMode(mode, { onExperienceModeChange } = {}) {
+    const nextMode = mode === UI_MODE.USER ? UI_MODE.USER : UI_MODE.DEVELOPER;
+    if (nextMode === this.uiState.uiMode) {
+      this.updateUIModeButtons();
+      this.applyUIModeLayout({
+        onExperienceModeChange
+      });
+      return;
+    }
+
+    if (nextMode === UI_MODE.USER) {
+      this.developerCardVisibilitySnapshot = { ...this.uiState.cardVisibility };
+    }
+
+    this.uiState.uiMode = nextMode;
+    this.persistUIMode(nextMode);
+    this.applyUIModeLayout({
+      onExperienceModeChange
+    });
+  }
+
+  updateUIModeButtons() {
+    const isUser = this.isUserMode();
+
+    if (this.uiModeUserButton) {
+      this.uiModeUserButton.dataset.active = isUser ? "true" : "false";
+      this.uiModeUserButton.setAttribute("aria-pressed", String(isUser));
+    }
+
+    if (this.uiModeDeveloperButton) {
+      const isDeveloper = !isUser;
+      this.uiModeDeveloperButton.dataset.active = isDeveloper ? "true" : "false";
+      this.uiModeDeveloperButton.setAttribute("aria-pressed", String(isDeveloper));
+    }
+  }
+
+  applyUIModeLayout({ onExperienceModeChange } = {}) {
+    const isUser = this.isUserMode();
+
+    if (isUser) {
+      for (const cardKey of Object.keys(this.cardRefs)) {
+        this.uiState.cardVisibility[cardKey] = USER_MODE_VISIBLE_CARDS.includes(cardKey);
+      }
+      for (const key of USER_MODE_VISIBLE_CARDS) {
+        this.uiState.cardCollapsed[key] = false;
+      }
+
+      if (this.experienceModeField) {
+        this.experienceModeField.hidden = true;
+      }
+
+      if (this.modeSelect) {
+        this.modeSelect.hidden = true;
+      }
+
+      if (this.placementModeField) {
+        this.placementModeField.hidden = true;
+      }
+
+      if (this.placeButton) {
+        this.placeButton.hidden = true;
+      }
+      if (this.resetButton) {
+        this.resetButton.hidden = true;
+      }
+      if (this.stopButton) {
+        this.stopButton.hidden = true;
+      }
+      if (this.geoActivateLocationButton) {
+        this.geoActivateLocationButton.hidden = false;
+      }
+
+      if (this.experienceModeSelect) {
+        this.experienceModeSelect.value = "geo-sensor";
+      }
+
+      if (!this.uiState.sessionActive && typeof onExperienceModeChange === "function") {
+        this.handleExperienceModeChange(onExperienceModeChange);
+      }
+
+      this.uiState.experienceMode = "geo-sensor";
+
+      for (const toggle of this.cardVisibilityToggles) {
+        const cardKey = toggle.dataset.cardVisibilityToggle;
+        const allowed = USER_MODE_VISIBLE_CARDS.includes(cardKey);
+        toggle.disabled = true;
+        toggle.checked = allowed;
+      }
+
+      if (this.staticRefs.menuTabs.developer) {
+        this.staticRefs.menuTabs.developer.hidden = true;
+      }
+      if (this.staticRefs.menuTabs.survey) {
+        this.staticRefs.menuTabs.survey.hidden = true;
+      }
+      if (this.staticRefs.menuTabs.settings) {
+        this.staticRefs.menuTabs.settings.hidden = true;
+      }
+
+      if (
+        this.uiState.activeMenuTab === "developer" ||
+        this.uiState.activeMenuTab === "survey" ||
+        this.uiState.activeMenuTab === "settings"
+      ) {
+        this.setActiveMenuTab("placement");
+      }
+    } else {
+      const fallbackVisibility = { ...DEFAULT_CARD_VISIBILITY };
+      const nextVisibility = this.developerCardVisibilitySnapshot || fallbackVisibility;
+      for (const cardKey of Object.keys(this.cardRefs)) {
+        this.uiState.cardVisibility[cardKey] = Boolean(nextVisibility[cardKey]);
+      }
+
+      if (this.experienceModeField) {
+        this.experienceModeField.hidden = false;
+      }
+
+      if (this.modeSelect) {
+        this.modeSelect.hidden = false;
+      }
+
+      if (this.placementModeField) {
+        this.placementModeField.hidden = false;
+      }
+
+      if (this.placeButton) {
+        this.placeButton.hidden = false;
+      }
+      if (this.resetButton) {
+        this.resetButton.hidden = false;
+      }
+      if (this.stopButton) {
+        this.stopButton.hidden = false;
+      }
+
+      for (const toggle of this.cardVisibilityToggles) {
+        toggle.disabled = false;
+      }
+
+      if (this.staticRefs.menuTabs.developer) {
+        this.staticRefs.menuTabs.developer.hidden = false;
+      }
+      if (this.staticRefs.menuTabs.survey) {
+        this.staticRefs.menuTabs.survey.hidden = false;
+      }
+      if (this.staticRefs.menuTabs.settings) {
+        this.staticRefs.menuTabs.settings.hidden = false;
+      }
+    }
+
+    this.updateUIModeButtons();
+    this.applyAllCardStates();
+    this.renderExperienceModeUI();
+    this.renderHelpCopy();
+    this.refreshButtons();
+  }
+
   setCardVisibility(cardKey, visible) {
     if (!Object.prototype.hasOwnProperty.call(this.uiState.cardVisibility, cardKey)) {
       return;
@@ -2019,6 +2263,9 @@ export class UIController {
     this.setElementText(this.staticRefs.menuCopies.help, text.menu.helpCopy);
     this.setElementText(this.staticRefs.menuCopies.survey, text.menu.surveyCopy);
     this.setElementText(this.staticRefs.menuCopies.settings, text.menu.settingsCopy);
+    this.setElementText(this.staticRefs.menuUiModeLabel, text.menu.uiModeLabel);
+    this.setElementText(this.uiModeUserButton, text.menu.uiModes.user);
+    this.setElementText(this.uiModeDeveloperButton, text.menu.uiModes.developer);
     this.setElementText(this.openHelpCardButton, text.menu.openHelp);
     this.setElementText(this.openSurveyCardButton, text.menu.openSurvey);
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
@@ -2044,7 +2291,7 @@ export class UIController {
     this.setListItems(this.staticRefs.welcomeList, text.welcome.items);
 
     this.setElementText(this.staticRefs.helpTitle, text.help.title);
-    this.setParagraphList(this.staticRefs.helpCopy, text.help.steps);
+    this.renderHelpCopy();
 
     this.setElementText(this.staticRefs.surveyTitle, text.survey.title);
     this.setElementText(this.staticRefs.surveyPlaceholderTitle, text.survey.placeholderTitle);
@@ -2165,6 +2412,12 @@ export class UIController {
     this.renderSensorSnapshot(this.lastSensorSnapshot);
   }
 
+  renderHelpCopy() {
+    const text = this.getText();
+    const helpSteps = this.isUserMode() ? text.help.userSteps : text.help.steps;
+    this.setParagraphList(this.staticRefs.helpCopy, helpSteps);
+  }
+
   updateLanguageButtons() {
     for (const [language, button] of Object.entries(this.languageButtons)) {
       if (!button) {
@@ -2237,20 +2490,21 @@ export class UIController {
 
   renderExperienceModeUI() {
     const text = this.getText();
+    const isUserMode = this.isUserMode();
     const experienceMode = this.uiState.experienceMode === "geo-sensor" ? "geo-sensor" : "xr";
-    const isGeoSensorMode = experienceMode === "geo-sensor";
+    const isGeoSensorMode = isUserMode || experienceMode === "geo-sensor";
 
     if (this.experienceModeSelect) {
-      this.experienceModeSelect.value = experienceMode;
+      this.experienceModeSelect.value = isUserMode ? "geo-sensor" : experienceMode;
     }
 
     if (this.startButton) {
       this.startButton.textContent =
-        isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
+        isUserMode ? text.placement.buttons.startXR : isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
     }
 
     if (this.geoActivateLocationButton) {
-      this.geoActivateLocationButton.hidden = !isGeoSensorMode;
+      this.geoActivateLocationButton.hidden = isUserMode ? false : !isGeoSensorMode;
       this.geoActivateLocationButton.textContent = text.placement.buttons.activateLocation;
     }
 
@@ -2446,10 +2700,14 @@ export class UIController {
     if (active) {
       this.closeMenu();
       this.setCardVisibility("placement", true);
-      this.setCardVisibility("coord", true);
       this.setCardCollapsed("placement", false);
-      this.setCardCollapsed("coord", false);
-      this.setCardVisibility("help", false);
+      if (!this.isUserMode()) {
+        this.setCardVisibility("coord", true);
+        this.setCardCollapsed("coord", false);
+        this.setCardVisibility("help", false);
+      } else {
+        this.setCardVisibility("help", true);
+      }
     }
 
     this.renderSystemStates();

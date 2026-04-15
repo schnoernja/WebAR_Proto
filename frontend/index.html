@@ -19,7 +19,7 @@
 </head>
 <body>
   <div id="app-shell">
-    <div id="app-version" aria-label="Anwendungsversion">v.0.13</div>
+    <div id="app-version" aria-label="Anwendungsversion">v.0.15</div>
     <div id="render-root" aria-label="3D viewport"></div>
 
     <div id="ui-container">
@@ -107,6 +107,30 @@
               >
                 Einstellungen
               </button>
+            </div>
+
+            <div class="menu-mode-block">
+              <p id="menu-ui-mode-label" class="menu-copy">Ansicht</p>
+              <div class="menu-mode-switch" role="group" aria-label="Ansichtsmodus">
+                <button
+                  id="ui-mode-user-button"
+                  class="menu-mode-button"
+                  type="button"
+                  data-ui-mode-option="user"
+                  aria-pressed="false"
+                >
+                  Benutzer
+                </button>
+                <button
+                  id="ui-mode-developer-button"
+                  class="menu-mode-button"
+                  type="button"
+                  data-ui-mode-option="developer"
+                  aria-pressed="true"
+                >
+                  Entwickler
+                </button>
+              </div>
             </div>
 
             <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">

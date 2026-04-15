@@ -453,6 +453,52 @@ body.ar-active .menu-option {
   accent-color: var(--accent);
 }
 
+.menu-mode-block {
+  margin-bottom: 14px;
+}
+
+.menu-mode-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.menu-mode-button {
+  min-height: 42px;
+  border: 1px solid rgba(19, 35, 38, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.menu-mode-button[data-active="true"] {
+  border-color: transparent;
+  background: linear-gradient(135deg, #0e7c74, #14514d);
+  color: #f4f1e7;
+}
+
+body.ar-active .menu-mode-button {
+  border-color: rgba(244, 241, 231, 0.16);
+  background: rgba(244, 241, 231, 0.08);
+  color: #f4f1e7;
+}
+
+.menu-mode-button:hover,
+.menu-mode-button:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(14, 124, 116, 0.4);
+  outline: none;
+}
+
 .welcome-headline {
   margin: 0;
   font-size: 1rem;
