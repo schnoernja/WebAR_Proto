@@ -21,6 +21,10 @@
       "northMeters": 0,
       "yawDeg": 0
     },
+    "transform": {
+      "scaleFactor": 1,
+      "rotationDeg": 0
+    },
     "maxDistanceMeters": 100
   },
   "objects": [

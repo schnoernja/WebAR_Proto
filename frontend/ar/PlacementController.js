@@ -74,11 +74,37 @@ function normalizeGeoCalibration(calibration) {
   };
 }
 
+function normalizePlacementTransform(transform) {
+  const source = transform && typeof transform === "object" ? transform : null;
+  const scaleSource =
+    source && Number.isFinite(source.scaleFactor)
+      ? source.scaleFactor
+      : source && Number.isFinite(source.scale)
+        ? source.scale
+        : 1;
+  const rotationSource =
+    source && Number.isFinite(source.rotationDeg)
+      ? source.rotationDeg
+      : source && Number.isFinite(source.rotation)
+        ? source.rotation
+        : 0;
+  const scaleFactor = clamp(scaleSource, 1, 3);
+  const normalizedRotationDeg = ((rotationSource % 360) + 360) % 360;
+
+  return {
+    scaleFactor,
+    rotationDeg: normalizedRotationDeg,
+    rotationRad: THREE.MathUtils.degToRad(normalizedRotationDeg)
+  };
+}
+
 export class PlacementController {
   constructor({ scene }) {
     this.scene = scene;
     this.objectRoot = new THREE.Group();
+    this.transformRoot = new THREE.Group();
     this.objectRoot.visible = true;
+    this.objectRoot.add(this.transformRoot);
 
     this.mode = isValidMode(APP_CONFIG.placement.defaultMode)
       ? APP_CONFIG.placement.defaultMode
@@ -86,6 +112,7 @@ export class PlacementController {
     this.geoTarget = { ...APP_CONFIG.placement.defaultGeoTarget };
     this.geoOrigin = null;
     this.geoCalibration = normalizeGeoCalibration(null);
+    this.placementTransform = normalizePlacementTransform(null);
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
     this.maxVisibleDistanceMeters = Math.max(
@@ -172,12 +199,13 @@ export class PlacementController {
 
   setAsset(asset) {
     if (this.asset) {
-      this.objectRoot.remove(this.asset);
+      this.transformRoot.remove(this.asset);
       disposeObject3D(this.asset);
     }
 
     this.asset = asset;
-    this.objectRoot.add(this.asset);
+    this.transformRoot.add(this.asset);
+    this.applyPlacementTransform();
     this.showFallbackPreview();
   }
 
@@ -254,6 +282,28 @@ export class PlacementController {
 
   getGeoCalibration() {
     return { ...this.geoCalibration };
+  }
+
+  setPlacementTransform(transform) {
+    this.placementTransform = normalizePlacementTransform(transform);
+    this.applyPlacementTransform();
+    return true;
+  }
+
+  getPlacementTransform() {
+    return {
+      scaleFactor: this.placementTransform.scaleFactor,
+      rotationDeg: this.placementTransform.rotationDeg
+    };
+  }
+
+  applyPlacementTransform() {
+    if (!this.transformRoot) {
+      return;
+    }
+
+    this.transformRoot.scale.setScalar(this.placementTransform.scaleFactor);
+    this.transformRoot.rotation.set(0, this.placementTransform.rotationRad, 0);
   }
 
   setGeoOrigin(coord) {
@@ -550,6 +600,7 @@ export class PlacementController {
     this.objectRoot.visible = this.presentationVisible;
     this.objectRoot.position.set(0, 0, 0);
     this.objectRoot.quaternion.identity();
+    this.applyPlacementTransform();
   }
 
   isPlaced() {

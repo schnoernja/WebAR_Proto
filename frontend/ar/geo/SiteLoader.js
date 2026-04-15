@@ -103,6 +103,24 @@ function normalizePlacementCalibration(calibration) {
   };
 }
 
+function normalizePlacementTransform(transform) {
+  if (transform == null) {
+    return null;
+  }
+
+  if (typeof transform !== "object") {
+    throw new Error("Site-Konfiguration ungueltig: placement.transform muss ein Objekt sein.");
+  }
+
+  const scaleSource = Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : transform.scale;
+  const rotationSource = Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : transform.rotation;
+
+  return {
+    scaleFactor: Number.isFinite(scaleSource) ? scaleSource : 1,
+    rotationDeg: Number.isFinite(rotationSource) ? rotationSource : 0
+  };
+}
+
 function normalizePlacement(placement) {
   if (placement == null) {
     return null;
@@ -118,11 +136,12 @@ function normalizePlacement(placement) {
       : null;
   const target = normalizePlacementTarget(placement.target);
   const calibration = normalizePlacementCalibration(placement.calibration);
+  const transform = normalizePlacementTransform(placement.transform);
   const maxDistanceMeters = Number.isFinite(placement.maxDistanceMeters)
     ? placement.maxDistanceMeters
     : null;
 
-  if (!asset && !target && !calibration && maxDistanceMeters === null) {
+  if (!asset && !target && !calibration && !transform && maxDistanceMeters === null) {
     return null;
   }
 
@@ -130,6 +149,7 @@ function normalizePlacement(placement) {
     asset,
     target,
     calibration,
+    transform,
     maxDistanceMeters
   };
 }

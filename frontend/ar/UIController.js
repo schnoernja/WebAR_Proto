@@ -35,6 +35,8 @@ const ACTION_MENU_TABS = Object.freeze({
 });
 
 const MAX_GEO_OFFSET_METERS = 20;
+const MIN_GEO_SCALE_FACTOR = 1;
+const MAX_GEO_SCALE_FACTOR = 3;
 
 const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
   "tree.glb konnte nicht geladen werden. Platzhalter aktiv.": "Could not load tree.glb. Placeholder active.",
@@ -389,13 +391,19 @@ const DE_TRANSLATIONS = Object.freeze({
     }
   },
   offset: {
-    title: "Geo Offset",
-    description: "Test-Offset fuer Geo-Placement. Werte werden zur Site-Kalibrierung addiert.",
+    title: "Geo Test-Anpassung",
+    description: "Offset, Skalierung und Rotation fuer Geo-Placement live testen. Werte werden zu den JSON-Vorgaben addiert bzw. ueberlagert.",
     toggle: "Offset aktivieren",
     eastLabel: "X (Ost/West)",
     northLabel: "Y (Nord/Sued)",
-    reset: "Offset reset",
-    unit: "m"
+    scaleToggle: "Skalierung aktivieren",
+    scaleLabel: "Skalierung",
+    rotationToggle: "Rotation aktivieren",
+    rotationLabel: "Rotation",
+    reset: "Tests reset",
+    unit: "m",
+    scaleUnit: "x",
+    rotationUnit: "deg"
   },
   debug: {
     title: "Geo Debug",
@@ -660,13 +668,19 @@ const EN_TRANSLATIONS = Object.freeze({
     }
   },
   offset: {
-    title: "Geo Offset",
-    description: "Live test offset for geo placement. Values are added to the site calibration.",
+    title: "Geo Test Adjustments",
+    description: "Live-test offset, scale, and rotation for geo placement. Values are added to or layered over JSON defaults.",
     toggle: "Enable offset",
     eastLabel: "X (East/West)",
     northLabel: "Y (North/South)",
-    reset: "Reset offset",
-    unit: "m"
+    scaleToggle: "Enable scale",
+    scaleLabel: "Scale",
+    rotationToggle: "Enable rotation",
+    rotationLabel: "Rotation",
+    reset: "Reset tests",
+    unit: "m",
+    scaleUnit: "x",
+    rotationUnit: "deg"
   },
   debug: {
     title: "Geo Debug",
@@ -836,6 +850,23 @@ function clampGeoOffset(value) {
   return Math.min(Math.max(value, -MAX_GEO_OFFSET_METERS), MAX_GEO_OFFSET_METERS);
 }
 
+function clampGeoScaleFactor(value) {
+  if (!Number.isFinite(value)) {
+    return MIN_GEO_SCALE_FACTOR;
+  }
+
+  return Math.min(Math.max(value, MIN_GEO_SCALE_FACTOR), MAX_GEO_SCALE_FACTOR);
+}
+
+function normalizeRotationDeg(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  const normalized = value % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
@@ -901,6 +932,12 @@ export class UIController {
       northRange: this.document.getElementById("geo-offset-north-range"),
       eastValue: this.document.getElementById("geo-offset-east-value"),
       northValue: this.document.getElementById("geo-offset-north-value"),
+      scaleEnabled: this.document.getElementById("geo-scale-enabled"),
+      scaleRange: this.document.getElementById("geo-scale-range"),
+      scaleValue: this.document.getElementById("geo-scale-value"),
+      rotationEnabled: this.document.getElementById("geo-rotation-enabled"),
+      rotationRange: this.document.getElementById("geo-rotation-range"),
+      rotationValue: this.document.getElementById("geo-rotation-value"),
       resetButton: this.document.getElementById("geo-offset-reset-button")
     };
 
@@ -1017,6 +1054,10 @@ export class UIController {
       offsetToggleLabel: this.document.getElementById("geo-offset-toggle-label"),
       offsetEastLabel: this.document.getElementById("geo-offset-east-label"),
       offsetNorthLabel: this.document.getElementById("geo-offset-north-label"),
+      scaleToggleLabel: this.document.getElementById("geo-scale-toggle-label"),
+      scaleLabel: this.document.getElementById("geo-scale-label"),
+      rotationToggleLabel: this.document.getElementById("geo-rotation-toggle-label"),
+      rotationLabel: this.document.getElementById("geo-rotation-label"),
       debugTitle: this.document.querySelector("#card-debug .card-title-group h2"),
       debugTag: this.document.querySelector("#card-debug .panel-tag"),
       geoLabels: {
@@ -1075,7 +1116,11 @@ export class UIController {
     this.geoOffsetDraft = {
       enabled: false,
       eastMeters: 0,
-      northMeters: 0
+      northMeters: 0,
+      scaleEnabled: false,
+      scaleFactor: 1,
+      rotationEnabled: false,
+      rotationDeg: 0
     };
     this.latestGeoPosition = null;
     this.lastGeoSnapshot = createGeoSnapshotDefaults();
@@ -1489,9 +1534,11 @@ export class UIController {
   }
 
   bindGeoOffsetControls({ onGeoOffsetToggle, onGeoOffsetChange, onGeoOffsetReset } = {}) {
+    const changeHandler = typeof onGeoOffsetChange === "function" ? onGeoOffsetChange : onGeoOffsetToggle;
+
     if (this.geoOffsetRefs.enabled) {
       const handleToggle = () => {
-        this.handleGeoOffsetToggle(onGeoOffsetToggle);
+        this.handleGeoOffsetToggle(changeHandler);
       };
       this.geoOffsetRefs.enabled.addEventListener("change", handleToggle);
       this.cleanupCallbacks.push(() => this.geoOffsetRefs.enabled.removeEventListener("change", handleToggle));
@@ -1499,7 +1546,7 @@ export class UIController {
 
     if (this.geoOffsetRefs.eastRange) {
       const handleEastInput = () => {
-        this.handleGeoOffsetRangeInput(onGeoOffsetChange);
+        this.handleGeoOffsetRangeInput(changeHandler);
       };
       this.geoOffsetRefs.eastRange.addEventListener("input", handleEastInput);
       this.cleanupCallbacks.push(() => this.geoOffsetRefs.eastRange.removeEventListener("input", handleEastInput));
@@ -1507,10 +1554,46 @@ export class UIController {
 
     if (this.geoOffsetRefs.northRange) {
       const handleNorthInput = () => {
-        this.handleGeoOffsetRangeInput(onGeoOffsetChange);
+        this.handleGeoOffsetRangeInput(changeHandler);
       };
       this.geoOffsetRefs.northRange.addEventListener("input", handleNorthInput);
       this.cleanupCallbacks.push(() => this.geoOffsetRefs.northRange.removeEventListener("input", handleNorthInput));
+    }
+
+    if (this.geoOffsetRefs.scaleEnabled) {
+      const handleScaleToggle = () => {
+        this.handleGeoScaleToggle(changeHandler);
+      };
+      this.geoOffsetRefs.scaleEnabled.addEventListener("change", handleScaleToggle);
+      this.cleanupCallbacks.push(() => this.geoOffsetRefs.scaleEnabled.removeEventListener("change", handleScaleToggle));
+    }
+
+    if (this.geoOffsetRefs.scaleRange) {
+      const handleScaleInput = () => {
+        this.handleGeoScaleRangeInput(changeHandler);
+      };
+      this.geoOffsetRefs.scaleRange.addEventListener("input", handleScaleInput);
+      this.cleanupCallbacks.push(() => this.geoOffsetRefs.scaleRange.removeEventListener("input", handleScaleInput));
+    }
+
+    if (this.geoOffsetRefs.rotationEnabled) {
+      const handleRotationToggle = () => {
+        this.handleGeoRotationToggle(changeHandler);
+      };
+      this.geoOffsetRefs.rotationEnabled.addEventListener("change", handleRotationToggle);
+      this.cleanupCallbacks.push(() =>
+        this.geoOffsetRefs.rotationEnabled.removeEventListener("change", handleRotationToggle)
+      );
+    }
+
+    if (this.geoOffsetRefs.rotationRange) {
+      const handleRotationInput = () => {
+        this.handleGeoRotationRangeInput(changeHandler);
+      };
+      this.geoOffsetRefs.rotationRange.addEventListener("input", handleRotationInput);
+      this.cleanupCallbacks.push(() =>
+        this.geoOffsetRefs.rotationRange.removeEventListener("input", handleRotationInput)
+      );
     }
 
     if (this.geoOffsetRefs.resetButton) {
@@ -1531,11 +1614,23 @@ export class UIController {
         ? Number.parseFloat(this.geoOffsetRefs.northRange.value)
         : this.geoOffsetDraft.northMeters
     );
+    const scaleFactor = clampGeoScaleFactor(
+      this.geoOffsetRefs.scaleRange
+        ? Number.parseFloat(this.geoOffsetRefs.scaleRange.value)
+        : this.geoOffsetDraft.scaleFactor
+    );
+    const rotationDeg = normalizeRotationDeg(
+      this.geoOffsetRefs.rotationRange
+        ? Number.parseFloat(this.geoOffsetRefs.rotationRange.value)
+        : this.geoOffsetDraft.rotationDeg
+    );
 
     this.geoOffsetDraft = {
       ...this.geoOffsetDraft,
       eastMeters,
-      northMeters
+      northMeters,
+      scaleFactor,
+      rotationDeg
     };
   }
 
@@ -1544,6 +1639,34 @@ export class UIController {
     this.geoOffsetDraft = {
       ...this.geoOffsetDraft,
       enabled
+    };
+    this.renderGeoOffsetControls();
+
+    if (typeof handler === "function") {
+      handler(this.getGeoOffsetControlState());
+    }
+  }
+
+  handleGeoScaleToggle(handler) {
+    const scaleEnabled = this.geoOffsetRefs.scaleEnabled ? Boolean(this.geoOffsetRefs.scaleEnabled.checked) : false;
+    this.geoOffsetDraft = {
+      ...this.geoOffsetDraft,
+      scaleEnabled
+    };
+    this.renderGeoOffsetControls();
+
+    if (typeof handler === "function") {
+      handler(this.getGeoOffsetControlState());
+    }
+  }
+
+  handleGeoRotationToggle(handler) {
+    const rotationEnabled = this.geoOffsetRefs.rotationEnabled
+      ? Boolean(this.geoOffsetRefs.rotationEnabled.checked)
+      : false;
+    this.geoOffsetDraft = {
+      ...this.geoOffsetDraft,
+      rotationEnabled
     };
     this.renderGeoOffsetControls();
 
@@ -1561,18 +1684,44 @@ export class UIController {
     }
   }
 
+  handleGeoScaleRangeInput(handler) {
+    this.updateGeoOffsetDraftFromInputs();
+    this.renderGeoOffsetControls();
+
+    if (typeof handler === "function") {
+      handler(this.getGeoOffsetControlState());
+    }
+  }
+
+  handleGeoRotationRangeInput(handler) {
+    this.updateGeoOffsetDraftFromInputs();
+    this.renderGeoOffsetControls();
+
+    if (typeof handler === "function") {
+      handler(this.getGeoOffsetControlState());
+    }
+  }
+
   handleGeoOffsetReset(handler) {
     const resetState =
       typeof handler === "function"
         ? handler() || {
             enabled: false,
             eastMeters: 0,
-            northMeters: 0
+            northMeters: 0,
+            scaleEnabled: false,
+            scaleFactor: 1,
+            rotationEnabled: false,
+            rotationDeg: 0
           }
         : {
             enabled: false,
             eastMeters: 0,
-            northMeters: 0
+            northMeters: 0,
+            scaleEnabled: false,
+            scaleFactor: 1,
+            rotationEnabled: false,
+            rotationDeg: 0
           };
     this.setGeoOffsetControlState(resetState);
   }
@@ -1596,6 +1745,30 @@ export class UIController {
           ? clampGeoOffset(Number.parseFloat(state.northMeters))
           : this.geoOffsetDraft
             ? this.geoOffsetDraft.northMeters
+            : 0,
+      scaleEnabled:
+        typeof state.scaleEnabled === "boolean"
+          ? state.scaleEnabled
+          : this.geoOffsetDraft
+            ? this.geoOffsetDraft.scaleEnabled
+            : false,
+      scaleFactor:
+        state.scaleFactor != null
+          ? clampGeoScaleFactor(Number.parseFloat(state.scaleFactor))
+          : this.geoOffsetDraft
+            ? this.geoOffsetDraft.scaleFactor
+            : 1,
+      rotationEnabled:
+        typeof state.rotationEnabled === "boolean"
+          ? state.rotationEnabled
+          : this.geoOffsetDraft
+            ? this.geoOffsetDraft.rotationEnabled
+            : false,
+      rotationDeg:
+        state.rotationDeg != null
+          ? normalizeRotationDeg(Number.parseFloat(state.rotationDeg))
+          : this.geoOffsetDraft
+            ? this.geoOffsetDraft.rotationDeg
             : 0
     };
 
@@ -1607,7 +1780,11 @@ export class UIController {
     return {
       enabled: Boolean(this.geoOffsetDraft.enabled),
       eastMeters: clampGeoOffset(this.geoOffsetDraft.eastMeters),
-      northMeters: clampGeoOffset(this.geoOffsetDraft.northMeters)
+      northMeters: clampGeoOffset(this.geoOffsetDraft.northMeters),
+      scaleEnabled: Boolean(this.geoOffsetDraft.scaleEnabled),
+      scaleFactor: clampGeoScaleFactor(this.geoOffsetDraft.scaleFactor),
+      rotationEnabled: Boolean(this.geoOffsetDraft.rotationEnabled),
+      rotationDeg: normalizeRotationDeg(this.geoOffsetDraft.rotationDeg)
     };
   }
 
@@ -1616,8 +1793,20 @@ export class UIController {
     return `${clampGeoOffset(value).toFixed(1)} ${unit}`;
   }
 
+  formatGeoScaleValue(value) {
+    const unit = this.getText().offset.scaleUnit || "x";
+    return `${unit}${clampGeoScaleFactor(value).toFixed(2)}`;
+  }
+
+  formatGeoRotationValue(value) {
+    const unit = this.getText().offset.rotationUnit || "deg";
+    return `${Math.round(normalizeRotationDeg(value))} ${unit}`;
+  }
+
   renderGeoOffsetControls() {
     const disabled = !this.geoOffsetDraft.enabled;
+    const scaleDisabled = !this.geoOffsetDraft.scaleEnabled;
+    const rotationDisabled = !this.geoOffsetDraft.rotationEnabled;
 
     if (this.geoOffsetRefs.enabled) {
       this.geoOffsetRefs.enabled.checked = this.geoOffsetDraft.enabled;
@@ -1633,12 +1822,38 @@ export class UIController {
       this.geoOffsetRefs.northRange.disabled = disabled;
     }
 
+    if (this.geoOffsetRefs.scaleEnabled) {
+      this.geoOffsetRefs.scaleEnabled.checked = this.geoOffsetDraft.scaleEnabled;
+    }
+
+    if (this.geoOffsetRefs.scaleRange) {
+      this.geoOffsetRefs.scaleRange.value = this.geoOffsetDraft.scaleFactor.toFixed(2);
+      this.geoOffsetRefs.scaleRange.disabled = scaleDisabled;
+    }
+
+    if (this.geoOffsetRefs.rotationEnabled) {
+      this.geoOffsetRefs.rotationEnabled.checked = this.geoOffsetDraft.rotationEnabled;
+    }
+
+    if (this.geoOffsetRefs.rotationRange) {
+      this.geoOffsetRefs.rotationRange.value = `${Math.round(this.geoOffsetDraft.rotationDeg)}`;
+      this.geoOffsetRefs.rotationRange.disabled = rotationDisabled;
+    }
+
     if (this.geoOffsetRefs.eastValue) {
       this.geoOffsetRefs.eastValue.textContent = this.formatGeoOffsetValue(this.geoOffsetDraft.eastMeters);
     }
 
     if (this.geoOffsetRefs.northValue) {
       this.geoOffsetRefs.northValue.textContent = this.formatGeoOffsetValue(this.geoOffsetDraft.northMeters);
+    }
+
+    if (this.geoOffsetRefs.scaleValue) {
+      this.geoOffsetRefs.scaleValue.textContent = this.formatGeoScaleValue(this.geoOffsetDraft.scaleFactor);
+    }
+
+    if (this.geoOffsetRefs.rotationValue) {
+      this.geoOffsetRefs.rotationValue.textContent = this.formatGeoRotationValue(this.geoOffsetDraft.rotationDeg);
     }
   }
 
@@ -1867,6 +2082,10 @@ export class UIController {
     this.setElementText(this.staticRefs.offsetToggleLabel, text.offset.toggle);
     this.setElementText(this.staticRefs.offsetEastLabel, text.offset.eastLabel);
     this.setElementText(this.staticRefs.offsetNorthLabel, text.offset.northLabel);
+    this.setElementText(this.staticRefs.scaleToggleLabel, text.offset.scaleToggle);
+    this.setElementText(this.staticRefs.scaleLabel, text.offset.scaleLabel);
+    this.setElementText(this.staticRefs.rotationToggleLabel, text.offset.rotationToggle);
+    this.setElementText(this.staticRefs.rotationLabel, text.offset.rotationLabel);
     this.setElementText(this.geoOffsetRefs.resetButton, text.offset.reset);
     this.setElementText(this.activateGeoButton, text.geo.buttons.location);
     this.setElementText(this.calibrateHeadingButton, text.geo.buttons.calibrate);

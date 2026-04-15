@@ -29,6 +29,8 @@ const MIN_GEO_SITE_TOLERANCE_METERS = 3;
 const MAX_GEO_SITE_TOLERANCE_METERS = 100;
 const DEFAULT_GEO_SITE_TOLERANCE_METERS = 100;
 const GEO_OFFSET_LIMIT_METERS = 20;
+const MIN_GEO_SCALE_FACTOR = 1;
+const MAX_GEO_SCALE_FACTOR = 3;
 
 function normalizeExperienceMode(mode) {
   return mode === ExperienceMode.GEO_SENSOR ? ExperienceMode.GEO_SENSOR : ExperienceMode.XR;
@@ -193,6 +195,23 @@ function clampGeoOffsetMeters(value) {
   return Math.min(Math.max(value, -GEO_OFFSET_LIMIT_METERS), GEO_OFFSET_LIMIT_METERS);
 }
 
+function clampGeoScaleFactor(value) {
+  if (!Number.isFinite(value)) {
+    return MIN_GEO_SCALE_FACTOR;
+  }
+
+  return Math.min(Math.max(value, MIN_GEO_SCALE_FACTOR), MAX_GEO_SCALE_FACTOR);
+}
+
+function normalizeRotationDeg(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  const normalized = value % 360;
+  return normalized < 0 ? normalized + 360 : normalized;
+}
+
 function normalizeGeoCalibration(calibration) {
   if (!calibration || typeof calibration !== "object") {
     return {
@@ -222,6 +241,41 @@ function mergeGeoCalibration(baseCalibration, offsetState) {
     eastMeters: base.eastMeters + (hasOffset ? clampGeoOffsetMeters(offsetState.eastMeters) : 0),
     northMeters: base.northMeters + (hasOffset ? clampGeoOffsetMeters(offsetState.northMeters) : 0),
     yawDeg: base.yawDeg
+  };
+}
+
+function normalizePlacementTransform(transform) {
+  if (!transform || typeof transform !== "object") {
+    return {
+      scaleFactor: 1,
+      rotationDeg: 0
+    };
+  }
+
+  const scaleSource =
+    Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : transform.scale;
+  const rotationSource =
+    Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : transform.rotation;
+
+  return {
+    scaleFactor: clampGeoScaleFactor(scaleSource),
+    rotationDeg: normalizeRotationDeg(rotationSource)
+  };
+}
+
+function mergePlacementTransform(baseTransform, uiState) {
+  const base = normalizePlacementTransform(baseTransform);
+  const hasBaseTransform = Boolean(baseTransform && typeof baseTransform === "object");
+  const hasScaleOverride = Boolean(uiState && uiState.scaleEnabled);
+  const hasRotationOverride = Boolean(uiState && uiState.rotationEnabled);
+
+  if (!hasBaseTransform && !hasScaleOverride && !hasRotationOverride) {
+    return null;
+  }
+
+  return {
+    scaleFactor: hasScaleOverride ? clampGeoScaleFactor(uiState.scaleFactor) : base.scaleFactor,
+    rotationDeg: hasRotationOverride ? normalizeRotationDeg(uiState.rotationDeg) : base.rotationDeg
   };
 }
 
@@ -292,7 +346,11 @@ export class ARApp {
     this.geoOffsetUiState = {
       enabled: false,
       eastMeters: 0,
-      northMeters: 0
+      northMeters: 0,
+      scaleEnabled: false,
+      scaleFactor: 1,
+      rotationEnabled: false,
+      rotationDeg: 0
     };
 
     this.handleFrame = this.handleFrame.bind(this);
@@ -317,6 +375,7 @@ export class ARApp {
     this.ui.setPlacementMode(this.selectedPlacementMode);
     this.applySiteGeoTargetFromConfig({ force: true });
     this.applySiteGeoCalibrationFromConfig({ force: true });
+    this.applySitePlacementTransformFromConfig({ force: true });
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
     this.ui.bindSensorFusion(this.sensorFusion);
@@ -444,6 +503,10 @@ export class ARApp {
         sitePlacement && sitePlacement.calibration && typeof sitePlacement.calibration === "object"
           ? sitePlacement.calibration
           : null,
+      transform:
+        sitePlacement && sitePlacement.transform && typeof sitePlacement.transform === "object"
+          ? sitePlacement.transform
+          : null,
       toleranceMeters
     };
   }
@@ -488,6 +551,23 @@ export class ARApp {
     return Boolean(effectiveCalibration);
   }
 
+  applySitePlacementTransformFromConfig({ force = false } = {}) {
+    if (!this.placementController) {
+      return false;
+    }
+
+    if (!force && this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+      this.placementController.setPlacementTransform(null);
+      return false;
+    }
+
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    const baseTransform = placementConfig ? placementConfig.transform : null;
+    const effectiveTransform = mergePlacementTransform(baseTransform, this.geoOffsetUiState);
+    this.placementController.setPlacementTransform(effectiveTransform);
+    return Boolean(effectiveTransform);
+  }
+
   applyGeoOffsetState(state = {}) {
     const nextState = {
       enabled:
@@ -501,12 +581,28 @@ export class ARApp {
       northMeters:
         state.northMeters != null
           ? clampGeoOffsetMeters(Number.parseFloat(state.northMeters))
-          : this.geoOffsetUiState.northMeters
+          : this.geoOffsetUiState.northMeters,
+      scaleEnabled:
+        typeof state.scaleEnabled === "boolean"
+          ? state.scaleEnabled
+          : this.geoOffsetUiState.scaleEnabled,
+      scaleFactor:
+        state.scaleFactor != null
+          ? clampGeoScaleFactor(Number.parseFloat(state.scaleFactor))
+          : this.geoOffsetUiState.scaleFactor,
+      rotationEnabled:
+        typeof state.rotationEnabled === "boolean"
+          ? state.rotationEnabled
+          : this.geoOffsetUiState.rotationEnabled,
+      rotationDeg:
+        state.rotationDeg != null
+          ? normalizeRotationDeg(Number.parseFloat(state.rotationDeg))
+          : this.geoOffsetUiState.rotationDeg
     };
 
     this.geoOffsetUiState = nextState;
     this.ui.setGeoOffsetControlState(nextState);
-    this.syncGeoCalibrationAfterOffsetChange();
+    this.syncGeoAdjustmentsAfterOffsetChange();
     return { ...nextState };
   }
 
@@ -514,11 +610,15 @@ export class ARApp {
     return this.applyGeoOffsetState({
       enabled: false,
       eastMeters: 0,
-      northMeters: 0
+      northMeters: 0,
+      scaleEnabled: false,
+      scaleFactor: 1,
+      rotationEnabled: false,
+      rotationDeg: 0
     });
   }
 
-  syncGeoCalibrationAfterOffsetChange() {
+  syncGeoAdjustmentsAfterOffsetChange() {
     if (!this.placementController) {
       return;
     }
@@ -528,6 +628,7 @@ export class ARApp {
     }
 
     this.applySiteGeoCalibrationFromConfig({ force: true });
+    this.applySitePlacementTransformFromConfig({ force: true });
   }
 
   getGeoSiteToleranceMeters() {
@@ -600,6 +701,7 @@ export class ARApp {
 
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
+      this.applySitePlacementTransformFromConfig({ force: true });
       const siteAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.GEO_SENSOR);
       if (!siteAssetReady) {
         return false;
@@ -614,6 +716,7 @@ export class ARApp {
     }
 
     this.applySiteGeoCalibrationFromConfig({ force: false });
+    this.applySitePlacementTransformFromConfig({ force: false });
 
     return this.startAR();
   }
@@ -715,6 +818,7 @@ export class ARApp {
 
     this.applySiteGeoTargetFromConfig({ force: true });
     this.applySiteGeoCalibrationFromConfig({ force: true });
+    this.applySitePlacementTransformFromConfig({ force: true });
     this.ui.setMessage("Starte Geo-Modus in WebXR...");
     const arStarted = await this.startAR({
       allowGeoGlobal: true
@@ -828,8 +932,10 @@ export class ARApp {
     this.placementController.setMode(mapPlacementUiModeToControllerMode(this.selectedPlacementMode));
     if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
       this.applySiteGeoCalibrationFromConfig({ force: true });
+      this.applySitePlacementTransformFromConfig({ force: true });
     } else {
       this.placementController.setGeoCalibration(null);
+      this.placementController.setPlacementTransform(null);
     }
     this.captureGeoOriginFromDevice();
     this.sceneManager.setARMode(true);
@@ -1005,8 +1111,10 @@ export class ARApp {
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
+      this.applySitePlacementTransformFromConfig({ force: true });
     } else {
       this.placementController.setGeoCalibration(null);
+      this.placementController.setPlacementTransform(null);
     }
 
     if (this.placementController.isPlaced()) {
@@ -1053,8 +1161,10 @@ export class ARApp {
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
+      this.applySitePlacementTransformFromConfig({ force: true });
     } else {
       this.placementController.setGeoCalibration(null);
+      this.placementController.setPlacementTransform(null);
     }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
