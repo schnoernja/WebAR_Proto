@@ -374,7 +374,7 @@ export class PlacementController {
 
     const northAlignedDirection = groundedDirection
       .clone()
-      .applyAxisAngle(WORLD_UP, -headingRad);
+      .applyAxisAngle(WORLD_UP, headingRad);
 
     if (northAlignedDirection.lengthSq() < 1e-6) {
       return null;
