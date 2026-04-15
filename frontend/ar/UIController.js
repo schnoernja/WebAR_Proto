@@ -1196,7 +1196,12 @@ export class UIController {
   readPersistedUIMode() {
     try {
       const storedMode = window.localStorage.getItem(UI_MODE_STORAGE_KEY);
-      return storedMode === UI_MODE.DEVELOPER ? UI_MODE.DEVELOPER : UI_MODE.USER;
+      if (storedMode === UI_MODE.DEVELOPER || storedMode === UI_MODE.USER) {
+        return storedMode;
+      }
+
+      window.localStorage.setItem(UI_MODE_STORAGE_KEY, UI_MODE.USER);
+      return UI_MODE.USER;
     } catch (_error) {
       return UI_MODE.USER;
     }
