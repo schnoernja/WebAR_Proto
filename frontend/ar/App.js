@@ -25,6 +25,7 @@ const GEOLOCATION_PERMISSION_OPTIONS = {
   maximumAge: 0,
   timeout: 15000
 };
+const MAX_GEO_ORIGIN_ACCURACY_METERS = 12;
 const MIN_GEO_SITE_TOLERANCE_METERS = 3;
 const MAX_GEO_SITE_TOLERANCE_METERS = 100;
 const DEFAULT_GEO_SITE_TOLERANCE_METERS = 100;
@@ -229,8 +230,13 @@ function normalizeGeoCalibration(calibration) {
 }
 
 function mergeGeoCalibration(baseCalibration, offsetState) {
-  const base = normalizeGeoCalibration(baseCalibration);
-  const hasBaseCalibration = Boolean(baseCalibration && typeof baseCalibration === "object");
+  const useSiteCalibration = !offsetState || offsetState.useSiteCalibration !== false;
+  const effectiveBaseCalibration =
+    useSiteCalibration && baseCalibration && typeof baseCalibration === "object"
+      ? baseCalibration
+      : null;
+  const base = normalizeGeoCalibration(effectiveBaseCalibration);
+  const hasBaseCalibration = Boolean(effectiveBaseCalibration);
   const hasOffset = Boolean(offsetState && offsetState.enabled);
 
   if (!hasBaseCalibration && !hasOffset) {
@@ -344,6 +350,7 @@ export class ARApp {
     this.geoSensorActive = false;
     this.activePlacementAssetSource = "default";
     this.geoOffsetUiState = {
+      useSiteCalibration: true,
       enabled: false,
       eastMeters: 0,
       northMeters: 0,
@@ -570,6 +577,10 @@ export class ARApp {
 
   applyGeoOffsetState(state = {}) {
     const nextState = {
+      useSiteCalibration:
+        typeof state.useSiteCalibration === "boolean"
+          ? state.useSiteCalibration
+          : this.geoOffsetUiState.useSiteCalibration,
       enabled:
         typeof state.enabled === "boolean"
           ? state.enabled
@@ -608,6 +619,7 @@ export class ARApp {
 
   resetGeoOffsetState() {
     return this.applyGeoOffsetState({
+      useSiteCalibration: true,
       enabled: false,
       eastMeters: 0,
       northMeters: 0,
@@ -638,6 +650,26 @@ export class ARApp {
 
   isWithinGeoSiteTolerance(distanceMeters) {
     return Number.isFinite(distanceMeters) && distanceMeters <= this.getGeoSiteToleranceMeters();
+  }
+
+  getCurrentGeoAccuracyMeters() {
+    const livePosition = this.geoLocationService.getCurrentPosition();
+    if (livePosition && Number.isFinite(livePosition.accuracyMeters)) {
+      return livePosition.accuracyMeters;
+    }
+
+    const sensorSnapshot = this.sensorFusion.getSnapshot();
+    const sensorPosition = sensorSnapshot && sensorSnapshot.position ? sensorSnapshot.position : null;
+    if (sensorPosition && Number.isFinite(sensorPosition.accuracyMeters)) {
+      return sensorPosition.accuracyMeters;
+    }
+
+    return null;
+  }
+
+  hasAcceptableGeoAccuracy() {
+    const accuracyMeters = this.getCurrentGeoAccuracyMeters();
+    return !Number.isFinite(accuracyMeters) || accuracyMeters <= MAX_GEO_ORIGIN_ACCURACY_METERS;
   }
 
   async ensurePlacementAssetForExperience(experienceMode) {
@@ -1311,7 +1343,13 @@ export class ARApp {
     if (!this.placementController.hasGeoOrigin()) {
       const captured = this.captureGeoOriginFromDevice(cameraState);
       if (!captured) {
-        this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+        if (!this.hasAcceptableGeoAccuracy()) {
+          this.ui.setMessage(
+            `Standort ist noch zu ungenau. Warte auf <= ${MAX_GEO_ORIGIN_ACCURACY_METERS} m GPS-Genauigkeit.`
+          );
+        } else {
+          this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+        }
         return false;
       }
     }
@@ -1388,6 +1426,7 @@ export class ARApp {
   captureGeoOriginFromDevice(cameraState = null) {
     const devicePosition = this.geoLocationService.getCurrentPosition();
     let geoCoord = toGeoCoord(devicePosition);
+    const deviceAccuracyMeters = devicePosition ? devicePosition.accuracyMeters : null;
     if (!geoCoord) {
       const sensorSnapshot = this.sensorFusion.getSnapshot();
       const sensorPosition =
@@ -1397,10 +1436,23 @@ export class ARApp {
           latitude: sensorPosition.lat,
           longitude: sensorPosition.lon
         };
+        if (
+          Number.isFinite(sensorPosition.accuracyMeters) &&
+          sensorPosition.accuracyMeters > MAX_GEO_ORIGIN_ACCURACY_METERS
+        ) {
+          return false;
+        }
       }
     }
 
     if (!geoCoord) {
+      return false;
+    }
+
+    if (
+      Number.isFinite(deviceAccuracyMeters) &&
+      deviceAccuracyMeters > MAX_GEO_ORIGIN_ACCURACY_METERS
+    ) {
       return false;
     }
 
@@ -1415,7 +1467,17 @@ export class ARApp {
       return false;
     }
 
-    return this.placementController.setGeoReferenceDirection(cameraState.direction);
+    const sensorSnapshot = this.sensorFusion.getSnapshot();
+    const headingRad =
+      sensorSnapshot && Number.isFinite(sensorSnapshot.headingDeg)
+        ? THREE.MathUtils.degToRad(sensorSnapshot.headingDeg)
+        : null;
+    const requireHeading = this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL;
+
+    return this.placementController.setGeoReferenceDirection(cameraState.direction, {
+      headingRad,
+      requireHeading
+    });
   }
 
   handleUIInteractionChange(isInteracting) {
@@ -1543,6 +1605,10 @@ export class ARApp {
     if (!this.placementController.hasGeoOrigin()) {
       if (!this.geoLocationService.getCurrentPosition()) {
         this.ui.setHint("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+      } else if (!this.hasAcceptableGeoAccuracy()) {
+        this.ui.setHint(
+          `GPS noch ungenau. Warte auf <= ${MAX_GEO_ORIGIN_ACCURACY_METERS} m Genauigkeit, dann wird das Geo-Origin gesetzt.`
+        );
       } else if (!this.placementController.hasGeoReferenceDirection()) {
         this.ui.setHint("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
       } else if (this.geoLocationService.getStatus() !== "granted") {

@@ -341,7 +341,7 @@ export class PlacementController {
     return true;
   }
 
-  setGeoReferenceDirection(direction) {
+  setGeoReferenceDirection(direction, { headingRad = null, requireHeading = false } = {}) {
     const groundedDirection = projectDirectionToGround(direction);
     if (!groundedDirection) {
       return false;
@@ -351,7 +351,11 @@ export class PlacementController {
       this.geoReferenceCapturedAt = Date.now();
     }
 
-    const northAlignedDirection = this.createNorthAlignedDirection(groundedDirection);
+    const northAlignedDirection = this.createNorthAlignedDirection(groundedDirection, headingRad);
+    if (requireHeading && !northAlignedDirection) {
+      return false;
+    }
+
     if (!northAlignedDirection && Date.now() - this.geoReferenceCapturedAt < HEADING_FALLBACK_DELAY_MS) {
       return false;
     }
@@ -389,8 +393,10 @@ export class PlacementController {
     this.clearGeoComputation();
   }
 
-  createNorthAlignedDirection(groundedDirection) {
-    const headingRad = this.headingService.getHeadingRad();
+  createNorthAlignedDirection(groundedDirection, headingRadOverride = null) {
+    const headingRad = Number.isFinite(headingRadOverride)
+      ? headingRadOverride
+      : this.headingService.getHeadingRad();
     if (!Number.isFinite(headingRad)) {
       return null;
     }

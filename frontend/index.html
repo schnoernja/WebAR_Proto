@@ -19,7 +19,7 @@
 </head>
 <body>
   <div id="app-shell">
-    <div id="app-version" aria-label="Anwendungsversion">v.0.21</div>
+    <div id="app-version" aria-label="Anwendungsversion">v.0.23</div>
     <div id="render-root" aria-label="3D viewport"></div>
 
     <div id="ui-container">
@@ -718,6 +718,11 @@
                 <p id="geo-offset-description" class="hint-text">
                   Test-Offset fuer Geo-Placement. Werte werden zur Site-Kalibrierung addiert.
                 </p>
+
+                <label class="offset-toggle-row" for="geo-site-calibration-enabled">
+                  <span id="geo-site-calibration-toggle-label" class="field-label">JSON-Offset aktivieren</span>
+                  <input id="geo-site-calibration-enabled" class="offset-toggle-input" type="checkbox" checked />
+                </label>
 
                 <label class="offset-toggle-row" for="geo-offset-enabled">
                   <span id="geo-offset-toggle-label" class="field-label">Offset aktivieren</span>

@@ -413,6 +413,7 @@ const DE_TRANSLATIONS = Object.freeze({
   offset: {
     title: "Geo Test-Anpassung",
     description: "Offset, Skalierung und Rotation fuer Geo-Placement live testen. Werte werden zu den JSON-Vorgaben addiert bzw. ueberlagert.",
+    siteCalibrationToggle: "JSON-Offset aktivieren",
     toggle: "Offset aktivieren",
     eastLabel: "X (Ost/West)",
     northLabel: "Y (Nord/Sued)",
@@ -702,6 +703,7 @@ const EN_TRANSLATIONS = Object.freeze({
   offset: {
     title: "Geo Test Adjustments",
     description: "Live-test offset, scale, and rotation for geo placement. Values are added to or layered over JSON defaults.",
+    siteCalibrationToggle: "Enable JSON offset",
     toggle: "Enable offset",
     eastLabel: "X (East/West)",
     northLabel: "Y (North/South)",
@@ -963,6 +965,7 @@ export class UIController {
     };
     this.geoCopyTriggers = Array.from(this.document.querySelectorAll("[data-copy-device-coords='true']"));
     this.geoOffsetRefs = {
+      siteCalibrationEnabled: this.document.getElementById("geo-site-calibration-enabled"),
       enabled: this.document.getElementById("geo-offset-enabled"),
       eastRange: this.document.getElementById("geo-offset-east-range"),
       northRange: this.document.getElementById("geo-offset-north-range"),
@@ -1088,6 +1091,7 @@ export class UIController {
       geoTitle: this.document.querySelector("#card-geo .card-title-group h2"),
       offsetTitle: this.document.getElementById("offset-card-title"),
       offsetDescription: this.document.getElementById("geo-offset-description"),
+      siteCalibrationToggleLabel: this.document.getElementById("geo-site-calibration-toggle-label"),
       offsetToggleLabel: this.document.getElementById("geo-offset-toggle-label"),
       offsetEastLabel: this.document.getElementById("geo-offset-east-label"),
       offsetNorthLabel: this.document.getElementById("geo-offset-north-label"),
@@ -1152,6 +1156,7 @@ export class UIController {
       longitude: ""
     };
     this.geoOffsetDraft = {
+      useSiteCalibration: true,
       enabled: false,
       eastMeters: 0,
       northMeters: 0,
@@ -1636,6 +1641,16 @@ export class UIController {
       this.cleanupCallbacks.push(() => this.geoOffsetRefs.enabled.removeEventListener("change", handleToggle));
     }
 
+    if (this.geoOffsetRefs.siteCalibrationEnabled) {
+      const handleSiteCalibrationToggle = () => {
+        this.handleGeoSiteCalibrationToggle(changeHandler);
+      };
+      this.geoOffsetRefs.siteCalibrationEnabled.addEventListener("change", handleSiteCalibrationToggle);
+      this.cleanupCallbacks.push(() =>
+        this.geoOffsetRefs.siteCalibrationEnabled.removeEventListener("change", handleSiteCalibrationToggle)
+      );
+    }
+
     if (this.geoOffsetRefs.eastRange) {
       const handleEastInput = () => {
         this.handleGeoOffsetRangeInput(changeHandler);
@@ -1739,6 +1754,21 @@ export class UIController {
     }
   }
 
+  handleGeoSiteCalibrationToggle(handler) {
+    const useSiteCalibration = this.geoOffsetRefs.siteCalibrationEnabled
+      ? Boolean(this.geoOffsetRefs.siteCalibrationEnabled.checked)
+      : true;
+    this.geoOffsetDraft = {
+      ...this.geoOffsetDraft,
+      useSiteCalibration
+    };
+    this.renderGeoOffsetControls();
+
+    if (typeof handler === "function") {
+      handler(this.getGeoOffsetControlState());
+    }
+  }
+
   handleGeoScaleToggle(handler) {
     const scaleEnabled = this.geoOffsetRefs.scaleEnabled ? Boolean(this.geoOffsetRefs.scaleEnabled.checked) : false;
     this.geoOffsetDraft = {
@@ -1798,6 +1828,7 @@ export class UIController {
     const resetState =
       typeof handler === "function"
         ? handler() || {
+            useSiteCalibration: true,
             enabled: false,
             eastMeters: 0,
             northMeters: 0,
@@ -1807,6 +1838,7 @@ export class UIController {
             rotationDeg: 0
           }
         : {
+            useSiteCalibration: true,
             enabled: false,
             eastMeters: 0,
             northMeters: 0,
@@ -1820,6 +1852,12 @@ export class UIController {
 
   setGeoOffsetControlState(state = {}) {
     const nextState = {
+      useSiteCalibration:
+        typeof state.useSiteCalibration === "boolean"
+          ? state.useSiteCalibration
+          : this.geoOffsetDraft
+            ? this.geoOffsetDraft.useSiteCalibration
+            : true,
       enabled:
         typeof state.enabled === "boolean"
           ? state.enabled
@@ -1870,6 +1908,7 @@ export class UIController {
 
   getGeoOffsetControlState() {
     return {
+      useSiteCalibration: this.geoOffsetDraft.useSiteCalibration !== false,
       enabled: Boolean(this.geoOffsetDraft.enabled),
       eastMeters: clampGeoOffset(this.geoOffsetDraft.eastMeters),
       northMeters: clampGeoOffset(this.geoOffsetDraft.northMeters),
@@ -1899,6 +1938,10 @@ export class UIController {
     const disabled = !this.geoOffsetDraft.enabled;
     const scaleDisabled = !this.geoOffsetDraft.scaleEnabled;
     const rotationDisabled = !this.geoOffsetDraft.rotationEnabled;
+
+    if (this.geoOffsetRefs.siteCalibrationEnabled) {
+      this.geoOffsetRefs.siteCalibrationEnabled.checked = this.geoOffsetDraft.useSiteCalibration !== false;
+    }
 
     if (this.geoOffsetRefs.enabled) {
       this.geoOffsetRefs.enabled.checked = this.geoOffsetDraft.enabled;
@@ -2329,6 +2372,7 @@ export class UIController {
     this.setElementText(this.staticRefs.geoTitle, text.geo.title);
     this.setElementText(this.staticRefs.offsetTitle, text.offset.title);
     this.setElementText(this.staticRefs.offsetDescription, text.offset.description);
+    this.setElementText(this.staticRefs.siteCalibrationToggleLabel, text.offset.siteCalibrationToggle);
     this.setElementText(this.staticRefs.offsetToggleLabel, text.offset.toggle);
     this.setElementText(this.staticRefs.offsetEastLabel, text.offset.eastLabel);
     this.setElementText(this.staticRefs.offsetNorthLabel, text.offset.northLabel);
