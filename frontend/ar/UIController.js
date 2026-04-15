@@ -40,7 +40,7 @@ const UI_MODE = Object.freeze({
 });
 const UI_MODE_STORAGE_KEY = "epartwin-ui-mode";
 const USER_MODE_VISIBLE_CARDS = Object.freeze(["welcome", "placement", "help"]);
-const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze(["help"]);
+const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze(["help", "survey", "settings"]);
 
 const MAX_GEO_OFFSET_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 1;
@@ -2090,16 +2090,14 @@ export class UIController {
         this.staticRefs.menuTabs.developer.hidden = true;
       }
       if (this.staticRefs.menuTabs.survey) {
-        this.staticRefs.menuTabs.survey.hidden = true;
+        this.staticRefs.menuTabs.survey.hidden = false;
       }
       if (this.staticRefs.menuTabs.settings) {
-        this.staticRefs.menuTabs.settings.hidden = true;
+        this.staticRefs.menuTabs.settings.hidden = false;
       }
 
       if (
-        this.uiState.activeMenuTab === "developer" ||
-        this.uiState.activeMenuTab === "survey" ||
-        this.uiState.activeMenuTab === "settings"
+        this.uiState.activeMenuTab === "developer"
       ) {
         this.setActiveMenuTab("placement");
       }
