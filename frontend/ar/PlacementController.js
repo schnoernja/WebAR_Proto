@@ -59,6 +59,18 @@ function projectDirectionToGround(direction) {
   return groundedDirection;
 }
 
+function cloneAnchorPosition(position) {
+  if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
+    return null;
+  }
+
+  if (position instanceof THREE.Vector3) {
+    return position.clone();
+  }
+
+  return new THREE.Vector3(position.x, position.y, position.z);
+}
+
 function normalizeGeoCalibration(calibration) {
   const source = calibration && typeof calibration === "object" ? calibration : null;
   const eastMeters = source && Number.isFinite(source.eastMeters) ? source.eastMeters : 0;
@@ -111,6 +123,7 @@ export class PlacementController {
       : PlacementMode.FREE;
     this.geoTarget = { ...APP_CONFIG.placement.defaultGeoTarget };
     this.geoOrigin = null;
+    this.geoOriginAnchor = null;
     this.geoCalibration = normalizeGeoCalibration(null);
     this.placementTransform = normalizePlacementTransform(null);
     this.geoReferenceForward = null;
@@ -307,14 +320,23 @@ export class PlacementController {
   }
 
   setGeoOrigin(coord) {
-    if (!isValidGeoCoord(coord)) {
+    let normalizedCoord = coord;
+    let anchorPosition = null;
+
+    if (coord && typeof coord === "object" && coord.coord) {
+      normalizedCoord = coord.coord;
+      anchorPosition = coord.anchorPosition || null;
+    }
+
+    if (!isValidGeoCoord(normalizedCoord)) {
       return false;
     }
 
     this.geoOrigin = {
-      latitude: coord.latitude,
-      longitude: coord.longitude
+      latitude: normalizedCoord.latitude,
+      longitude: normalizedCoord.longitude
     };
+    this.geoOriginAnchor = cloneAnchorPosition(anchorPosition);
     this.clearGeoComputation();
     return true;
   }
@@ -356,6 +378,7 @@ export class PlacementController {
 
   clearGeoOrigin() {
     this.geoOrigin = null;
+    this.geoOriginAnchor = null;
     this.clearGeoComputation();
   }
 
@@ -400,6 +423,10 @@ export class PlacementController {
       return this.getLastGeoComputation();
     }
 
+    if (!this.geoOriginAnchor && cameraState && cameraState.position) {
+      this.geoOriginAnchor = cameraState.position.clone();
+    }
+
     const originLatRad = THREE.MathUtils.degToRad(this.geoOrigin.latitude);
     const metersPerDegreeLon = Math.cos(originLatRad) * METERS_PER_DEGREE_LAT;
     const deltaLat = this.geoTarget.latitude - this.geoOrigin.latitude;
@@ -440,8 +467,9 @@ export class PlacementController {
       .multiplyScalar(clampedEastMeters)
       .add(this.geoReferenceForward.clone().multiplyScalar(clampedNorthMeters));
 
+    const anchor = this.geoOriginAnchor || new THREE.Vector3(0, 0, 0);
     const pose = {
-      position: new THREE.Vector3(offset.x, floorPose.position.y, offset.z),
+      position: new THREE.Vector3(anchor.x + offset.x, floorPose.position.y, anchor.z + offset.z),
       quaternion: new THREE.Quaternion()
     };
 

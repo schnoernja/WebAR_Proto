@@ -1309,7 +1309,7 @@ export class ARApp {
     }
 
     if (!this.placementController.hasGeoOrigin()) {
-      const captured = this.captureGeoOriginFromDevice();
+      const captured = this.captureGeoOriginFromDevice(cameraState);
       if (!captured) {
         this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
         return false;
@@ -1358,7 +1358,7 @@ export class ARApp {
     }
 
     if (!this.placementController.hasGeoOrigin()) {
-      const captured = this.captureGeoOriginFromDevice();
+      const captured = this.captureGeoOriginFromDevice(cameraState);
       if (!captured) {
         return;
       }
@@ -1385,7 +1385,7 @@ export class ARApp {
     this.ui.setHint("Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.");
   }
 
-  captureGeoOriginFromDevice() {
+  captureGeoOriginFromDevice(cameraState = null) {
     const devicePosition = this.geoLocationService.getCurrentPosition();
     let geoCoord = toGeoCoord(devicePosition);
     if (!geoCoord) {
@@ -1404,7 +1404,10 @@ export class ARApp {
       return false;
     }
 
-    return this.placementController.setGeoOrigin(geoCoord);
+    return this.placementController.setGeoOrigin({
+      coord: geoCoord,
+      anchorPosition: cameraState && cameraState.position ? cameraState.position : null
+    });
   }
 
   captureGeoReferenceDirection(cameraState) {
