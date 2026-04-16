@@ -27,5 +27,14 @@
     },
     "maxDistanceMeters": 100
   },
-  "objects": []
+  "objects": [
+    {
+      "id": "efh-root",
+      "offset": {
+        "x": 0,
+        "z": 0,
+        "y": 0
+      }
+    }
+  ]
 }

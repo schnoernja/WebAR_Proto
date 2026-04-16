@@ -20,13 +20,24 @@ function ensureFiniteNumber(value, label) {
 }
 
 function normalizeOrigin(origin) {
-  if (!origin || typeof origin !== "object") {
-    throw new Error("Site-Konfiguration ungueltig: origin fehlt.");
+  if (origin == null) {
+    return null;
+  }
+
+  if (typeof origin !== "object") {
+    throw new Error("Site-Konfiguration ungueltig: origin muss ein Objekt sein.");
+  }
+
+  const latitude = Number.isFinite(origin.lat) ? origin.lat : origin.latitude;
+  const longitude = Number.isFinite(origin.lon) ? origin.lon : origin.longitude;
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
   }
 
   return {
-    lat: ensureFiniteNumber(origin.lat, "origin.lat"),
-    lon: ensureFiniteNumber(origin.lon, "origin.lon"),
+    lat: ensureFiniteNumber(latitude, "origin.lat"),
+    lon: ensureFiniteNumber(longitude, "origin.lon"),
     h: Number.isFinite(origin.h) ? origin.h : 0
   };
 }
@@ -38,8 +49,16 @@ function normalizeOrientation(orientation) {
 }
 
 function normalizeScene(scene) {
-  if (!scene || typeof scene.asset !== "string" || !scene.asset.trim()) {
-    throw new Error("Site-Konfiguration ungueltig: scene.asset fehlt.");
+  if (scene == null) {
+    return null;
+  }
+
+  if (typeof scene !== "object") {
+    throw new Error("Site-Konfiguration ungueltig: scene muss ein Objekt sein.");
+  }
+
+  if (typeof scene.asset !== "string" || !scene.asset.trim()) {
+    return null;
   }
 
   return {
@@ -53,13 +72,25 @@ function normalizeObjects(objects) {
   }
 
   return objects.map((objectConfig, index) => {
-    const enu = objectConfig && objectConfig.enu ? objectConfig.enu : {};
+    const enu = objectConfig && objectConfig.enu ? objectConfig.enu : null;
+    const offset = objectConfig && objectConfig.offset ? objectConfig.offset : null;
+    const normalizedOffset = {
+      x: Number.isFinite(offset && offset.x) ? offset.x : Number.isFinite(enu && enu.e) ? enu.e : 0,
+      y: Number.isFinite(offset && offset.y) ? offset.y : Number.isFinite(enu && enu.u) ? enu.u : 0,
+      z: Number.isFinite(offset && offset.z) ? offset.z : Number.isFinite(enu && enu.n) ? enu.n : 0
+    };
+
     return {
       id: typeof objectConfig.id === "string" && objectConfig.id.trim() ? objectConfig.id.trim() : `object-${index + 1}`,
+      asset:
+        typeof objectConfig.asset === "string" && objectConfig.asset.trim()
+          ? objectConfig.asset.trim()
+          : null,
+      offset: normalizedOffset,
       enu: {
-        e: Number.isFinite(enu.e) ? enu.e : 0,
-        n: Number.isFinite(enu.n) ? enu.n : 0,
-        u: Number.isFinite(enu.u) ? enu.u : 0
+        e: normalizedOffset.x,
+        n: normalizedOffset.z,
+        u: normalizedOffset.y
       }
     };
   });

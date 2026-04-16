@@ -1,13 +1,15 @@
 import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
-import { HeadingService } from "./HeadingService.js";
 import { applyPose, disposeObject3D } from "./utils.js";
 
-const METERS_PER_DEGREE_LAT = 111320;
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 const DEFAULT_GEO_FORWARD = new THREE.Vector3(0, 0, -1);
-const MIN_GEO_VISIBILITY_DISTANCE_METERS = 150;
-const HEADING_FALLBACK_DELAY_MS = 1500;
+const DEFAULT_LOCAL_OBJECTS = Object.freeze([
+  {
+    id: "object-1",
+    offset: Object.freeze({ x: 0, y: 0, z: 0 })
+  }
+]);
 
 export const PlacementMode = Object.freeze({
   FREE: "free",
@@ -110,13 +112,105 @@ function normalizePlacementTransform(transform) {
   };
 }
 
+function cloneLocalObjectConfig(objectConfig) {
+  if (!objectConfig || typeof objectConfig !== "object") {
+    return null;
+  }
+
+  const offset = objectConfig.offset && typeof objectConfig.offset === "object" ? objectConfig.offset : null;
+  if (!offset) {
+    return null;
+  }
+
+  const id =
+    typeof objectConfig.id === "string" && objectConfig.id.trim()
+      ? objectConfig.id.trim()
+      : null;
+
+  return {
+    id,
+    asset:
+      typeof objectConfig.asset === "string" && objectConfig.asset.trim()
+        ? objectConfig.asset.trim()
+        : null,
+    offset: {
+      x: Number.isFinite(offset.x) ? offset.x : 0,
+      y: Number.isFinite(offset.y) ? offset.y : 0,
+      z: Number.isFinite(offset.z) ? offset.z : 0
+    }
+  };
+}
+
+function cloneLocalObjectConfigs(objectConfigs) {
+  if (!Array.isArray(objectConfigs) || objectConfigs.length === 0) {
+    return DEFAULT_LOCAL_OBJECTS.map((entry) => ({
+      id: entry.id,
+      asset: null,
+      offset: { ...entry.offset }
+    }));
+  }
+
+  const normalized = [];
+  for (let index = 0; index < objectConfigs.length; index += 1) {
+    const cloned = cloneLocalObjectConfig(objectConfigs[index]);
+    if (!cloned) {
+      continue;
+    }
+
+    if (!cloned.id) {
+      cloned.id = `object-${index + 1}`;
+    }
+
+    normalized.push(cloned);
+  }
+
+  if (!normalized.length) {
+    return DEFAULT_LOCAL_OBJECTS.map((entry) => ({
+      id: entry.id,
+      asset: null,
+      offset: { ...entry.offset }
+    }));
+  }
+
+  return normalized;
+}
+
+function cloneGeoPlacement(placement) {
+  if (!placement || !placement.worldPosition || !placement.offset) {
+    return null;
+  }
+
+  return {
+    id: placement.id,
+    asset: placement.asset || null,
+    offset: {
+      x: placement.offset.x,
+      y: placement.offset.y,
+      z: placement.offset.z
+    },
+    worldPosition: placement.worldPosition.clone(),
+    pose: clonePose(placement.pose)
+  };
+}
+
+function cloneGeoPlacements(placements) {
+  if (!Array.isArray(placements)) {
+    return [];
+  }
+
+  return placements.map((placement) => cloneGeoPlacement(placement)).filter((placement) => placement !== null);
+}
+
 export class PlacementController {
   constructor({ scene }) {
     this.scene = scene;
     this.objectRoot = new THREE.Group();
     this.transformRoot = new THREE.Group();
+    this.geoInstancesRoot = new THREE.Group();
+    this.geoInstancesRoot.name = "geo-local-instances";
     this.objectRoot.visible = true;
     this.objectRoot.add(this.transformRoot);
+    this.objectRoot.add(this.geoInstancesRoot);
 
     this.mode = isValidMode(APP_CONFIG.placement.defaultMode)
       ? APP_CONFIG.placement.defaultMode
@@ -128,16 +222,7 @@ export class PlacementController {
     this.placementTransform = normalizePlacementTransform(null);
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
-    this.maxVisibleDistanceMeters = Math.max(
-      APP_CONFIG.placement.maxVisibleDistanceMeters,
-      MIN_GEO_VISIBILITY_DISTANCE_METERS
-    );
-    this.debugClampDistanceMeters = Math.max(
-      APP_CONFIG.placement.debugClampDistanceMeters,
-      this.maxVisibleDistanceMeters
-    );
-    this.headingService = new HeadingService();
-    this.geoReferenceCapturedAt = 0;
+    this.localObjects = cloneLocalObjectConfigs(null);
 
     this.reticle = this.createReticle();
     this.reticle.visible = false;
@@ -159,10 +244,10 @@ export class PlacementController {
   createGeoDebugSnapshot(status, overrides = {}) {
     return {
       status,
-      originLatitude: this.geoOrigin ? this.geoOrigin.latitude : null,
-      originLongitude: this.geoOrigin ? this.geoOrigin.longitude : null,
-      targetLatitude: this.geoTarget ? this.geoTarget.latitude : null,
-      targetLongitude: this.geoTarget ? this.geoTarget.longitude : null,
+      originLatitude: this.geoOriginAnchor ? this.geoOriginAnchor.x : null,
+      originLongitude: this.geoOriginAnchor ? this.geoOriginAnchor.z : null,
+      targetLatitude: null,
+      targetLongitude: null,
       deltaLatitude: null,
       deltaLongitude: null,
       xMeters: null,
@@ -172,6 +257,7 @@ export class PlacementController {
       debugClamped: false,
       objectBehindCamera: false,
       pose: null,
+      placements: [],
       ...overrides
     };
   }
@@ -222,8 +308,23 @@ export class PlacementController {
     this.showFallbackPreview();
   }
 
+  setGeoObjects(objectConfigs) {
+    this.localObjects = cloneLocalObjectConfigs(objectConfigs);
+    this.clearGeoComputation();
+    return true;
+  }
+
+  getGeoObjects() {
+    return this.localObjects.map((objectConfig) => ({
+      id: objectConfig.id,
+      asset: objectConfig.asset,
+      offset: { ...objectConfig.offset }
+    }));
+  }
+
   enterARMode() {
     this.inARMode = true;
+    this.clearGeoOrigin();
     this.clearGeoReferenceDirection();
     this.resetPlacement();
   }
@@ -317,50 +418,63 @@ export class PlacementController {
 
     this.transformRoot.scale.setScalar(this.placementTransform.scaleFactor);
     this.transformRoot.rotation.set(0, this.placementTransform.rotationRad, 0);
+
+    for (const slot of this.geoInstancesRoot.children) {
+      const instance = slot.children && slot.children.length ? slot.children[0] : null;
+      if (!instance) {
+        continue;
+      }
+
+      this.applyPlacementTransformToInstance(instance);
+    }
+  }
+
+  applyPlacementTransformToInstance(instance) {
+    if (!instance) {
+      return;
+    }
+
+    instance.scale.setScalar(this.placementTransform.scaleFactor);
+    instance.rotation.set(0, this.placementTransform.rotationRad, 0);
   }
 
   setGeoOrigin(coord) {
-    let normalizedCoord = coord;
     let anchorPosition = null;
-
-    if (coord && typeof coord === "object" && coord.coord) {
-      normalizedCoord = coord.coord;
-      anchorPosition = coord.anchorPosition || null;
+    if (coord && typeof coord === "object") {
+      if (coord.anchorPose && coord.anchorPose.position) {
+        anchorPosition = coord.anchorPose.position;
+      } else if (coord.anchorPosition) {
+        anchorPosition = coord.anchorPosition;
+      } else if (Number.isFinite(coord.x) && Number.isFinite(coord.y) && Number.isFinite(coord.z)) {
+        anchorPosition = coord;
+      }
     }
 
-    if (!isValidGeoCoord(normalizedCoord)) {
+    const clonedAnchor = cloneAnchorPosition(anchorPosition);
+    if (!clonedAnchor) {
       return false;
     }
 
+    this.geoOriginAnchor = clonedAnchor;
     this.geoOrigin = {
-      latitude: normalizedCoord.latitude,
-      longitude: normalizedCoord.longitude
+      x: clonedAnchor.x,
+      y: clonedAnchor.y,
+      z: clonedAnchor.z
     };
-    this.geoOriginAnchor = cloneAnchorPosition(anchorPosition);
     this.clearGeoComputation();
     return true;
   }
 
   setGeoReferenceDirection(direction, { headingRad = null, requireHeading = false } = {}) {
+    void headingRad;
+    void requireHeading;
+
     const groundedDirection = projectDirectionToGround(direction);
     if (!groundedDirection) {
       return false;
     }
 
-    if (this.geoReferenceCapturedAt === 0) {
-      this.geoReferenceCapturedAt = Date.now();
-    }
-
-    const northAlignedDirection = this.createNorthAlignedDirection(groundedDirection, headingRad);
-    if (requireHeading && !northAlignedDirection) {
-      return false;
-    }
-
-    if (!northAlignedDirection && Date.now() - this.geoReferenceCapturedAt < HEADING_FALLBACK_DELAY_MS) {
-      return false;
-    }
-
-    this.geoReferenceForward = northAlignedDirection || groundedDirection;
+    this.geoReferenceForward = groundedDirection;
     this.geoReferenceRight = new THREE.Vector3()
       .crossVectors(this.geoReferenceForward, WORLD_UP)
       .normalize();
@@ -373,7 +487,7 @@ export class PlacementController {
   }
 
   hasGeoOrigin() {
-    return this.geoOrigin !== null;
+    return this.geoOriginAnchor !== null;
   }
 
   getGeoOrigin() {
@@ -389,37 +503,16 @@ export class PlacementController {
   clearGeoReferenceDirection() {
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
-    this.geoReferenceCapturedAt = 0;
     this.clearGeoComputation();
   }
 
-  createNorthAlignedDirection(groundedDirection, headingRadOverride = null) {
-    const headingRad = Number.isFinite(headingRadOverride)
-      ? headingRadOverride
-      : this.headingService.getHeadingRad();
-    if (!Number.isFinite(headingRad)) {
-      return null;
-    }
-
-    const northAlignedDirection = groundedDirection
-      .clone()
-      .applyAxisAngle(WORLD_UP, headingRad);
-
-    if (northAlignedDirection.lengthSq() < 1e-6) {
-      return null;
-    }
-
-    northAlignedDirection.normalize();
-    return northAlignedDirection;
-  }
-
   computeGeoPosition(floorPose, cameraState = null) {
-    if (!floorPose) {
+    if (!floorPose || !floorPose.position) {
       this.lastGeoComputation = this.createGeoDebugSnapshot("missing-floor");
       return this.getLastGeoComputation();
     }
 
-    if (!this.geoOrigin || !this.geoTarget) {
+    if (!this.geoOriginAnchor) {
       this.lastGeoComputation = this.createGeoDebugSnapshot("missing-origin");
       return this.getLastGeoComputation();
     }
@@ -429,74 +522,73 @@ export class PlacementController {
       return this.getLastGeoComputation();
     }
 
-    if (!this.geoOriginAnchor && cameraState && cameraState.position) {
-      this.geoOriginAnchor = cameraState.position.clone();
+    const floorY = floorPose.position.y;
+    const placements = [];
+    let maxDistanceMeters = 0;
+
+    for (const objectConfig of this.localObjects) {
+      const offsetX = objectConfig.offset.x + this.geoCalibration.eastMeters;
+      const offsetZ = objectConfig.offset.z + this.geoCalibration.northMeters;
+      const offsetY = objectConfig.offset.y;
+      const offset = this.geoReferenceRight
+        .clone()
+        .multiplyScalar(offsetX)
+        .add(this.geoReferenceForward.clone().multiplyScalar(offsetZ));
+      const worldPosition = new THREE.Vector3(
+        this.geoOriginAnchor.x + offset.x,
+        floorY + offsetY,
+        this.geoOriginAnchor.z + offset.z
+      );
+      const distanceMeters = Math.hypot(offsetX, offsetZ);
+      maxDistanceMeters = Math.max(maxDistanceMeters, distanceMeters);
+
+      placements.push({
+        id: objectConfig.id,
+        asset: objectConfig.asset || null,
+        offset: {
+          x: objectConfig.offset.x,
+          y: objectConfig.offset.y,
+          z: objectConfig.offset.z
+        },
+        worldPosition,
+        pose: {
+          position: worldPosition.clone(),
+          quaternion: new THREE.Quaternion()
+        }
+      });
     }
 
-    const originLatRad = THREE.MathUtils.degToRad(this.geoOrigin.latitude);
-    const metersPerDegreeLon = Math.cos(originLatRad) * METERS_PER_DEGREE_LAT;
-    const deltaLat = this.geoTarget.latitude - this.geoOrigin.latitude;
-    const deltaLon = this.geoTarget.longitude - this.geoOrigin.longitude;
-    const baseEastMeters = deltaLon * metersPerDegreeLon;
-    const baseNorthMeters = deltaLat * METERS_PER_DEGREE_LAT;
-    const distanceMeters = Math.hypot(baseEastMeters, baseNorthMeters);
-
-    if (distanceMeters > this.maxVisibleDistanceMeters) {
-      this.lastGeoComputation = this.createGeoDebugSnapshot("too-far", {
-        deltaLatitude: deltaLat,
-        deltaLongitude: deltaLon,
-        distanceMeters,
-        distanceOverLimit: true
-      });
+    if (!placements.length) {
+      this.lastGeoComputation = this.createGeoDebugSnapshot("missing-target");
       return this.getLastGeoComputation();
     }
 
-    const cosYaw = Math.cos(this.geoCalibration.yawRad);
-    const sinYaw = Math.sin(this.geoCalibration.yawRad);
-    const rotatedEastMeters = baseEastMeters * cosYaw - baseNorthMeters * sinYaw;
-    const rotatedNorthMeters = baseEastMeters * sinYaw + baseNorthMeters * cosYaw;
-    const calibratedEastMeters = rotatedEastMeters + this.geoCalibration.eastMeters;
-    const calibratedNorthMeters = rotatedNorthMeters + this.geoCalibration.northMeters;
-
-    const clampedEastMeters = clamp(
-      calibratedEastMeters,
-      -this.debugClampDistanceMeters,
-      this.debugClampDistanceMeters
-    );
-    const clampedNorthMeters = clamp(
-      calibratedNorthMeters,
-      -this.debugClampDistanceMeters,
-      this.debugClampDistanceMeters
-    );
-    const offset = this.geoReferenceRight
-      .clone()
-      .multiplyScalar(clampedEastMeters)
-      .add(this.geoReferenceForward.clone().multiplyScalar(clampedNorthMeters));
-
-    const anchor = this.geoOriginAnchor || new THREE.Vector3(0, 0, 0);
+    const firstPlacement = placements[0];
     const pose = {
-      position: new THREE.Vector3(anchor.x + offset.x, floorPose.position.y, anchor.z + offset.z),
+      position: firstPlacement.worldPosition.clone(),
       quaternion: new THREE.Quaternion()
     };
-
-    const visibilityDebug = this.computeVisibilityDebug(cameraState, pose.position);
+    const visibilityDebug = this.computeVisibilityDebug(cameraState, firstPlacement.worldPosition);
 
     this.lastGeoComputation = this.createGeoDebugSnapshot("ready", {
-      deltaLatitude: deltaLat,
-      deltaLongitude: deltaLon,
-      xMeters: pose.position.x,
-      zMeters: pose.position.z,
-      distanceMeters,
+      targetLatitude: firstPlacement.offset.x,
+      targetLongitude: firstPlacement.offset.z,
+      deltaLatitude: firstPlacement.offset.x,
+      deltaLongitude: firstPlacement.offset.z,
+      xMeters: firstPlacement.worldPosition.x,
+      zMeters: firstPlacement.worldPosition.z,
+      distanceMeters: maxDistanceMeters,
       distanceOverLimit: false,
-      debugClamped: clampedEastMeters !== calibratedEastMeters || clampedNorthMeters !== calibratedNorthMeters,
       objectBehindCamera: visibilityDebug.objectBehindCamera,
-      pose: clonePose(pose)
+      pose: clonePose(pose),
+      placements: cloneGeoPlacements(placements)
     });
 
     return {
       status: "ready",
-      distanceMeters,
-      pose
+      distanceMeters: maxDistanceMeters,
+      pose,
+      placements: cloneGeoPlacements(placements)
     };
   }
 
@@ -515,7 +607,8 @@ export class PlacementController {
       distanceOverLimit: this.lastGeoComputation.distanceOverLimit,
       debugClamped: this.lastGeoComputation.debugClamped,
       objectBehindCamera: this.lastGeoComputation.objectBehindCamera,
-      pose: clonePose(this.lastGeoComputation.pose)
+      pose: clonePose(this.lastGeoComputation.pose),
+      placements: cloneGeoPlacements(this.lastGeoComputation.placements)
     };
   }
 
@@ -543,6 +636,8 @@ export class PlacementController {
       return false;
     }
 
+    this.clearGeoInstances();
+    this.transformRoot.visible = true;
     applyPose(this.objectRoot, pose);
     this.objectRoot.visible = this.presentationVisible;
     this.reticle.visible = false;
@@ -555,8 +650,32 @@ export class PlacementController {
       return false;
     }
 
-    this.objectRoot.position.copy(pose.position);
-    this.objectRoot.quaternion.copy(this.createGeoPlacementQuaternion(cameraState));
+    const computation = this.getLastGeoComputation();
+    const placements = Array.isArray(computation.placements) ? computation.placements : [];
+    if (!placements.length) {
+      return false;
+    }
+
+    this.clearGeoInstances();
+    this.transformRoot.visible = false;
+    this.objectRoot.position.set(0, 0, 0);
+    this.objectRoot.quaternion.identity();
+    void cameraState;
+
+    for (const placement of placements) {
+      const slot = new THREE.Group();
+      slot.name = `geo-offset-${placement.id}`;
+      slot.position.copy(placement.worldPosition);
+
+      const instance = this.asset ? this.asset.clone(true) : null;
+      if (instance) {
+        this.applyPlacementTransformToInstance(instance);
+        slot.add(instance);
+      }
+
+      this.geoInstancesRoot.add(slot);
+    }
+
     this.objectRoot.visible = this.presentationVisible;
     this.reticle.visible = false;
     this.placed = true;
@@ -572,6 +691,14 @@ export class PlacementController {
     return new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
   }
 
+  getPrimaryPlacedPosition() {
+    if (this.geoInstancesRoot.children.length > 0) {
+      return this.geoInstancesRoot.children[0].position.clone();
+    }
+
+    return this.placed ? this.objectRoot.position.clone() : null;
+  }
+
   computeVisibilityDebug(cameraState, targetPosition = null) {
     if (!cameraState || !cameraState.position || !cameraState.direction) {
       return {
@@ -582,11 +709,9 @@ export class PlacementController {
 
     const referencePosition = targetPosition
       ? targetPosition.clone()
-      : this.placed
-        ? this.objectRoot.position.clone()
-        : this.lastGeoComputation.pose
-          ? this.lastGeoComputation.pose.position.clone()
-          : null;
+      : this.lastGeoComputation.pose
+        ? this.lastGeoComputation.pose.position.clone()
+        : this.getPrimaryPlacedPosition();
 
     if (!referencePosition) {
       return {
@@ -611,10 +736,19 @@ export class PlacementController {
     };
   }
 
+  clearGeoInstances() {
+    for (const child of [...this.geoInstancesRoot.children]) {
+      this.geoInstancesRoot.remove(child);
+      disposeObject3D(child);
+    }
+  }
+
   resetPlacement() {
     this.placed = false;
     this.currentSurfaceState = null;
     this.reticle.visible = false;
+    this.clearGeoInstances();
+    this.transformRoot.visible = true;
     this.clearGeoComputation();
 
     if (this.inARMode) {
@@ -631,6 +765,8 @@ export class PlacementController {
 
   showFallbackPreview() {
     this.reticle.visible = false;
+    this.clearGeoInstances();
+    this.transformRoot.visible = true;
     this.objectRoot.visible = this.presentationVisible;
     this.objectRoot.position.set(0, 0, 0);
     this.objectRoot.quaternion.identity();
@@ -675,7 +811,6 @@ export class PlacementController {
   }
 
   dispose() {
-    this.headingService.dispose();
     this.scene.remove(this.objectRoot);
     this.scene.remove(this.reticle);
 

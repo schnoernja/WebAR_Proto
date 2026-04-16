@@ -59,22 +59,35 @@ export class GeoSceneManager {
       return null;
     }
 
-    this.root.rotation.set(0, THREE.MathUtils.degToRad(this.siteConfig.orientation.yawDeg || 0), 0);
+    const yawDeg =
+      this.siteConfig.orientation && Number.isFinite(this.siteConfig.orientation.yawDeg)
+        ? this.siteConfig.orientation.yawDeg
+        : 0;
+    this.root.rotation.set(0, THREE.MathUtils.degToRad(yawDeg), 0);
 
-    const gltf = await this.loader.loadAsync(this.siteConfig.scene.asset);
-    this.sceneAssetRoot = gltf.scene;
-    this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
-    this.root.add(this.sceneAssetRoot);
+    if (this.siteConfig.scene && this.siteConfig.scene.asset) {
+      const gltf = await this.loader.loadAsync(this.siteConfig.scene.asset);
+      this.sceneAssetRoot = gltf.scene;
+      this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
+      this.root.add(this.sceneAssetRoot);
+    }
 
     for (const objectConfig of this.siteConfig.objects) {
       const marker = createObjectMarker(objectConfig.id);
-      marker.position.copy(enuToVector3(objectConfig.enu));
+      const enu = objectConfig.enu
+        ? objectConfig.enu
+        : {
+            e: objectConfig.offset && Number.isFinite(objectConfig.offset.x) ? objectConfig.offset.x : 0,
+            n: objectConfig.offset && Number.isFinite(objectConfig.offset.z) ? objectConfig.offset.z : 0,
+            u: objectConfig.offset && Number.isFinite(objectConfig.offset.y) ? objectConfig.offset.y : 0
+          };
+      marker.position.copy(enuToVector3(enu));
       this.objectMarkersRoot.add(marker);
     }
 
     return {
       siteId: this.siteConfig.id,
-      assetUrl: this.siteConfig.scene.asset,
+      assetUrl: this.siteConfig.scene && this.siteConfig.scene.asset ? this.siteConfig.scene.asset : null,
       objectCount: this.siteConfig.objects.length
     };
   }

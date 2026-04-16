@@ -383,6 +383,7 @@ export class ARApp {
     this.applySiteGeoTargetFromConfig({ force: true });
     this.applySiteGeoCalibrationFromConfig({ force: true });
     this.applySitePlacementTransformFromConfig({ force: true });
+    this.applySiteLocalObjectsFromConfig({ force: true });
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
     this.ui.bindSensorFusion(this.sensorFusion);
@@ -390,7 +391,7 @@ export class ARApp {
     if (assetInfo.usedPlaceholder) {
       this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
     } else {
-      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Local-Modus per Latitude/Longitude.");
+      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Local-Modus per QR-basiertem lokalen Offset.");
     }
 
     this.arSessionManager = new ARSessionManager({
@@ -430,7 +431,7 @@ export class ARApp {
 
     if (this.siteConfig) {
       this.ui.setMessage(`Site '${this.siteConfig.id}' geladen.`);
-      this.ui.setHint("Geo (WebXR) ist vorausgewaehlt. Starte den Modus, um WebXR mit Standort und IMU/Kompass zu nutzen.");
+      this.ui.setHint("QR-Site geladen. AR (WebXR) mit Geo-Local ist vorausgewaehlt.");
     }
 
     this.sceneManager.setAnimationLoop(this.handleFrame);
@@ -452,8 +453,9 @@ export class ARApp {
 
     try {
       await this.geoSceneManager.loadSite(this.siteConfig);
-      this.selectedExperienceMode = ExperienceMode.GEO_SENSOR;
-      this.selectedPlacementMode = PlacementUIModel.GEO_GLOBAL;
+      this.selectedExperienceMode = ExperienceMode.XR;
+      this.selectedPlacementMode = PlacementUIModel.GEO_LOCAL;
+      this.lastXRPlacementMode = PlacementUIModel.GEO_LOCAL;
     } catch (error) {
       this.siteConfig = null;
       this.ui.setMessage(`Site-Szene konnte nicht geladen werden: ${toMessage(error)}`);
@@ -474,21 +476,23 @@ export class ARApp {
       sitePlacement && sitePlacement.target && typeof sitePlacement.target === "object"
         ? sitePlacement.target
         : this.siteConfig.origin;
-
-    if (!targetSource) {
-      return null;
-    }
-
-    const latitude = Number.isFinite(targetSource.lat) ? targetSource.lat : targetSource.latitude;
-    const longitude = Number.isFinite(targetSource.lon) ? targetSource.lon : targetSource.longitude;
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-      return null;
-    }
-
-    const targetCoord = {
-      latitude,
-      longitude
-    };
+    const latitude = Number.isFinite(targetSource && targetSource.lat)
+      ? targetSource.lat
+      : targetSource && Number.isFinite(targetSource.latitude)
+        ? targetSource.latitude
+        : null;
+    const longitude = Number.isFinite(targetSource && targetSource.lon)
+      ? targetSource.lon
+      : targetSource && Number.isFinite(targetSource.longitude)
+        ? targetSource.longitude
+        : null;
+    const targetCoord =
+      Number.isFinite(latitude) && Number.isFinite(longitude)
+        ? {
+            latitude,
+            longitude
+          }
+        : null;
 
     const preferredAssetUrl =
       sitePlacement && typeof sitePlacement.asset === "string" && sitePlacement.asset.trim()
@@ -519,6 +523,28 @@ export class ARApp {
     };
   }
 
+  isGeoPlacementModeSelected() {
+    return (
+      this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL ||
+      this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL
+    );
+  }
+
+  applySiteLocalObjectsFromConfig({ force = false } = {}) {
+    if (!this.placementController) {
+      return false;
+    }
+
+    if (!force && !this.isGeoPlacementModeSelected()) {
+      return false;
+    }
+
+    const siteObjects =
+      this.siteConfig && Array.isArray(this.siteConfig.objects) ? this.siteConfig.objects : null;
+    this.placementController.setGeoObjects(siteObjects);
+    return Array.isArray(siteObjects) && siteObjects.length > 0;
+  }
+
   applySiteGeoTargetFromConfig({ force = false } = {}) {
     if (!this.placementController || !this.siteConfig) {
       return false;
@@ -547,7 +573,7 @@ export class ARApp {
       return false;
     }
 
-    if (!force && this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+    if (!force && !this.isGeoPlacementModeSelected()) {
       this.placementController.setGeoCalibration(null);
       return false;
     }
@@ -564,7 +590,7 @@ export class ARApp {
       return false;
     }
 
-    if (!force && this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+    if (!force && !this.isGeoPlacementModeSelected()) {
       this.placementController.setPlacementTransform(null);
       return false;
     }
@@ -679,7 +705,7 @@ export class ARApp {
       return;
     }
 
-    if (this.selectedPlacementMode !== PlacementUIModel.GEO_GLOBAL) {
+    if (!this.isGeoPlacementModeSelected()) {
       return;
     }
 
@@ -721,12 +747,12 @@ export class ARApp {
       return false;
     }
 
-    if (experienceMode === ExperienceMode.GEO_SENSOR) {
-      const placementConfig = this.getSiteGeoPlacementConfig();
-      if (!placementConfig || !placementConfig.assetUrl) {
-        return true;
-      }
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    const shouldUseSiteAsset =
+      Boolean(placementConfig && placementConfig.assetUrl) &&
+      (experienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected());
 
+    if (shouldUseSiteAsset) {
       if (this.activePlacementAssetSource === placementConfig.assetUrl) {
         return true;
       }
@@ -778,6 +804,7 @@ export class ARApp {
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
+      this.applySiteLocalObjectsFromConfig({ force: true });
       const siteAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.GEO_SENSOR);
       if (!siteAssetReady) {
         return false;
@@ -786,13 +813,14 @@ export class ARApp {
       return this.startGeoSensorMode();
     }
 
-    const defaultAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
-    if (!defaultAssetReady) {
+    const xrAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
+    if (!xrAssetReady) {
       return false;
     }
 
     this.applySiteGeoCalibrationFromConfig({ force: false });
     this.applySitePlacementTransformFromConfig({ force: false });
+    this.applySiteLocalObjectsFromConfig({ force: false });
 
     return this.startAR();
   }
@@ -911,6 +939,12 @@ export class ARApp {
     }
 
     this.requestGeoLocation();
+    if (!this.siteConfig.origin) {
+      this.ui.setSessionState(false, "Geo-Modus benoetigt in der Site-JSON eine origin-Koordinate.");
+      this.ui.setHint("Fuer QR-basiertes Placement nutze AR (WebXR) mit Geo-Local.");
+      await this.stopAR();
+      return false;
+    }
     const started = await this.sensorFusion.start({
       origin: this.siteConfig.origin
     });
@@ -926,7 +960,6 @@ export class ARApp {
     }
 
     this.geoSensorActive = true;
-    this.captureGeoOriginFromDevice();
     this.syncPresentationVisibility();
     this.ui.setSessionState(true, `Geo-Modus aktiv. Site '${this.siteConfig.id}' geladen.`);
     this.syncDebugPanels(this.activeSurfaceState, null, this.sensorFusion.getSnapshot());
@@ -1006,14 +1039,15 @@ export class ARApp {
     this.placementController.enterARMode();
     this.placementController.setTextInputActive(this.isTextInputActive);
     this.placementController.setMode(mapPlacementUiModeToControllerMode(this.selectedPlacementMode));
-    if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
+    if (this.isGeoPlacementModeSelected()) {
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
+      this.applySiteLocalObjectsFromConfig({ force: true });
     } else {
       this.placementController.setGeoCalibration(null);
       this.placementController.setPlacementTransform(null);
+      this.placementController.setGeoObjects(null);
     }
-    this.captureGeoOriginFromDevice();
     this.sceneManager.setARMode(true);
     this.syncPresentationVisibility();
     this.ui.setSessionState(true, result.message);
@@ -1023,8 +1057,8 @@ export class ARApp {
     this.syncDebugPanels();
     this.syncCanvasPointerState();
 
-    if (this.placementController.getMode() === PlacementMode.GEO && !this.placementController.hasGeoOrigin()) {
-      this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort und stabile Flaeche.");
+    if (this.placementController.getMode() === PlacementMode.GEO) {
+      this.ui.setHint("Geo-Local aktiv. Richte dich am QR-Code aus und halte fuer die erste stabile Bodenpose kurz still.");
       return true;
     }
 
@@ -1104,7 +1138,7 @@ export class ARApp {
       }
 
       if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
-        this.captureGeoReferenceDirection(cameraState);
+        this.captureGeoLocalReference(surfaceState, cameraState);
         this.maybePlaceGeoObject(surfaceState, cameraState);
       }
 
@@ -1184,19 +1218,21 @@ export class ARApp {
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
 
-    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
+    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected()) {
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
+      this.applySiteLocalObjectsFromConfig({ force: true });
     } else {
       this.placementController.setGeoCalibration(null);
       this.placementController.setPlacementTransform(null);
+      this.placementController.setGeoObjects(null);
     }
 
     if (this.placementController.isPlaced()) {
       this.ui.setHint("Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.");
     } else if (normalizedMode === PlacementUIModel.GEO_LOCAL) {
-      this.ui.setHint("Koordinaten-Modus aktiv. Bei stabiler Flaeche wird das Objekt relativ zur Geo-Position gesetzt.");
+      this.ui.setHint("Geo-Local aktiv. QR-Startpunkt und Blickrichtung definieren den lokalen AR-Raum.");
     } else if (normalizedMode === PlacementUIModel.GEO_GLOBAL) {
       this.ui.setHint("Geo-Global-Modus aktiv. Beim Start werden GNSS, IMU und Kompass fuer die Szene genutzt.");
     } else {
@@ -1234,19 +1270,21 @@ export class ARApp {
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
 
-    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
+    if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected()) {
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
+      this.applySiteLocalObjectsFromConfig({ force: true });
     } else {
       this.placementController.setGeoCalibration(null);
       this.placementController.setPlacementTransform(null);
+      this.placementController.setGeoObjects(null);
     }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.ui.setHint("Geo (WebXR) ausgewaehlt. Beim Start werden WebXR, Standort und IMU/Kompass gemeinsam aktiviert.");
     } else if (this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL) {
-      this.ui.setHint("AR (WebXR) ausgewaehlt. Geo-Local nutzt weiter die bestehende Hit-Test- und Stabilizer-Kette.");
+      this.ui.setHint("AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit Hit-Test + Stabilizer.");
     } else {
       this.ui.setHint("AR (WebXR) ausgewaehlt. Freie Platzierung bleibt unveraendert.");
     }
@@ -1375,49 +1413,25 @@ export class ARApp {
       return false;
     }
 
-    if (!this.placementController.hasGeoReferenceDirection()) {
-      this.captureGeoReferenceDirection(cameraState);
-    }
+    this.captureGeoLocalReference(this.activeSurfaceState, cameraState);
 
     if (!this.placementController.hasGeoReferenceDirection()) {
-      this.ui.setMessage("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      this.ui.setMessage("Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil.");
       return false;
     }
 
     if (!this.placementController.hasGeoOrigin()) {
-      const captured = this.captureGeoOriginFromDevice(cameraState);
-      if (!captured) {
-        if (!this.hasAcceptableGeoAccuracy()) {
-          this.ui.setMessage(
-            `Standort ist noch zu ungenau. Warte auf <= ${MAX_GEO_ORIGIN_ACCURACY_METERS} m GPS-Genauigkeit.`
-          );
-        } else {
-          this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
-        }
-        return false;
-      }
+      this.ui.setMessage("Lokaler QR-Ursprung wird initialisiert. Halte das Geraet kurz ruhig.");
+      return false;
     }
 
     const computation = this.placementController.computeGeoPosition(this.activeSurfaceState.stablePose, cameraState);
     if (computation.status !== "ready" || !computation.pose) {
-      if (computation.status === "too-far" && Number.isFinite(computation.distanceMeters)) {
-        this.ui.setMessage(
-          `Ziel zu weit entfernt: ${computation.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`
-        );
-      } else if (computation.status === "missing-origin") {
-        this.ui.setMessage("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
+      if (computation.status === "missing-origin") {
+        this.ui.setMessage("Lokaler QR-Ursprung fehlt noch. Halte die Bodenpose kurz stabil.");
       } else if (computation.status === "missing-reference") {
-        this.ui.setMessage("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+        this.ui.setMessage("Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil.");
       }
-      return false;
-    }
-
-    const siteToleranceMeters = this.getGeoSiteToleranceMeters();
-    if (!this.isWithinGeoSiteTolerance(computation.distanceMeters)) {
-      this.ui.setMessage(
-        `Du bist ${computation.distanceMeters.toFixed(1)} m vom Geo-Ziel entfernt. Fuer diese Site sind max. ${siteToleranceMeters.toFixed(1)} m erlaubt.`
-      );
-      this.ui.setHint("Bewege dich naeher an die Zielkoordinate und halte das Geraet ueber einer stabilen Flaeche.");
       return false;
     }
 
@@ -1426,11 +1440,10 @@ export class ARApp {
       return false;
     }
 
+    const objectCount = Array.isArray(computation.placements) ? computation.placements.length : 1;
     this.ui.setPlacementState(true);
-    this.ui.setMessage(
-      `Objekt im Koordinaten-Modus platziert. Distanz zum Startpunkt: ${computation.distanceMeters.toFixed(1)} m.`
-    );
-    this.ui.setHint("Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.");
+    this.ui.setMessage(`Geo-Local Placement aktiv: ${objectCount} Objekt(e) relativ zum QR-Ursprung gesetzt.`);
+    this.ui.setHint("Placement-Lock aktiv. Offsets bleiben stabil, bis du resettest.");
     return true;
   }
 
@@ -1439,19 +1452,10 @@ export class ARApp {
       return;
     }
 
-    if (!this.placementController.hasGeoOrigin()) {
-      const captured = this.captureGeoOriginFromDevice(cameraState);
-      if (!captured) {
-        return;
-      }
-    }
+    this.captureGeoLocalReference(surfaceState, cameraState);
 
     const computation = this.placementController.computeGeoPosition(surfaceState.stablePose, cameraState);
     if (computation.status !== "ready" || !computation.pose) {
-      return;
-    }
-
-    if (!this.isWithinGeoSiteTolerance(computation.distanceMeters)) {
       return;
     }
 
@@ -1460,68 +1464,29 @@ export class ARApp {
       return;
     }
 
+    const objectCount = Array.isArray(computation.placements) ? computation.placements.length : 1;
     this.ui.setPlacementState(true);
-    this.ui.setMessage(
-      `Objekt im Koordinaten-Modus platziert. Distanz zum Startpunkt: ${computation.distanceMeters.toFixed(1)} m.`
-    );
-    this.ui.setHint("Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.");
+    this.ui.setMessage(`Geo-Local Placement aktiv: ${objectCount} Objekt(e) relativ zum QR-Ursprung gesetzt.`);
+    this.ui.setHint("Placement-Lock aktiv. Offsets bleiben stabil, bis du resettest.");
   }
 
-  captureGeoOriginFromDevice(cameraState = null) {
-    const devicePosition = this.geoLocationService.getCurrentPosition();
-    let geoCoord = toGeoCoord(devicePosition);
-    const deviceAccuracyMeters = devicePosition ? devicePosition.accuracyMeters : null;
-    if (!geoCoord) {
-      const sensorSnapshot = this.sensorFusion.getSnapshot();
-      const sensorPosition =
-        sensorSnapshot && sensorSnapshot.position ? sensorSnapshot.position : null;
-      if (sensorPosition) {
-        geoCoord = {
-          latitude: sensorPosition.lat,
-          longitude: sensorPosition.lon
-        };
-        if (
-          Number.isFinite(sensorPosition.accuracyMeters) &&
-          sensorPosition.accuracyMeters > MAX_GEO_ORIGIN_ACCURACY_METERS
-        ) {
-          return false;
-        }
-      }
-    }
-
-    if (!geoCoord) {
+  captureGeoLocalReference(surfaceState, cameraState) {
+    if (!surfaceState || !surfaceState.isStable || !surfaceState.stablePose || !cameraState) {
       return false;
     }
 
-    if (
-      Number.isFinite(deviceAccuracyMeters) &&
-      deviceAccuracyMeters > MAX_GEO_ORIGIN_ACCURACY_METERS
-    ) {
-      return false;
-    }
+    const localOriginPose =
+      this.arSessionManager && this.arSessionManager.hasOriginPose()
+        ? this.arSessionManager.getOriginPose()
+        : surfaceState.stablePose;
+    const originCaptured = this.placementController.hasGeoOrigin()
+      ? true
+      : this.placementController.setGeoOrigin({ anchorPose: localOriginPose });
+    const directionCaptured = this.placementController.hasGeoReferenceDirection()
+      ? true
+      : this.placementController.setGeoReferenceDirection(cameraState.direction);
 
-    return this.placementController.setGeoOrigin({
-      coord: geoCoord,
-      anchorPosition: cameraState && cameraState.position ? cameraState.position : null
-    });
-  }
-
-  captureGeoReferenceDirection(cameraState) {
-    if (!cameraState || this.placementController.hasGeoReferenceDirection()) {
-      return false;
-    }
-
-    const sensorSnapshot = this.sensorFusion.getSnapshot();
-    const headingRad =
-      sensorSnapshot && Number.isFinite(sensorSnapshot.headingDeg)
-        ? THREE.MathUtils.degToRad(sensorSnapshot.headingDeg)
-        : null;
-    const requireHeading = this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL;
-
-    return this.placementController.setGeoReferenceDirection(cameraState.direction, {
-      headingRad,
-      requireHeading
-    });
+    return originCaptured && directionCaptured;
   }
 
   handleUIInteractionChange(isInteracting) {
@@ -1552,8 +1517,8 @@ export class ARApp {
     if (this.geoSensorActive && !hasARSession) {
       const enuPosition = geoSensorSnapshot && geoSensorSnapshot.enuPosition ? geoSensorSnapshot.enuPosition : null;
       this.ui.setGeoDebug({
-        originLatitude: this.siteConfig ? this.siteConfig.origin.lat : null,
-        originLongitude: this.siteConfig ? this.siteConfig.origin.lon : null,
+        originLatitude: this.siteConfig && this.siteConfig.origin ? this.siteConfig.origin.lat : null,
+        originLongitude: this.siteConfig && this.siteConfig.origin ? this.siteConfig.origin.lon : null,
         targetLatitude: geoSensorSnapshot && geoSensorSnapshot.position ? geoSensorSnapshot.position.lat : null,
         targetLongitude: geoSensorSnapshot && geoSensorSnapshot.position ? geoSensorSnapshot.position.lon : null,
         xMeters: enuPosition ? enuPosition.e : null,
@@ -1647,42 +1612,17 @@ export class ARApp {
     }
 
     if (!this.placementController.hasGeoOrigin()) {
-      if (!this.geoLocationService.getCurrentPosition()) {
-        this.ui.setHint("Keine Geraeteposition verfuegbar. Aktiviere zuerst den Standort.");
-      } else if (!this.hasAcceptableGeoAccuracy()) {
-        this.ui.setHint(
-          `GPS noch ungenau. Warte auf <= ${MAX_GEO_ORIGIN_ACCURACY_METERS} m Genauigkeit, dann wird das Geo-Origin gesetzt.`
-        );
-      } else if (!this.placementController.hasGeoReferenceDirection()) {
-        this.ui.setHint("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
-      } else if (this.geoLocationService.getStatus() !== "granted") {
-        this.ui.setHint("Koordinaten-Modus aktiv. Aktiviere zuerst den Standort ueber 'Standort aktivieren'.");
-      } else {
-        this.ui.setHint("Koordinaten-Modus aktiv. Warte auf Geraetestandort, um die Zielposition zu berechnen.");
-      }
+      this.ui.setHint("Geo-Local aktiv. Warte auf die erste stabile Bodenpose am QR-Startpunkt.");
       return;
     }
 
     if (!this.placementController.hasGeoReferenceDirection()) {
-      this.ui.setHint("Geo-Referenz wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      this.ui.setHint("Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil.");
       return;
     }
 
     if (geoDebug.status === "missing-origin") {
-      this.ui.setHint("Keine Geraeteposition verfuegbar.");
-      return;
-    }
-
-    if (geoDebug.status === "too-far" && Number.isFinite(geoDebug.distanceMeters)) {
-      this.ui.setHint(`Ziel zu weit entfernt: ${geoDebug.distanceMeters.toFixed(1)} m. Sichtbarkeit endet bei 100 m.`);
-      return;
-    }
-
-    const siteToleranceMeters = this.getGeoSiteToleranceMeters();
-    if (Number.isFinite(geoDebug.distanceMeters) && geoDebug.distanceMeters > siteToleranceMeters) {
-      this.ui.setHint(
-        `Zielkoordinate noch zu weit: ${geoDebug.distanceMeters.toFixed(1)} m. Fuer diese Site sind max. ${siteToleranceMeters.toFixed(1)} m erlaubt.`
-      );
+      this.ui.setHint("Lokaler QR-Ursprung fehlt noch.");
       return;
     }
 
@@ -1700,7 +1640,7 @@ export class ARApp {
       return;
     }
 
-    this.ui.setHint("Stabile Flaeche erkannt. Geo-Ziel wird relativ zum Startpunkt auf dem Boden gesetzt.");
+    this.ui.setHint("Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung im lokalen AR-Raum gesetzt.");
   }
 
   resetPlacement() {
@@ -1718,6 +1658,8 @@ export class ARApp {
     if (this.arSessionManager) {
       this.arSessionManager.clearOriginPose();
     }
+    this.placementController.clearGeoOrigin();
+    this.placementController.clearGeoReferenceDirection();
     this.placementController.resetPlacement();
     this.ui.setPlacementState(false);
     this.ui.setSurfaceState(false, false);
@@ -1726,7 +1668,7 @@ export class ARApp {
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       this.ui.setMessage("Placement wurde zurueckgesetzt.");
       if (this.placementController.getMode() === PlacementMode.GEO) {
-        this.ui.setHint("Suche eine neue stabile Flaeche. Das Geo-Ziel wird danach erneut auf dem Boden platziert.");
+        this.ui.setHint("Suche am QR-Startpunkt eine neue stabile Flaeche; der lokale Ursprung wird neu gesetzt.");
       } else {
         this.ui.setHint("Freie Platzierung aktiv. Richte das Reticle neu aus und setze das Objekt erneut.");
       }
