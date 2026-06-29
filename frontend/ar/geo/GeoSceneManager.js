@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { disposeObject3D } from "../utils.js";
+import { resolveAppUrl } from "../urlUtils.js";
 import { enuToVector3 } from "./GeoENU.js";
 
 function createMarkerMaterial(color) {
@@ -66,7 +67,7 @@ export class GeoSceneManager {
     this.root.rotation.set(0, THREE.MathUtils.degToRad(yawDeg), 0);
 
     if (this.siteConfig.scene && this.siteConfig.scene.asset) {
-      const gltf = await this.loader.loadAsync(this.siteConfig.scene.asset);
+      const gltf = await this.loader.loadAsync(resolveAppUrl(this.siteConfig.scene.asset));
       this.sceneAssetRoot = gltf.scene;
       this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
       this.root.add(this.sceneAssetRoot);

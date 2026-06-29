@@ -7,6 +7,7 @@ import { PlacementController, PlacementMode } from "./PlacementController.js";
 import { UIController } from "./UIController.js";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
+import { resolveAppUrl } from "./urlUtils.js";
 import { SiteLoader } from "./geo/SiteLoader.js";
 import { SensorFusion } from "./geo/SensorFusion.js";
 import { GeoSceneManager } from "./geo/GeoSceneManager.js";
@@ -153,21 +154,7 @@ function toGeoCoord(position) {
 }
 
 function normalizeSiteAssetUrl(url) {
-  if (typeof url !== "string") {
-    return null;
-  }
-
-  const trimmed = url.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const hasProtocol = /^([a-z]+:)?\/\//i.test(trimmed);
-  if (hasProtocol || trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) {
-    return trimmed;
-  }
-
-  return `/${trimmed}`;
+  return resolveAppUrl(url);
 }
 
 function toAssetLabel(url, fallbackLabel = "Site-Modell") {

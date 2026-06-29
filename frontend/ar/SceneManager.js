@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { APP_CONFIG } from "./config.js";
+import { resolveAppUrl } from "./urlUtils.js";
 import { disposeObject3D } from "./utils.js";
 
 function setTransparentGrid(grid) {
@@ -176,21 +177,7 @@ export class SceneManager {
   }
 
   normalizeAssetUrl(url) {
-    if (typeof url !== "string") {
-      return null;
-    }
-
-    const trimmed = url.trim();
-    if (!trimmed) {
-      return null;
-    }
-
-    const hasProtocol = /^([a-z]+:)?\/\//i.test(trimmed);
-    if (hasProtocol || trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) {
-      return trimmed;
-    }
-
-    return `/${trimmed}`;
+    return resolveAppUrl(url);
   }
 
   async createPlacementAssetFromUrl(url, label = null) {

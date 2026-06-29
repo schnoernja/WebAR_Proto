@@ -1,3 +1,5 @@
+import { resolveAppUrl } from "../urlUtils.js";
+
 function sanitizeSiteId(siteId) {
   if (typeof siteId !== "string") {
     return null;
@@ -62,7 +64,7 @@ function normalizeScene(scene) {
   }
 
   return {
-    asset: scene.asset.trim()
+    asset: resolveAppUrl(scene.asset.trim())
   };
 }
 
@@ -86,10 +88,7 @@ function normalizeObjects(objects) {
 
     return {
       id: typeof objectConfig.id === "string" && objectConfig.id.trim() ? objectConfig.id.trim() : `object-${index + 1}`,
-      asset:
-        typeof objectConfig.asset === "string" && objectConfig.asset.trim()
-          ? objectConfig.asset.trim()
-          : null,
+      asset: typeof objectConfig.asset === "string" && objectConfig.asset.trim() ? resolveAppUrl(objectConfig.asset.trim()) : null,
       anchor,
       offset: normalizedOffset,
       enu: {
@@ -182,7 +181,7 @@ function normalizePlacement(placement) {
   }
 
   return {
-    asset,
+    asset: resolveAppUrl(asset),
     target,
     calibration,
     transform,
@@ -202,7 +201,7 @@ export class SiteLoader {
   }
 
   buildSiteUrl(siteId) {
-    return `/public/sites/${encodeURIComponent(siteId)}.json`;
+    return resolveAppUrl(`public/sites/${encodeURIComponent(siteId)}.json`, this.location);
   }
 
   normalizeSite(siteId, rawConfig, sourceUrl) {
