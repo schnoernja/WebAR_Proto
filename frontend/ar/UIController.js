@@ -39,8 +39,8 @@ const UI_MODE = Object.freeze({
   USER: "user"
 });
 const UI_MODE_STORAGE_KEY = "epartwin-ui-mode";
-const USER_MODE_VISIBLE_CARDS = Object.freeze(["welcome", "placement", "help"]);
-const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze(["help", "survey", "settings"]);
+const USER_MODE_VISIBLE_CARDS = Object.freeze(["placement", "note"]);
+const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze([]);
 
 const MAX_GEO_OFFSET_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 1;
@@ -226,7 +226,7 @@ const DE_TRANSLATIONS = Object.freeze({
   languageCode: "de",
   menu: {
     eyebrow: "Steuerung",
-    title: "Menue",
+    title: "Menü",
     tabs: {
       placement: "Platzierung",
       developer: "Entwickler",
@@ -236,17 +236,17 @@ const DE_TRANSLATIONS = Object.freeze({
     },
     placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
-    helpCopy: "Die Hilfskachel laesst sich jederzeit erneut einblenden.",
-    surveyCopy: "Die Umfragekachel enthaelt einen Platzhalter fuer eine spaetere Nutzerumfrage.",
-    settingsCopy: "Die Einstellungenkachel enthaelt die Sprachumschaltung fuer die UI.",
+    helpCopy: "Die Hilfskachel lässt sich jederzeit erneut einblenden.",
+    surveyCopy: "Die Umfragekachel enthält einen Platzhalter für eine spätere Nutzerumfrage.",
+    settingsCopy: "Die Einstellungenkachel enthält die Sprachumschaltung für die UI.",
     uiModeLabel: "Ansicht",
     uiModes: {
       user: "Benutzer",
       developer: "Entwickler"
     },
-    openHelp: "Hilfskachel oeffnen",
-    openSurvey: "Umfragekachel oeffnen",
-    openSettings: "Einstellungen oeffnen",
+    openHelp: "Hilfskachel öffnen",
+    openSurvey: "Umfragekachel öffnen",
+    openSettings: "Einstellungen öffnen",
     developerOptions: {
       geoHeadingReference: "Geo-Local mit Kompassbezug",
       geoHeadingReferenceDescription:
@@ -265,7 +265,7 @@ const DE_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
-    intro: "Waehle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.",
+    intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.",
     modeLabel: "Hauptmodus",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -286,47 +286,47 @@ const DE_TRANSLATIONS = Object.freeze({
     headline: "Herzlich Willkommen bei der EPARtwin WebAR Experience!",
     subheading: "Anforderungen",
     items: [
-      "Ein mobiles Geraet mit WebXR-Unterstuetzung",
-      "Kamerafreigabe fuer den AR- und Geo-Modus (WebXR)",
-      "Standortfreigabe fuer Geo-Placement",
-      "Eine erkennbare Boden- oder Tischflaeche fuer stabiles Placement"
+      "Ein mobiles Gerät mit WebXR-Unterstützung",
+      "Kamerafreigabe für den AR- und Geo-Modus (WebXR)",
+      "Standortfreigabe für Geo-Placement",
+      "Eine erkennbare Boden- oder Tischfläche für stabiles Placement"
     ]
   },
   help: {
     title: "Hilfe",
     steps: [
-      "1. Starte AR oder Geo ueber die Aktionskachel oben.",
-      "2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.",
-      "3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.",
-      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum uebertragen und auf der stabilen Bodenflaeche verankert."
+      "1. Starte AR oder Geo über die Aktionskachel oben.",
+      "2. Bewege das Gerät langsam, bis eine stabile Fläche erkannt wird.",
+      "3. Im freien Modus setzt du das Objekt direkt auf die stabile Fläche.",
+      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum übertragen und auf der stabilen Bodenfläche verankert."
     ],
     userSteps: [
-      "1. Zum Starten der WebAR-Anwendung mit dem Ruecken zum QR-Code stehen.",
-      "2. Standort aktivieren, dann AR starten klicken.",
-      "3. Zugriff auf Standort und AR/Kamera zulassen.",
-      "4. Handy auf den Boden richten, bis oben rechts 'Objekt: Platziert' angezeigt wird.",
+      "1. Zum Starten der WebAR-Anwendung mit dem Rücken zum QR-Code stehen.",
+      "2. In der Kachel 'Objektplatzierung' den angezeigten Start-Button verwenden.",
+      "3. Zugriff auf AR/Kamera und, falls abgefragt, Standort zulassen.",
+      "4. Handy auf den Boden richten, bis oben rechts 'Objekt platziert: Ja' angezeigt wird.",
       "5. Dann umgucken."
     ]
   },
   survey: {
     title: "Umfrage",
     placeholderTitle: "Platzhalter",
-    placeholderText: "Hier wird kuenftig eine Nutzerumfrage integriert.",
+    placeholderText: "Hier wird künftig eine Nutzerumfrage integriert.",
     recommendationTitle: "Technische Empfehlung",
     recommendationText:
-      "Geeignet sind eingebettete Formulare, die anonym genutzt und spaeter exportiert oder per E-Mail ausgewertet werden koennen.",
+      "Geeignet sind eingebettete Formulare, die anonym genutzt und später exportiert oder per E-Mail ausgewertet werden können.",
     tools: [
       {
         name: "Google Forms",
-        description: "schnell verfuegbar, einfach teilbar und Antworten im Google-Workspace auswertbar"
+        description: "schnell verfügbar, einfach teilbar und Antworten im Google-Workspace auswertbar"
       },
       {
         name: "Typeform",
-        description: "starke mobile UX, gutes Embedding und gefuehrte Frageablaeufe"
+        description: "starke mobile UX, gutes Embedding und geführte Frageabläufe"
       },
       {
         name: "Tally.so",
-        description: "leichtgewichtig, iframe-faehig und gut fuer anonyme Formulare mit Export"
+        description: "leichtgewichtig, iframe-fähig und gut für anonyme Formulare mit Export"
       },
       {
         name: "Microsoft Forms",
@@ -337,7 +337,7 @@ const DE_TRANSLATIONS = Object.freeze({
     requirements: [
       "Per iframe in die bestehende UI einbettbar",
       "Optional anonym nutzbar",
-      "Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard moeglich"
+      "Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard möglich"
     ]
   },
   settings: {
@@ -359,8 +359,8 @@ const DE_TRANSLATIONS = Object.freeze({
       geoLocal: "Geo-Local",
       geoGlobal: "Geo-Global"
     },
-    apply: "Koordinaten uebernehmen",
-    feedbackDefault: "Im Koordinaten-Modus wird das Objekt nur im gueltigen Umkreis angezeigt."
+    apply: "Koordinaten übernehmen",
+    feedbackDefault: "Im Koordinaten-Modus wird das Objekt nur im gültigen Umkreis angezeigt."
   },
   state: {
     title: "Status",
@@ -368,18 +368,18 @@ const DE_TRANSLATIONS = Object.freeze({
       support: "WebXR",
       session: "Modus aktiv",
       tracking: "Tracking",
-      surface: "Flaeche",
-      stability: "Stabilitaet",
+      surface: "Fläche",
+      stability: "Stabilität",
       placement: "Objekt"
     },
     values: {
-      checking: "Pruefung",
-      available: "Verfuegbar",
-      unavailable: "Nicht verfuegbar",
+      checking: "Prüfung",
+      available: "Verfügbar",
+      unavailable: "Nicht verfügbar",
       yes: "Ja",
       no: "Nein",
       waiting: "Wartet",
-      running: "Laeuft",
+      running: "Läuft",
       search: "Suche",
       detected: "Erkannt",
       stable: "Stabil",
@@ -404,7 +404,7 @@ const DE_TRANSLATIONS = Object.freeze({
       heading: "Heading"
     },
     badges: {
-      checking: "Pruefung",
+      checking: "Prüfung",
       ready: "Bereit",
       waiting: "Wartet",
       granted: "Granted",
@@ -420,34 +420,34 @@ const DE_TRANSLATIONS = Object.freeze({
     },
     messages: {
       notRequested: "Standort noch nicht angefordert.",
-      httpsRequired: "Geolocation benoetigt HTTPS oder localhost.",
-      unsupported: "Geolocation ist in diesem Browser nicht verfuegbar.",
+      httpsRequired: "Geolocation benötigt HTTPS oder localhost.",
+      unsupported: "Geolocation ist in diesem Browser nicht verfügbar.",
       waiting: "Warte auf Standortfreigabe.",
       denied: "Standort verweigert - bitte im Browser aktivieren.",
-      positionUnavailable: "Standort aktuell nicht verfuegbar.",
+      positionUnavailable: "Standort aktuell nicht verfügbar.",
       timeout: "Standortabfrage Timeout.",
       genericError: "Geolocation konnte nicht gelesen werden.",
-      available: "Geraetestandort verfuegbar.",
+      available: "Gerätestandort verfügbar.",
       permissionGranted: "Standortfreigabe vorhanden. Position wird aktualisiert."
     },
     help: {
       notRequested: "Tippe auf 'Standort aktivieren', damit der Browser die Freigabe anfragt.",
-      httpsRequired: "Oeffne die Seite ueber https:// oder localhost, damit der Browser Standortzugriff erlaubt.",
+      httpsRequired: "Öffne die Seite über https:// oder localhost, damit der Browser Standortzugriff erlaubt.",
       denied: "Bitte aktiviere Standort in: Browser Einstellungen -> Standort -> Erlauben.",
-      waiting: "Bestaetige die Standortabfrage im Browser, damit Latitude und Longitude geladen werden.",
-      positionUnavailable: "Pruefe GPS, Netzverbindung und freie Sicht zum Himmel.",
+      waiting: "Bestätige die Standortabfrage im Browser, damit Latitude und Longitude geladen werden.",
+      positionUnavailable: "Prüfe GPS, Netzverbindung und freie Sicht zum Himmel.",
       timeout: "Versuche es erneut oder bewege dich an einen Ort mit besserem Empfang.",
       none: ""
     }
   },
   offset: {
     title: "Geo Test-Anpassung",
-    description: "Offset, Skalierung und Rotation fuer Geo-Placement live testen. Werte werden zu den JSON-Vorgaben addiert bzw. ueberlagert.",
+    description: "Offset, Skalierung und Rotation für Geo-Placement live testen. Werte werden zu den JSON-Vorgaben addiert bzw. überlagert.",
     siteCalibrationToggle: "JSON-Offset aktivieren",
     adoptAsSiteCalibration: "Test-Offset als JSON-Kalibrierung uebernehmen",
     toggle: "Offset aktivieren",
     eastLabel: "X (Ost/West)",
-    northLabel: "Y (Nord/Sued)",
+    northLabel: "Y (Nord/Süd)",
     scaleToggle: "Skalierung aktivieren",
     scaleLabel: "Skalierung",
     rotationToggle: "Rotation aktivieren",
@@ -479,31 +479,33 @@ const DE_TRANSLATIONS = Object.freeze({
   mini: {
     session: {
       active: "Modus: Aktiv",
-      checking: "Modus: Pruefung",
+      checking: "Modus: Prüfung",
       ready: "Modus: Bereit",
       inactive: "Modus: Inaktiv"
     },
     surface: {
-      stable: "Flaeche: Stabil",
-      checking: "Flaeche: Pruefung",
-      search: "Flaeche: Suche"
+      stable: "Fläche: Stabil",
+      checking: "Fläche: Prüfung",
+      search: "Fläche: Suche"
     },
     placement: {
       placed: "Objekt: Platziert",
-      waiting: "Objekt: Wartet"
+      waiting: "Objekt: Wartet",
+      yes: "Objekt platziert: Ja",
+      no: "Objekt platziert: Nein"
     }
   },
   aria: {
-    menuOpen: "Menue oeffnen",
-    menuClose: "Menue schliessen",
+    menuOpen: "Menü öffnen",
+    menuClose: "Menü schließen",
     closeButtons: {
-      welcome: "Begruessung schliessen",
-      help: "Hilfskachel schliessen",
-      survey: "Umfrage schliessen",
-      settings: "Einstellungen schliessen"
+      welcome: "Begrüßung schließen",
+      help: "Hilfskachel schließen",
+      survey: "Umfrage schließen",
+      settings: "Einstellungen schließen"
     },
     toggleButtons: {
-      welcome: "Begruessung auf- oder zuklappen",
+      welcome: "Begrüßung auf- oder zuklappen",
       placement: "Objektplatzierung auf- oder zuklappen",
       help: "Hilfskachel auf- oder zuklappen",
       survey: "Umfrage auf- oder zuklappen",
@@ -598,9 +600,9 @@ const EN_TRANSLATIONS = Object.freeze({
     ],
     userSteps: [
       "1. Start the WebAR experience while standing with your back to the QR code.",
-      "2. Enable location, then tap Start AR.",
-      "3. Allow access to location and AR/camera.",
-      "4. Point the phone at the floor until the top-right status shows 'Object: Placed'.",
+      "2. Use the visible start button in the placement card.",
+      "3. Allow access to AR/camera and location if the browser asks for it.",
+      "4. Point the phone at the floor until the top-right status shows 'Object placed: Yes'.",
       "5. Then look around."
     ]
   },
@@ -786,7 +788,9 @@ const EN_TRANSLATIONS = Object.freeze({
     },
     placement: {
       placed: "Object: Placed",
-      waiting: "Object: Waiting"
+      waiting: "Object: Waiting",
+      yes: "Object placed: Yes",
+      no: "Object placed: No"
     }
   },
   aria: {
@@ -1345,7 +1349,7 @@ export class UIController {
 
     this.bindCardToggleButtons();
     this.bindMenuControls();
-    this.bindUIModeControls(onExperienceModeChange);
+    this.bindUIModeControls();
     this.bindLanguageControls();
     this.bindGeoHeadingReferenceControl(onGeoHeadingReferenceToggle);
     this.bindInteractionSurface(this.uiContainer);
@@ -1668,12 +1672,10 @@ export class UIController {
     }
   }
 
-  bindUIModeControls(onExperienceModeChange) {
+  bindUIModeControls() {
     if (this.uiModeUserButton) {
       const toUser = () => {
-        this.setUIMode(UI_MODE.USER, {
-          onExperienceModeChange
-        });
+        this.setUIMode(UI_MODE.USER);
       };
       this.uiModeUserButton.addEventListener("click", toUser);
       this.cleanupCallbacks.push(() => this.uiModeUserButton.removeEventListener("click", toUser));
@@ -1681,9 +1683,7 @@ export class UIController {
 
     if (this.uiModeDeveloperButton) {
       const toDeveloper = () => {
-        this.setUIMode(UI_MODE.DEVELOPER, {
-          onExperienceModeChange
-        });
+        this.setUIMode(UI_MODE.DEVELOPER);
       };
       this.uiModeDeveloperButton.addEventListener("click", toDeveloper);
       this.cleanupCallbacks.push(() => this.uiModeDeveloperButton.removeEventListener("click", toDeveloper));
@@ -2124,13 +2124,11 @@ export class UIController {
     }
   }
 
-  setUIMode(mode, { onExperienceModeChange } = {}) {
+  setUIMode(mode) {
     const nextMode = mode === UI_MODE.USER ? UI_MODE.USER : UI_MODE.DEVELOPER;
     if (nextMode === this.uiState.uiMode) {
       this.updateUIModeButtons();
-      this.applyUIModeLayout({
-        onExperienceModeChange
-      });
+      this.applyUIModeLayout();
       return;
     }
 
@@ -2140,9 +2138,7 @@ export class UIController {
 
     this.uiState.uiMode = nextMode;
     this.persistUIMode(nextMode);
-    this.applyUIModeLayout({
-      onExperienceModeChange
-    });
+    this.applyUIModeLayout();
   }
 
   updateUIModeButtons() {
@@ -2160,8 +2156,11 @@ export class UIController {
     }
   }
 
-  applyUIModeLayout({ onExperienceModeChange } = {}) {
+  applyUIModeLayout() {
     const isUser = this.isUserMode();
+    if (this.document.body) {
+      this.document.body.setAttribute("data-ui-mode", isUser ? "user" : "developer");
+    }
 
     if (isUser) {
       for (const cardKey of Object.keys(this.cardRefs)) {
@@ -2192,40 +2191,31 @@ export class UIController {
       if (this.stopButton) {
         this.stopButton.hidden = true;
       }
-      if (this.geoActivateLocationButton) {
-        this.geoActivateLocationButton.hidden = false;
-      }
-
-      if (this.experienceModeSelect) {
-        this.experienceModeSelect.value = "geo-sensor";
-      }
-
-      if (!this.uiState.sessionActive && typeof onExperienceModeChange === "function") {
-        this.handleExperienceModeChange(onExperienceModeChange);
-      }
-
-      this.uiState.experienceMode = "geo-sensor";
-
       for (const toggle of this.cardVisibilityToggles) {
         const cardKey = toggle.dataset.cardVisibilityToggle;
         const allowed = USER_MODE_VISIBLE_CARDS.includes(cardKey);
         toggle.disabled = true;
         toggle.checked = allowed;
+        const toggleOption = toggle.closest(".menu-option");
+        if (toggleOption) {
+          toggleOption.hidden = !allowed;
+        }
       }
 
       if (this.staticRefs.menuTabs.developer) {
         this.staticRefs.menuTabs.developer.hidden = true;
       }
+      if (this.staticRefs.menuTabs.help) {
+        this.staticRefs.menuTabs.help.hidden = true;
+      }
       if (this.staticRefs.menuTabs.survey) {
-        this.staticRefs.menuTabs.survey.hidden = false;
+        this.staticRefs.menuTabs.survey.hidden = true;
       }
       if (this.staticRefs.menuTabs.settings) {
-        this.staticRefs.menuTabs.settings.hidden = false;
+        this.staticRefs.menuTabs.settings.hidden = true;
       }
 
-      if (
-        this.uiState.activeMenuTab === "developer"
-      ) {
+      if (this.uiState.activeMenuTab !== "placement") {
         this.setActiveMenuTab("placement");
       }
     } else {
@@ -2259,10 +2249,17 @@ export class UIController {
 
       for (const toggle of this.cardVisibilityToggles) {
         toggle.disabled = false;
+        const toggleOption = toggle.closest(".menu-option");
+        if (toggleOption) {
+          toggleOption.hidden = false;
+        }
       }
 
       if (this.staticRefs.menuTabs.developer) {
         this.staticRefs.menuTabs.developer.hidden = false;
+      }
+      if (this.staticRefs.menuTabs.help) {
+        this.staticRefs.menuTabs.help.hidden = false;
       }
       if (this.staticRefs.menuTabs.survey) {
         this.staticRefs.menuTabs.survey.hidden = false;
@@ -2274,6 +2271,7 @@ export class UIController {
 
     this.updateUIModeButtons();
     this.applyAllCardStates();
+    this.updateMiniSummaryLayout();
     this.renderExperienceModeUI();
     this.renderHelpCopy();
     this.refreshButtons();
@@ -2622,21 +2620,20 @@ export class UIController {
 
   renderExperienceModeUI() {
     const text = this.getText();
-    const isUserMode = this.isUserMode();
     const experienceMode = this.uiState.experienceMode === "geo-sensor" ? "geo-sensor" : "xr";
-    const isGeoSensorMode = isUserMode || experienceMode === "geo-sensor";
+    const isGeoSensorMode = experienceMode === "geo-sensor";
 
     if (this.experienceModeSelect) {
-      this.experienceModeSelect.value = isUserMode ? "geo-sensor" : experienceMode;
+      this.experienceModeSelect.value = experienceMode;
     }
 
     if (this.startButton) {
       this.startButton.textContent =
-        isUserMode ? text.placement.buttons.startXR : isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
+        isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
     }
 
     if (this.geoActivateLocationButton) {
-      this.geoActivateLocationButton.hidden = isUserMode ? false : !isGeoSensorMode;
+      this.geoActivateLocationButton.hidden = !isGeoSensorMode;
       this.geoActivateLocationButton.textContent = text.placement.buttons.activateLocation;
     }
 
@@ -2865,7 +2862,8 @@ export class UIController {
         this.setCardCollapsed("coord", false);
         this.setCardVisibility("help", false);
       } else {
-        this.setCardVisibility("help", true);
+        this.setCardVisibility("note", true);
+        this.setCardCollapsed("note", false);
       }
     }
 
@@ -2932,6 +2930,18 @@ export class UIController {
     this.refreshMiniSummary();
   }
 
+  updateMiniSummaryLayout() {
+    const isUserMode = this.isUserMode();
+
+    if (this.miniRefs.session) {
+      this.miniRefs.session.hidden = isUserMode;
+    }
+
+    if (this.miniRefs.surface) {
+      this.miniRefs.surface.hidden = isUserMode;
+    }
+  }
+
   setState(key, text, status) {
     const ref = this.stateRefs[key];
     if (!ref) {
@@ -2988,6 +2998,8 @@ export class UIController {
 
   refreshMiniSummary() {
     const text = this.getText();
+    const isUserMode = this.isUserMode();
+    this.updateMiniSummaryLayout();
 
     const sessionText =
       this.uiState.experienceMode === "geo-sensor"
@@ -3025,7 +3037,13 @@ export class UIController {
         ? "warning"
         : "idle";
 
-    const placementText = this.uiState.placed ? text.mini.placement.placed : text.mini.placement.waiting;
+    const placementText = isUserMode
+      ? this.uiState.placed
+        ? text.mini.placement.yes
+        : text.mini.placement.no
+      : this.uiState.placed
+        ? text.mini.placement.placed
+        : text.mini.placement.waiting;
     const placementStatus = this.uiState.placed ? "done" : "idle";
 
     this.setMiniState("session", sessionText, sessionStatus);

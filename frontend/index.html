@@ -210,11 +210,14 @@
         <div class="hud-shell">
           <div class="panel hud-toolbar">
             <div class="hud-toolbar-main">
-              <span class="hud-caption">EPARtwin WebAR</span>
+              <div class="hud-brand">
+                <img id="hud-logo" class="hud-logo" src="assets/design/logo.png" alt="EPARtwin Logo" />
+                <span class="hud-caption">EPARtwin WebAR</span>
+              </div>
               <div class="hud-mini-summary">
                 <span id="mini-session" class="mini-pill" data-status="idle">AR: Inaktiv</span>
-                <span id="mini-surface" class="mini-pill" data-status="idle">Flaeche: Suche</span>
-                <span id="mini-placement" class="mini-pill" data-status="idle">Objekt: Wartet</span>
+                <span id="mini-surface" class="mini-pill" data-status="idle">Fläche: Suche</span>
+                <span id="mini-placement" class="mini-pill" data-status="idle">Objekt platziert: Nein</span>
               </div>
             </div>
           </div>
@@ -254,10 +257,10 @@
                 </p>
                 <p id="welcome-card-subheading" class="card-subheading">Anforderungen</p>
                 <ul id="welcome-card-list" class="card-list welcome-list">
-                  <li>Ein mobiles Geraet mit WebXR-Unterstuetzung</li>
-                  <li>Kamerafreigabe fuer den AR- und Geo-Modus (WebXR)</li>
-                  <li>Standortfreigabe fuer Geo-Placement</li>
-                  <li>Eine erkennbare Boden- oder Tischflaeche fuer stabiles Placement</li>
+                  <li>Ein mobiles Gerät mit WebXR-Unterstützung</li>
+                  <li>Kamerafreigabe für den AR- und Geo-Modus (WebXR)</li>
+                  <li>Standortfreigabe für Geo-Placement</li>
+                  <li>Eine erkennbare Boden- oder Tischfläche für stabiles Placement</li>
                 </ul>
               </div>
             </section>
@@ -350,10 +353,10 @@
 
               <div id="card-help-content" class="card-content" data-card-content="help">
                 <div class="help-copy">
-                  <p>1. Starte AR oder Geo ueber die Aktionskachel oben.</p>
-                  <p>2. Bewege das Geraet langsam, bis eine stabile Flaeche erkannt wird.</p>
-                  <p>3. Im freien Modus setzt du das Objekt direkt auf die stabile Flaeche.</p>
-                  <p>4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum uebertragen und auf der stabilen Bodenflaeche verankert.</p>
+                  <p>1. Starte AR oder Geo über die Aktionskachel oben.</p>
+                  <p>2. Bewege das Gerät langsam, bis eine stabile Fläche erkannt wird.</p>
+                  <p>3. Im freien Modus setzt du das Objekt direkt auf die stabile Fläche.</p>
+                  <p>4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum übertragen und auf der stabilen Bodenfläche verankert.</p>
                 </div>
               </div>
             </section>
@@ -390,19 +393,19 @@
                 <div class="card-copy-block">
                   <p id="survey-placeholder-title" class="card-subheading">Platzhalter</p>
                   <p id="survey-placeholder-text">
-                    Hier wird kuenftig eine Nutzerumfrage integriert.
+                    Hier wird künftig eine Nutzerumfrage integriert.
                   </p>
                 </div>
 
                 <div class="card-copy-block">
                   <p id="survey-recommendation-title" class="card-subheading">Technische Empfehlung</p>
                   <p id="survey-recommendation-text">
-                    Geeignet sind eingebettete Formulare, die anonym genutzt und spaeter exportiert oder per E-Mail ausgewertet werden koennen.
+                    Geeignet sind eingebettete Formulare, die anonym genutzt und später exportiert oder per E-Mail ausgewertet werden können.
                   </p>
                   <ul id="survey-tool-list" class="card-list survey-tool-list">
-                    <li><strong>Google Forms:</strong> schnell verfuegbar, einfach teilbar, Antworten im Google-Workspace auswertbar.</li>
-                    <li><strong>Typeform:</strong> starke mobile UX, gutes Embedding, Fokus auf gefuehrte Frageablaeufe.</li>
-                    <li><strong>Tally.so:</strong> leichtgewichtig, iframe-faehig, einfach fuer anonyme Formulare und Export.</li>
+                    <li><strong>Google Forms:</strong> schnell verfügbar, einfach teilbar, Antworten im Google-Workspace auswertbar.</li>
+                    <li><strong>Typeform:</strong> starke mobile UX, gutes Embedding, Fokus auf geführte Frageabläufe.</li>
+                    <li><strong>Tally.so:</strong> leichtgewichtig, iframe-fähig, einfach für anonyme Formulare und Export.</li>
                     <li><strong>Microsoft Forms:</strong> sinnvoll bei bestehender Microsoft-Umgebung und Auswertung im M365-Kontext.</li>
                   </ul>
                 </div>
@@ -412,7 +415,7 @@
                   <ul id="survey-requirements-list" class="card-list survey-requirements-list">
                     <li>Per iframe in die bestehende UI einbettbar</li>
                     <li>Optional anonym nutzbar</li>
-                    <li>Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard moeglich</li>
+                    <li>Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard möglich</li>
                   </ul>
                 </div>
               </div>
@@ -573,7 +576,7 @@
                 <div class="state-grid">
                   <article class="state-item" data-state="support" data-status="idle">
                     <span class="state-label">WebXR</span>
-                    <strong id="state-support" class="state-value">Pruefung</strong>
+                    <strong id="state-support" class="state-value">Prüfung</strong>
                   </article>
                   <article class="state-item" data-state="session" data-status="idle">
                     <span class="state-label">AR aktiv</span>
@@ -584,11 +587,11 @@
                     <strong id="state-tracking" class="state-value">Wartet</strong>
                   </article>
                   <article class="state-item" data-state="surface" data-status="idle">
-                    <span class="state-label">Flaeche</span>
+                    <span class="state-label">Fläche</span>
                     <strong id="state-surface" class="state-value">Suche</strong>
                   </article>
                   <article class="state-item" data-state="stability" data-status="idle">
-                    <span class="state-label">Stabilitaet</span>
+                    <span class="state-label">Stabilität</span>
                     <strong id="state-stability" class="state-value">Wartet</strong>
                   </article>
                   <article class="state-item" data-state="placement" data-status="idle">
@@ -621,7 +624,7 @@
 
               <div id="card-note-content" class="card-content" data-card-content="note" hidden>
                 <p id="interaction-hint" class="hint-text">
-                  Fallback-3D-Ansicht aktiv. Im AR-Modus wird zuerst eine stabile Referenzflaeche gesucht.
+                  Fallback-3D-Ansicht aktiv. Im AR-Modus wird zuerst eine stabile Referenzfläche gesucht.
                 </p>
               </div>
             </section>

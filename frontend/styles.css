@@ -556,6 +556,29 @@ body.ar-active .welcome-headline {
   gap: 8px;
 }
 
+.hud-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hud-brand .hud-caption {
+  margin: 0;
+}
+
+.hud-logo {
+  display: none;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+body[data-ui-mode="user"] .hud-logo {
+  display: block;
+}
+
 .hud-mini-summary {
   display: flex;
   flex-wrap: wrap;
@@ -776,6 +799,70 @@ body.ar-active .button {
 
 .button-ghost {
   background: transparent;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) {
+  background: #ddf1fd;
+}
+
+body[data-ui-mode="user"]:not(.ar-active)::before,
+body[data-ui-mode="user"]:not(.ar-active)::after {
+  display: none;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar,
+body[data-ui-mode="user"]:not(.ar-active) .card-panel {
+  background: #35abe2;
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.22);
+  backdrop-filter: none;
+  box-shadow: 0 20px 44px rgba(25, 92, 135, 0.2);
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-caption,
+body[data-ui-mode="user"]:not(.ar-active) .eyebrow,
+body[data-ui-mode="user"]:not(.ar-active) .card-subheading {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+body[data-ui-mode="user"]:not(.ar-active) h1,
+body[data-ui-mode="user"]:not(.ar-active) h2,
+body[data-ui-mode="user"]:not(.ar-active) .welcome-headline {
+  color: #ffffff;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .panel-intro,
+body[data-ui-mode="user"]:not(.ar-active) .status-message,
+body[data-ui-mode="user"]:not(.ar-active) .hint-text,
+body[data-ui-mode="user"]:not(.ar-active) .help-copy p,
+body[data-ui-mode="user"]:not(.ar-active) .card-list,
+body[data-ui-mode="user"]:not(.ar-active) .field-label,
+body[data-ui-mode="user"]:not(.ar-active) .state-label {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .card-toggle-button,
+body[data-ui-mode="user"]:not(.ar-active) .card-close-button {
+  color: #ffffff;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .button {
+  border-color: transparent;
+  background: #2e85c6;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(20, 67, 110, 0.18);
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .button:hover:not(:disabled),
+body[data-ui-mode="user"]:not(.ar-active) .button:focus-visible:not(:disabled) {
+  border-color: transparent;
+  background: #2776b1;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .mini-pill {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.16);
+  color: #ffffff;
 }
 
 .panel-tag,
