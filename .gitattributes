@@ -1,1 +1,6 @@
-frontend/assets/fountain_benches_trees.glb filter=lfs diff=lfs merge=lfs -text
+frontend/assets/*.glb filter=lfs diff=lfs merge=lfs -text
+frontend/assets/**/*.glb filter=lfs diff=lfs merge=lfs -text
+frontend/models/*.glb filter=lfs diff=lfs merge=lfs -text
+frontend/models/*.gltf filter=lfs diff=lfs merge=lfs -text
+frontend/models/*.bin filter=lfs diff=lfs merge=lfs -text
+frontend/models/*.dae filter=lfs diff=lfs merge=lfs -text
