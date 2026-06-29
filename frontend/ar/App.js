@@ -6,6 +6,7 @@ import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js";
 import { UIController } from "./UIController.js";
 import { GeoLocationService } from "./GeoLocationService.js";
+import { HeadingService } from "./HeadingService.js";
 import { SiteLoader } from "./geo/SiteLoader.js";
 import { SensorFusion } from "./geo/SensorFusion.js";
 import { GeoSceneManager } from "./geo/GeoSceneManager.js";
@@ -334,6 +335,7 @@ export class ARApp {
     this.hitTestManager = new HitTestManager();
     this.poseStabilizer = new PoseStabilizer();
     this.geoLocationService = new GeoLocationService();
+    this.headingService = new HeadingService();
     this.siteLoader = new SiteLoader();
     this.sensorFusion = new SensorFusion();
     this.placementController = null;
@@ -347,6 +349,7 @@ export class ARApp {
     this.selectedExperienceMode = ExperienceMode.XR;
     this.selectedPlacementMode = PlacementUIModel.FREE;
     this.lastXRPlacementMode = PlacementUIModel.FREE;
+    this.geoHeadingReferenceEnabled = false;
     this.geoSensorActive = false;
     this.activePlacementAssetSource = "default";
     this.geoOffsetUiState = {
@@ -380,6 +383,7 @@ export class ARApp {
     this.activePlacementAssetSource = "default";
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
+    this.ui.setGeoHeadingReferenceEnabled(this.geoHeadingReferenceEnabled);
     this.applySiteGeoTargetFromConfig({ force: true });
     this.applySiteGeoCalibrationFromConfig({ force: true });
     this.applySitePlacementTransformFromConfig({ force: true });
@@ -411,6 +415,7 @@ export class ARApp {
       onExperienceModeChange: (mode) => this.applyExperienceMode(mode),
       onRequestGeolocation: () => this.requestGeoLocation(),
       onCalibrateHeading: () => this.calibrateGeoHeading(),
+      onGeoHeadingReferenceToggle: (enabled) => this.applyGeoHeadingReferenceMode(enabled),
       onGeoOffsetToggle: (state) => this.applyGeoOffsetState(state),
       onGeoOffsetChange: (state) => this.applyGeoOffsetState(state),
       onGeoOffsetAdopt: (state) => this.adoptGeoOffsetAsSiteCalibration(state),
@@ -528,6 +533,61 @@ export class ARApp {
       this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL ||
       this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL
     );
+  }
+
+  isGeoLocalHeadingReferenceEnabled() {
+    return this.geoHeadingReferenceEnabled && this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL;
+  }
+
+  hasGeoLocalHeading() {
+    return Number.isFinite(this.headingService.getHeadingRad());
+  }
+
+  applyGeoHeadingReferenceMode(enabled) {
+    if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
+      this.ui.setMessage("Kompassbezug ist nur moeglich, wenn kein AR- oder Geo-Modus laeuft.");
+      this.ui.setGeoHeadingReferenceEnabled(this.geoHeadingReferenceEnabled);
+      return false;
+    }
+
+    this.geoHeadingReferenceEnabled = Boolean(enabled);
+    this.ui.setGeoHeadingReferenceEnabled(this.geoHeadingReferenceEnabled);
+
+    if (this.geoHeadingReferenceEnabled) {
+      this.ui.setMessage("Geo-Local mit Kompassbezug aktiviert.");
+      this.ui.setHint("X/Z-Offsets werden beim naechsten Geo-Local-Start als Ost/Nord-Meter interpretiert.");
+    } else {
+      this.ui.setMessage("Geo-Local mit Kompassbezug deaktiviert.");
+      this.ui.setHint("X/Z-Offsets folgen beim naechsten Geo-Local-Start wieder der lokalen Blickrichtung.");
+    }
+
+    return true;
+  }
+
+  async ensureGeoLocalHeadingPermissionFromUserGesture() {
+    if (!this.isGeoLocalHeadingReferenceEnabled()) {
+      return true;
+    }
+
+    try {
+      const granted = await this.headingService.requestPermission();
+      if (!granted) {
+        this.ui.setSessionState(false, "Kompass-Freigabe verweigert.");
+        this.ui.setHint(
+          "Fuer echten Nord/Ost-Bezug im Geo-Local-Modus muss der Browser Zugriff auf Orientierungssensoren erlauben."
+        );
+        return false;
+      }
+    } catch (_error) {
+      this.ui.setSessionState(false, "Kompass-Freigabe verweigert.");
+      this.ui.setHint(
+        "Fuer echten Nord/Ost-Bezug im Geo-Local-Modus muss der Browser Zugriff auf Orientierungssensoren erlauben."
+      );
+      return false;
+    }
+
+    await this.headingService.waitForHeading(250);
+    return true;
   }
 
   applySiteLocalObjectsFromConfig({ force = false } = {}) {
@@ -813,6 +873,11 @@ export class ARApp {
       return this.startGeoSensorMode();
     }
 
+    const headingPermissionReady = await this.ensureGeoLocalHeadingPermissionFromUserGesture();
+    if (!headingPermissionReady) {
+      return false;
+    }
+
     const xrAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
     if (!xrAssetReady) {
       return false;
@@ -1058,7 +1123,11 @@ export class ARApp {
     this.syncCanvasPointerState();
 
     if (this.placementController.getMode() === PlacementMode.GEO) {
-      this.ui.setHint("Geo-Local aktiv. Richte dich am QR-Code aus und halte fuer die erste stabile Bodenpose kurz still.");
+      this.ui.setHint(
+        this.isGeoLocalHeadingReferenceEnabled()
+          ? "Geo-Local mit Kompassbezug aktiv. Halte am QR-Startpunkt kurz still, damit Ursprung und Nordrichtung erfasst werden."
+          : "Geo-Local aktiv. Richte dich am QR-Code aus und halte fuer die erste stabile Bodenpose kurz still."
+      );
       return true;
     }
 
@@ -1232,7 +1301,11 @@ export class ARApp {
     if (this.placementController.isPlaced()) {
       this.ui.setHint("Mode gewechselt. Bestehendes Placement bleibt bis zum Reset unveraendert.");
     } else if (normalizedMode === PlacementUIModel.GEO_LOCAL) {
-      this.ui.setHint("Geo-Local aktiv. QR-Startpunkt und Blickrichtung definieren den lokalen AR-Raum.");
+      this.ui.setHint(
+        this.geoHeadingReferenceEnabled
+          ? "Geo-Local aktiv. Mit Kompassbezug werden X/Z-Offsets beim Start als Ost/Nord-Meter interpretiert."
+          : "Geo-Local aktiv. QR-Startpunkt und Blickrichtung definieren den lokalen AR-Raum."
+      );
     } else if (normalizedMode === PlacementUIModel.GEO_GLOBAL) {
       this.ui.setHint("Geo-Global-Modus aktiv. Beim Start werden GNSS, IMU und Kompass fuer die Szene genutzt.");
     } else {
@@ -1284,7 +1357,11 @@ export class ARApp {
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
       this.ui.setHint("Geo (WebXR) ausgewaehlt. Beim Start werden WebXR, Standort und IMU/Kompass gemeinsam aktiviert.");
     } else if (this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL) {
-      this.ui.setHint("AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit Hit-Test + Stabilizer.");
+      this.ui.setHint(
+        this.geoHeadingReferenceEnabled
+          ? "AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit optionalem Kompassbezug fuer echte Ost/Nord-Platzierung."
+          : "AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit Hit-Test + Stabilizer."
+      );
     } else {
       this.ui.setHint("AR (WebXR) ausgewaehlt. Freie Platzierung bleibt unveraendert.");
     }
@@ -1416,7 +1493,13 @@ export class ARApp {
     this.captureGeoLocalReference(this.activeSurfaceState, cameraState);
 
     if (!this.placementController.hasGeoReferenceDirection()) {
-      this.ui.setMessage("Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      this.ui.setMessage(
+        this.isGeoLocalHeadingReferenceEnabled()
+          ? this.hasGeoLocalHeading()
+            ? "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig."
+            : "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug."
+          : "Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil."
+      );
       return false;
     }
 
@@ -1430,7 +1513,13 @@ export class ARApp {
       if (computation.status === "missing-origin") {
         this.ui.setMessage("Lokaler QR-Ursprung fehlt noch. Halte die Bodenpose kurz stabil.");
       } else if (computation.status === "missing-reference") {
-        this.ui.setMessage("Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil.");
+        this.ui.setMessage(
+          this.isGeoLocalHeadingReferenceEnabled()
+            ? this.hasGeoLocalHeading()
+              ? "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig."
+              : "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug."
+            : "Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil."
+        );
       }
       return false;
     }
@@ -1482,9 +1571,13 @@ export class ARApp {
     const originCaptured = this.placementController.hasGeoOrigin()
       ? true
       : this.placementController.setGeoOrigin({ anchorPose: localOriginPose });
+    const usesHeadingReference = this.isGeoLocalHeadingReferenceEnabled();
     const directionCaptured = this.placementController.hasGeoReferenceDirection()
       ? true
-      : this.placementController.setGeoReferenceDirection(cameraState.direction);
+      : this.placementController.setGeoReferenceDirection(cameraState.direction, {
+          headingRad: this.headingService.getHeadingRad(),
+          requireHeading: usesHeadingReference
+        });
 
     return originCaptured && directionCaptured;
   }
@@ -1617,7 +1710,13 @@ export class ARApp {
     }
 
     if (!this.placementController.hasGeoReferenceDirection()) {
-      this.ui.setHint("Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil.");
+      this.ui.setHint(
+        this.isGeoLocalHeadingReferenceEnabled()
+          ? this.hasGeoLocalHeading()
+            ? "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig."
+            : "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug."
+          : "Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil."
+      );
       return;
     }
 
@@ -1640,7 +1739,11 @@ export class ARApp {
       return;
     }
 
-    this.ui.setHint("Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung im lokalen AR-Raum gesetzt.");
+    this.ui.setHint(
+      this.isGeoLocalHeadingReferenceEnabled()
+        ? "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung als Ost/Nord-Meter gesetzt."
+        : "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung im lokalen AR-Raum gesetzt."
+    );
   }
 
   resetPlacement() {
@@ -1668,7 +1771,11 @@ export class ARApp {
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       this.ui.setMessage("Placement wurde zurueckgesetzt.");
       if (this.placementController.getMode() === PlacementMode.GEO) {
-        this.ui.setHint("Suche am QR-Startpunkt eine neue stabile Flaeche; der lokale Ursprung wird neu gesetzt.");
+        this.ui.setHint(
+          this.isGeoLocalHeadingReferenceEnabled()
+            ? "Suche am QR-Startpunkt eine neue stabile Flaeche; Ursprung und Nordrichtung werden neu gesetzt."
+            : "Suche am QR-Startpunkt eine neue stabile Flaeche; der lokale Ursprung wird neu gesetzt."
+        );
       } else {
         this.ui.setHint("Freie Platzierung aktiv. Richte das Reticle neu aus und setze das Objekt erneut.");
       }
@@ -1701,6 +1808,7 @@ export class ARApp {
     this.hitTestManager.dispose();
     this.poseStabilizer.reset();
     this.geoLocationService.stop();
+    this.headingService.dispose();
 
     if (this.placementController) {
       this.placementController.dispose();

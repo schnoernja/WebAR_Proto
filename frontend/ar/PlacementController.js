@@ -126,6 +126,10 @@ function cloneLocalObjectConfig(objectConfig) {
     typeof objectConfig.id === "string" && objectConfig.id.trim()
       ? objectConfig.id.trim()
       : null;
+  const anchor =
+    typeof objectConfig.anchor === "string" && objectConfig.anchor.trim() === "viewer-forward"
+      ? "viewer-forward"
+      : "origin";
 
   return {
     id,
@@ -133,6 +137,7 @@ function cloneLocalObjectConfig(objectConfig) {
       typeof objectConfig.asset === "string" && objectConfig.asset.trim()
         ? objectConfig.asset.trim()
         : null,
+    anchor,
     offset: {
       x: Number.isFinite(offset.x) ? offset.x : 0,
       y: Number.isFinite(offset.y) ? offset.y : 0,
@@ -146,6 +151,7 @@ function cloneLocalObjectConfigs(objectConfigs) {
     return DEFAULT_LOCAL_OBJECTS.map((entry) => ({
       id: entry.id,
       asset: null,
+      anchor: "origin",
       offset: { ...entry.offset }
     }));
   }
@@ -168,6 +174,7 @@ function cloneLocalObjectConfigs(objectConfigs) {
     return DEFAULT_LOCAL_OBJECTS.map((entry) => ({
       id: entry.id,
       asset: null,
+      anchor: "origin",
       offset: { ...entry.offset }
     }));
   }
@@ -466,15 +473,21 @@ export class PlacementController {
   }
 
   setGeoReferenceDirection(direction, { headingRad = null, requireHeading = false } = {}) {
-    void headingRad;
-    void requireHeading;
-
     const groundedDirection = projectDirectionToGround(direction);
     if (!groundedDirection) {
       return false;
     }
 
-    this.geoReferenceForward = groundedDirection;
+    if (requireHeading) {
+      if (!Number.isFinite(headingRad)) {
+        return false;
+      }
+
+      this.geoReferenceForward = groundedDirection.clone().applyAxisAngle(WORLD_UP, -headingRad).normalize();
+    } else {
+      this.geoReferenceForward = groundedDirection;
+    }
+
     this.geoReferenceRight = new THREE.Vector3()
       .crossVectors(this.geoReferenceForward, WORLD_UP)
       .normalize();
@@ -534,10 +547,14 @@ export class PlacementController {
         .clone()
         .multiplyScalar(offsetX)
         .add(this.geoReferenceForward.clone().multiplyScalar(offsetZ));
+      const usesViewerForwardAnchor = objectConfig.anchor === "viewer-forward" && cameraState && cameraState.position;
+      const anchorPosition = usesViewerForwardAnchor
+        ? cameraState.position
+        : this.geoOriginAnchor;
       const worldPosition = new THREE.Vector3(
-        this.geoOriginAnchor.x + offset.x,
+        anchorPosition.x + offset.x,
         floorY + offsetY,
-        this.geoOriginAnchor.z + offset.z
+        anchorPosition.z + offset.z
       );
       const distanceMeters = Math.hypot(offsetX, offsetZ);
       maxDistanceMeters = Math.max(maxDistanceMeters, distanceMeters);

@@ -74,6 +74,10 @@ function normalizeObjects(objects) {
   return objects.map((objectConfig, index) => {
     const enu = objectConfig && objectConfig.enu ? objectConfig.enu : null;
     const offset = objectConfig && objectConfig.offset ? objectConfig.offset : null;
+    const anchor =
+      objectConfig && typeof objectConfig.anchor === "string" && objectConfig.anchor.trim()
+        ? objectConfig.anchor.trim()
+        : null;
     const normalizedOffset = {
       x: Number.isFinite(offset && offset.x) ? offset.x : Number.isFinite(enu && enu.e) ? enu.e : 0,
       y: Number.isFinite(offset && offset.y) ? offset.y : Number.isFinite(enu && enu.u) ? enu.u : 0,
@@ -86,6 +90,7 @@ function normalizeObjects(objects) {
         typeof objectConfig.asset === "string" && objectConfig.asset.trim()
           ? objectConfig.asset.trim()
           : null,
+      anchor,
       offset: normalizedOffset,
       enu: {
         e: normalizedOffset.x,

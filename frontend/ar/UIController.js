@@ -159,7 +159,32 @@ const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
   "AR-Session aktiv.": "AR session is active.",
   "AR-Session aktiv. Browser zeigt kein DOM-Overlay an.":
     "AR session is active. The browser does not provide a DOM overlay.",
-  "AR beendet. Fallback-3D-Ansicht aktiv.": "AR ended. Fallback 3D view active."
+  "AR beendet. Fallback-3D-Ansicht aktiv.": "AR ended. Fallback 3D view active.",
+  "Kompassbezug ist nur moeglich, wenn kein AR- oder Geo-Modus laeuft.":
+    "Compass reference can only be changed while no AR or Geo mode is running.",
+  "Geo-Local mit Kompassbezug aktiviert.": "Geo-Local compass reference enabled.",
+  "X/Z-Offsets werden beim naechsten Geo-Local-Start als Ost/Nord-Meter interpretiert.":
+    "On the next Geo-Local start, X/Z offsets will be interpreted as east/north meters.",
+  "Geo-Local mit Kompassbezug deaktiviert.": "Geo-Local compass reference disabled.",
+  "X/Z-Offsets folgen beim naechsten Geo-Local-Start wieder der lokalen Blickrichtung.":
+    "On the next Geo-Local start, X/Z offsets will again follow the local viewing direction.",
+  "Kompass-Freigabe verweigert.": "Compass permission denied.",
+  "Fuer echten Nord/Ost-Bezug im Geo-Local-Modus muss der Browser Zugriff auf Orientierungssensoren erlauben.":
+    "For true east/north placement in Geo-Local mode, the browser must allow orientation sensor access.",
+  "Geo-Local mit Kompassbezug aktiv. Halte am QR-Startpunkt kurz still, damit Ursprung und Nordrichtung erfasst werden.":
+    "Geo-Local with compass reference is active. Hold still briefly at the QR start point so origin and north can be captured.",
+  "Geo-Local aktiv. Mit Kompassbezug werden X/Z-Offsets beim Start als Ost/Nord-Meter interpretiert.":
+    "Geo-Local is active. With compass reference, X/Z offsets are interpreted as east/north meters on start.",
+  "AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit optionalem Kompassbezug fuer echte Ost/Nord-Platzierung.":
+    "AR (WebXR) selected. Geo-Local uses QR offsets with optional compass reference for true east/north placement.",
+  "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig.":
+    "North reference is being initialized. Hold the device still briefly.",
+  "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug.":
+    "Geo-Local is active. Waiting for compass heading for true east/north placement.",
+  "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung als Ost/Nord-Meter gesetzt.":
+    "Stable surface detected. Offsets are placed relative to the QR origin as east/north meters.",
+  "Suche am QR-Startpunkt eine neue stabile Flaeche; Ursprung und Nordrichtung werden neu gesetzt.":
+    "Find a new stable surface at the QR start point; origin and north direction will be captured again."
 });
 
 const REGEX_RUNTIME_TRANSLATIONS_EN = Object.freeze([
@@ -222,6 +247,11 @@ const DE_TRANSLATIONS = Object.freeze({
     openHelp: "Hilfskachel oeffnen",
     openSurvey: "Umfragekachel oeffnen",
     openSettings: "Einstellungen oeffnen",
+    developerOptions: {
+      geoHeadingReference: "Geo-Local mit Kompassbezug",
+      geoHeadingReferenceDescription:
+        "Interpretiert X/Z-Offsets in Geo-Local als Ost/Nord-Meter statt relativ zur Blickrichtung."
+    },
     visibility: {
       placement: "Objektplatzierung",
       coord: "Modus und Geo-Ziel",
@@ -513,6 +543,11 @@ const EN_TRANSLATIONS = Object.freeze({
     openHelp: "Open help card",
     openSurvey: "Open survey card",
     openSettings: "Open settings",
+    developerOptions: {
+      geoHeadingReference: "Geo-Local with compass reference",
+      geoHeadingReferenceDescription:
+        "Interprets X/Z offsets in Geo-Local as east/north meters instead of relative to the viewing direction."
+    },
     visibility: {
       placement: "Object placement",
       coord: "Mode and geo target",
@@ -921,6 +956,7 @@ export class UIController {
     this.menuTabButtons = Array.from(this.document.querySelectorAll("[data-menu-tab]"));
     this.menuTabPanels = Array.from(this.document.querySelectorAll("[data-menu-panel]"));
     this.cardVisibilityToggles = Array.from(this.document.querySelectorAll("[data-card-visibility-toggle]"));
+    this.geoHeadingReferenceToggle = this.document.getElementById("geo-heading-reference-enabled");
 
     this.messageEl = this.document.getElementById("status-message");
     this.hintEl = this.document.getElementById("interaction-hint");
@@ -1058,6 +1094,8 @@ export class UIController {
         offset: this.getVisibilityToggleLabel("offset"),
         debug: this.getVisibilityToggleLabel("debug")
       },
+      geoHeadingReferenceToggleLabel: this.document.getElementById("geo-heading-reference-toggle-label"),
+      geoHeadingReferenceToggleDescription: this.document.getElementById("geo-heading-reference-toggle-description"),
       placementEyebrow: this.document.querySelector("#card-placement .eyebrow"),
       placementTitle: this.document.querySelector("#card-placement h1"),
       placementIntro: this.document.querySelector("#card-placement .panel-intro"),
@@ -1139,6 +1177,7 @@ export class UIController {
       placementMode: "free",
       geoStatus: "not-requested",
       geoWatchActive: false,
+      geoHeadingReferenceEnabled: false,
       uiMode: this.readPersistedUIMode(),
       menuOpen: false,
       activeMenuTab: "placement",
@@ -1188,6 +1227,7 @@ export class UIController {
     this.applyUIModeLayout();
     this.setExperienceMode(this.uiState.experienceMode);
     this.setPlacementMode(this.uiState.placementMode);
+    this.renderGeoHeadingReferenceControl();
     this.setGeoOffsetControlState(this.geoOffsetDraft);
     this.renderSystemStates();
     this.renderGeoSnapshot(this.lastGeoSnapshot);
@@ -1273,6 +1313,7 @@ export class UIController {
     onExperienceModeChange,
     onRequestGeolocation,
     onCalibrateHeading,
+    onGeoHeadingReferenceToggle,
     onGeoOffsetToggle,
     onGeoOffsetChange,
     onGeoOffsetAdopt,
@@ -1306,6 +1347,7 @@ export class UIController {
     this.bindMenuControls();
     this.bindUIModeControls(onExperienceModeChange);
     this.bindLanguageControls();
+    this.bindGeoHeadingReferenceControl(onGeoHeadingReferenceToggle);
     this.bindInteractionSurface(this.uiContainer);
     this.bindInteractionSurface(this.hudRoot);
     this.bindDeviceCoordinateCopy();
@@ -1318,6 +1360,19 @@ export class UIController {
     this.bindTextInputActivity();
 
     this.refreshButtons();
+  }
+
+  bindGeoHeadingReferenceControl(handler) {
+    if (!this.geoHeadingReferenceToggle) {
+      return;
+    }
+
+    const handleToggle = () => {
+      this.handleGeoHeadingReferenceToggle(handler);
+    };
+
+    this.geoHeadingReferenceToggle.addEventListener("change", handleToggle);
+    this.cleanupCallbacks.push(() => this.geoHeadingReferenceToggle.removeEventListener("change", handleToggle));
   }
 
   bindGeoLocationService(service) {
@@ -2339,6 +2394,11 @@ export class UIController {
     this.setElementText(this.openHelpCardButton, text.menu.openHelp);
     this.setElementText(this.openSurveyCardButton, text.menu.openSurvey);
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
+    this.setElementText(this.staticRefs.geoHeadingReferenceToggleLabel, text.menu.developerOptions.geoHeadingReference);
+    this.setElementText(
+      this.staticRefs.geoHeadingReferenceToggleDescription,
+      text.menu.developerOptions.geoHeadingReferenceDescription
+    );
     this.setElementText(this.staticRefs.menuVisibilityLabels.placement, text.menu.visibility.placement);
     this.setElementText(this.staticRefs.menuVisibilityLabels.coord, text.menu.visibility.coord);
     this.setElementText(this.staticRefs.menuVisibilityLabels.state, text.menu.visibility.state);
@@ -2657,6 +2717,33 @@ export class UIController {
     this.refreshButtons();
   }
 
+  handleGeoHeadingReferenceToggle(handler) {
+    const enabled = this.geoHeadingReferenceToggle ? Boolean(this.geoHeadingReferenceToggle.checked) : false;
+    const accepted = typeof handler === "function" ? handler(enabled) : true;
+
+    if (accepted === false) {
+      this.renderGeoHeadingReferenceControl();
+      return;
+    }
+
+    this.uiState.geoHeadingReferenceEnabled = enabled;
+    this.renderGeoHeadingReferenceControl();
+  }
+
+  setGeoHeadingReferenceEnabled(enabled) {
+    this.uiState.geoHeadingReferenceEnabled = Boolean(enabled);
+    this.renderGeoHeadingReferenceControl();
+  }
+
+  renderGeoHeadingReferenceControl() {
+    if (!this.geoHeadingReferenceToggle) {
+      return;
+    }
+
+    this.geoHeadingReferenceToggle.checked = Boolean(this.uiState.geoHeadingReferenceEnabled);
+    this.geoHeadingReferenceToggle.disabled = Boolean(this.uiState.sessionActive);
+  }
+
   setGeoTargetInputs(coord) {
     if (!coord) {
       return;
@@ -2861,6 +2948,8 @@ export class UIController {
   }
 
   refreshButtons() {
+    this.renderGeoHeadingReferenceControl();
+
     if (this.startButton) {
       this.startButton.disabled =
         this.uiState.experienceMode === "geo-sensor"

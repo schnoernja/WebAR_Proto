@@ -1,24 +1,24 @@
 {
   "origin": {
     "lat": 50.984751,
-    "lon": 11.044106,
+    "lon": 11.044114,
     "h": 0
   },
   "orientation": {
     "yawDeg": 0
   },
   "scene": {
-    "asset": "/assets/EFH.glb"
+    "asset": "/assets/fountain_benches_trees.glb"
   },
   "placement": {
-    "asset": "assets/EFH.glb",
+    "asset": "assets/fountain_benches_trees.glb",
     "target": {
-      "lat": 50.984751,
-      "lon": 11.044106
+      "lat": 50.984655,
+      "lon": 11.044260
     },
     "calibration": {
-      "eastMeters": -8.7,
-      "northMeters": -7.7,
+      "eastMeters": 0,
+      "northMeters": 0,
       "yawDeg": 0
     },
     "transform": {
@@ -29,10 +29,10 @@
   },
   "objects": [
     {
-      "id": "efh-root",
+      "id": "place-a-root",
       "offset": {
-        "x": 2.9,
-        "z": 9.6,
+        "x": 10.231529,
+        "z": -10.68672,
         "y": 0
       }
     }
