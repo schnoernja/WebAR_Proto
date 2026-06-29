@@ -833,10 +833,22 @@ body[data-ui-mode="user"]:not(.ar-active) #render-root canvas {
   pointer-events: none;
 }
 
-body[data-ui-mode="user"]:not(.ar-active) .menu-panel,
+body[data-ui-mode="user"]:not(.ar-active) .menu-panel {
+  background: #ddf1fd;
+  color: #10395a;
+  border-color: rgba(255, 255, 255, 0.3);
+  backdrop-filter: none;
+  box-shadow: 0 18px 40px rgba(9, 49, 84, 0.18);
+}
+
 body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar,
 body[data-ui-mode="user"]:not(.ar-active) .card-panel {
-  background: #ddf1fd;
+  background:
+    linear-gradient(180deg, rgba(221, 241, 253, 0.94), rgba(221, 241, 253, 0.97)),
+    url("assets/design/leaves_background.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   color: #10395a;
   border-color: rgba(255, 255, 255, 0.3);
   backdrop-filter: none;
