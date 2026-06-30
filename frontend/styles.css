@@ -610,6 +610,7 @@ body[data-ui-mode="user"] .hud-logo {
 }
 
 .user-toolbar-button,
+.user-menu-reset-button,
 .user-menu-survey-button {
   width: 100%;
 }
@@ -727,6 +728,31 @@ body.ar-active .mini-pill {
 
 .card-copy-block + .card-copy-block {
   margin-top: 16px;
+}
+
+.user-placement-popup {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  z-index: 1080;
+  width: min(360px, calc(100vw - 28px));
+  padding: 14px 16px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.user-placement-popup-title {
+  margin: 0 0 6px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.user-placement-popup-text {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.45;
 }
 
 .survey-panel {
@@ -946,6 +972,10 @@ body[data-ui-mode="user"]:not(.ar-active) .card-panel {
   box-shadow: 0 18px 40px rgba(9, 49, 84, 0.18);
 }
 
+body[data-ui-mode="user"]:not(.ar-active) .user-placement-popup {
+  display: none;
+}
+
 body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar {
   align-self: center;
   width: min(340px, calc(100vw - 104px));
@@ -1129,7 +1159,8 @@ body[data-ui-mode="user"]:not(.ar-active) .mini-pill {
 
 body[data-ui-mode="user"].ar-active .menu-panel,
 body[data-ui-mode="user"].ar-active .hud-toolbar,
-body[data-ui-mode="user"].ar-active .card-panel {
+body[data-ui-mode="user"].ar-active .card-panel,
+body[data-ui-mode="user"].ar-active .user-placement-popup {
   position: relative;
   background: rgba(221, 241, 253, 0.9);
   color: #10395a;
@@ -1139,7 +1170,8 @@ body[data-ui-mode="user"].ar-active .card-panel {
 
 body[data-ui-mode="user"].ar-active .hud-toolbar::before,
 body[data-ui-mode="user"].ar-active .card-panel::before,
-body[data-ui-mode="user"].ar-active .menu-panel::before {
+body[data-ui-mode="user"].ar-active .menu-panel::before,
+body[data-ui-mode="user"].ar-active .user-placement-popup::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -1154,7 +1186,8 @@ body[data-ui-mode="user"].ar-active .menu-panel::before {
 
 body[data-ui-mode="user"].ar-active .hud-toolbar > *,
 body[data-ui-mode="user"].ar-active .card-panel > *,
-body[data-ui-mode="user"].ar-active .menu-panel > * {
+body[data-ui-mode="user"].ar-active .menu-panel > *,
+body[data-ui-mode="user"].ar-active .user-placement-popup > * {
   position: relative;
   z-index: 1;
 }
@@ -1174,6 +1207,8 @@ body[data-ui-mode="user"].ar-active .menu-copy,
 body[data-ui-mode="user"].ar-active .panel-intro,
 body[data-ui-mode="user"].ar-active .status-message,
 body[data-ui-mode="user"].ar-active .hint-text,
+body[data-ui-mode="user"].ar-active .user-placement-popup-title,
+body[data-ui-mode="user"].ar-active .user-placement-popup-text,
 body[data-ui-mode="user"].ar-active .help-copy p,
 body[data-ui-mode="user"].ar-active .card-list,
 body[data-ui-mode="user"].ar-active .field-label,

@@ -136,6 +136,9 @@
             <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">
               <p class="menu-copy">Sichtbarkeit der Hauptkacheln im Overlay steuern.</p>
               <div id="user-menu-actions" class="user-menu-actions" hidden>
+                <button id="user-menu-reset-button" class="button user-menu-reset-button" type="button" hidden>
+                  Objekt neu platzieren
+                </button>
                 <button id="user-menu-survey-button" class="button user-menu-survey-button" type="button">
                   An Umfrage teilnehmen
                 </button>
@@ -228,6 +231,12 @@
                 </button>
               </div>
             </div>
+          </div>
+          <div id="user-placement-popup" class="panel user-placement-popup" role="status" aria-live="polite" hidden>
+            <p id="user-placement-popup-title" class="user-placement-popup-title">Objektplatzierung</p>
+            <p id="user-placement-popup-text" class="user-placement-popup-text">
+              Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.
+            </p>
           </div>
 
           <div id="hud-body" class="hud-body">

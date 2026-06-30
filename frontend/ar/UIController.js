@@ -236,6 +236,7 @@ const DE_TRANSLATIONS = Object.freeze({
     },
     placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
     userPlacementCopy: "",
+    userResetPlacement: "Objekt neu platzieren",
     userSurveyAction: "An Umfrage teilnehmen",
     userStopAr: "AR beenden",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
@@ -270,6 +271,10 @@ const DE_TRANSLATIONS = Object.freeze({
     title: "Objektplatzierung",
     intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.",
     userIntro: "Tippe auf 'AR starten' und erlaube Kamera/AR sowie bei Bedarf den Standort.",
+    userGuideTitle: "Objektplatzierung",
+    userGuideSearch:
+      "Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.",
+    userGuideDetected: "Flaeche erkannt. Bitte halte das Geraet kurz ruhig, bis das Objekt platziert wird.",
     modeLabel: "Hauptmodus",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -538,6 +543,7 @@ const EN_TRANSLATIONS = Object.freeze({
     },
     placementCopy: "Control the visibility of the main cards in the overlay.",
     userPlacementCopy: "",
+    userResetPlacement: "Reposition object",
     userSurveyAction: "Take survey",
     userStopAr: "Stop AR",
     developerCopy: "Show or hide developer views and debug cards separately.",
@@ -572,6 +578,9 @@ const EN_TRANSLATIONS = Object.freeze({
     title: "Object Placement",
     intro: "Choose between free WebXR placement with the stabilized reticle and geo placement in the same WebXR flow with location, IMU, and compass.",
     userIntro: "Tap 'Start AR' and allow camera/AR and, if requested, location access.",
+    userGuideTitle: "Object placement",
+    userGuideSearch: "Please point the device at the floor and move it slowly until a surface is detected.",
+    userGuideDetected: "Surface detected. Please hold the device still briefly until the object is placed.",
     modeLabel: "Main mode",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -966,6 +975,7 @@ export class UIController {
     this.openSurveyCardButton = this.document.getElementById("open-survey-card-button");
     this.openSettingsCardButton = this.document.getElementById("open-settings-card-button");
     this.userMenuActions = this.document.getElementById("user-menu-actions");
+    this.userMenuResetButton = this.document.getElementById("user-menu-reset-button");
     this.userMenuSurveyButton = this.document.getElementById("user-menu-survey-button");
     this.menuTabButtons = Array.from(this.document.querySelectorAll("[data-menu-tab]"));
     this.menuTabPanels = Array.from(this.document.querySelectorAll("[data-menu-panel]"));
@@ -992,6 +1002,9 @@ export class UIController {
     this.closeSettingsButton = this.document.getElementById("close-settings-button");
     this.userToolbarActions = this.document.getElementById("user-ar-toolbar-actions");
     this.userToolbarStopButton = this.document.getElementById("user-toolbar-stop-button");
+    this.userPlacementPopup = this.document.getElementById("user-placement-popup");
+    this.userPlacementPopupTitle = this.document.getElementById("user-placement-popup-title");
+    this.userPlacementPopupText = this.document.getElementById("user-placement-popup-text");
 
     this.languageButtons = {
       de: this.document.getElementById("language-de-button"),
@@ -1356,6 +1369,12 @@ export class UIController {
     this.bindButton(this.closeHelpButton, () => this.closeCard("help"));
     this.bindButton(this.closeSurveyButton, () => this.closeCard("survey"));
     this.bindButton(this.closeSettingsButton, () => this.closeCard("settings"));
+    this.bindButton(this.userMenuResetButton, () => {
+      if (typeof onResetPlacement === "function") {
+        onResetPlacement();
+      }
+      this.closeMenu();
+    });
     this.bindButton(this.userMenuSurveyButton, () => this.toggleMenuCard("survey"));
     this.bindButton(this.userToolbarStopButton, onStopAR);
 
@@ -2494,6 +2513,7 @@ export class UIController {
     this.setElementText(this.openHelpCardButton, text.menu.openHelp);
     this.setElementText(this.openSurveyCardButton, text.menu.openSurvey);
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
+    this.setElementText(this.userMenuResetButton, text.menu.userResetPlacement);
     this.setElementText(this.userMenuSurveyButton, text.menu.userSurveyAction);
     this.setElementText(this.userToolbarStopButton, text.menu.userStopAr);
     this.setElementText(this.staticRefs.geoHeadingReferenceToggleLabel, text.menu.developerOptions.geoHeadingReference);
@@ -2512,6 +2532,7 @@ export class UIController {
     this.setElementText(this.staticRefs.placementEyebrow, text.placement.eyebrow);
     this.setElementText(this.staticRefs.placementTitle, text.placement.title);
     this.setElementText(this.staticRefs.placementModeLabel, text.placement.modeLabel);
+    this.setElementText(this.userPlacementPopupTitle, text.placement.userGuideTitle);
     this.setElementText(this.geoActivateLocationButton, text.placement.buttons.activateLocation);
     this.setElementText(this.placeButton, text.placement.buttons.place);
     this.setElementText(this.resetButton, text.placement.buttons.reset);
@@ -2638,6 +2659,7 @@ export class UIController {
     this.renderSystemStates();
     this.renderMessageText();
     this.renderHintText();
+    this.updateUserPlacementPopup(text);
     this.renderGeoTargetFeedback();
     this.renderAssetLabel();
     this.renderGeoOffsetControls();
@@ -2663,6 +2685,8 @@ export class UIController {
         ? text.placement.userIntro
         : text.placement.intro;
     }
+
+    this.updateUserPlacementPopup(text);
   }
 
   updateLanguageButtons() {
@@ -3001,12 +3025,14 @@ export class UIController {
     this.uiState.stableSurface = Boolean(detected && stable);
     this.renderSystemStates();
     this.refreshButtons();
+    this.updateUserPlacementPopup();
   }
 
   setPlacementState(placed) {
     this.uiState.placed = Boolean(placed);
     this.renderSystemStates();
     this.refreshButtons();
+    this.updateUserPlacementPopup();
   }
 
   renderSystemStates() {
@@ -3070,6 +3096,10 @@ export class UIController {
       this.userMenuActions.hidden = !isUserMode;
     }
 
+    if (this.userMenuResetButton) {
+      this.userMenuResetButton.hidden = !(isUserMode && sessionActive);
+    }
+
     if (this.userToolbarActions) {
       this.userToolbarActions.hidden = !(isUserMode && sessionActive);
     }
@@ -3077,6 +3107,24 @@ export class UIController {
     if (this.staticRefs.placementMenuOptionList) {
       this.staticRefs.placementMenuOptionList.hidden = isUserMode;
     }
+
+    this.updateUserPlacementPopup();
+  }
+
+  updateUserPlacementPopup(text = this.getText()) {
+    const shouldShow = this.isUserMode() && this.uiState.sessionActive && !this.uiState.placed;
+    if (this.userPlacementPopup) {
+      this.userPlacementPopup.hidden = !shouldShow;
+    }
+
+    if (!shouldShow || !this.userPlacementPopupText) {
+      return;
+    }
+
+    this.userPlacementPopupText.textContent =
+      this.uiState.surfaceDetected || this.uiState.stableSurface
+        ? text.placement.userGuideDetected
+        : text.placement.userGuideSearch;
   }
 
   setState(key, text, status) {
@@ -3126,6 +3174,10 @@ export class UIController {
 
     if (this.resetButton) {
       this.resetButton.disabled = !this.uiState.sessionActive && !this.uiState.placed;
+    }
+
+    if (this.userMenuResetButton) {
+      this.userMenuResetButton.disabled = !this.uiState.sessionActive;
     }
 
     if (this.stopButton) {
