@@ -881,34 +881,42 @@ export class ARApp {
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
       this.applySiteLocalObjectsFromConfig({ force: true });
-      const siteAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.GEO_SENSOR);
-      if (!siteAssetReady) {
-        return false;
-      }
-
       return this.startGeoSensorMode();
-    }
-
-    const headingPermissionReady = await this.ensureGeoLocalHeadingPermissionFromUserGesture();
-    if (!headingPermissionReady) {
-      return false;
-    }
-
-    const xrAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
-    if (!xrAssetReady) {
-      return false;
     }
 
     this.applySiteGeoCalibrationFromConfig({ force: false });
     this.applySitePlacementTransformFromConfig({ force: false });
     this.applySiteLocalObjectsFromConfig({ force: false });
 
-    this.requestGeoLocation();
-    const arStarted = await this.startAR();
+    // requestSession must be invoked before any awaited permission or asset work.
+    const arStartPromise = this.startAR();
+    const headingPermissionPromise = this.ensureGeoLocalHeadingPermissionFromUserGesture();
+    const xrAssetReadyPromise = this.ensurePlacementAssetForExperience(ExperienceMode.XR);
+    const [arStarted, headingPermissionReady, xrAssetReady] = await Promise.all([
+      arStartPromise,
+      headingPermissionPromise,
+      xrAssetReadyPromise
+    ]);
+
     if (!arStarted) {
-      this.geoLocationService.stop();
+      return false;
     }
-    return arStarted;
+
+    if (!headingPermissionReady || !xrAssetReady) {
+      await this.stopAR();
+      if (!xrAssetReady) {
+        this.ui.setSessionState(false, "AR beendet: Das 3D-Modell konnte nicht geladen werden.");
+        this.ui.setHint("Pruefe den Modellpfad und starte AR danach erneut.");
+      } else {
+        this.ui.setSessionState(false, "Kompass-Freigabe verweigert. AR wurde beendet.");
+        this.ui.setHint(
+          "Deaktiviere den Kompassbezug oder erlaube den Zugriff auf Orientierungssensoren und starte erneut."
+        );
+      }
+      return false;
+    }
+
+    return true;
   }
 
   async stopActiveExperience() {
@@ -972,9 +980,14 @@ export class ARApp {
     }
 
     try {
+      console.info("[Geolocation] Standort wird fuer den Geo-Modus angefragt.");
       await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
-          () => {
+          (position) => {
+            const accuracy = position && position.coords ? position.coords.accuracy : null;
+            console.info(
+              `[Geolocation] Standort erhalten${Number.isFinite(accuracy) ? ` (${accuracy.toFixed(1)} m)` : ""}.`
+            );
             resolve(true);
           },
           (error) => {
@@ -1009,18 +1022,30 @@ export class ARApp {
     this.applySiteGeoTargetFromConfig({ force: true });
     this.applySiteGeoCalibrationFromConfig({ force: true });
     this.applySitePlacementTransformFromConfig({ force: true });
-    this.ui.setMessage("Starte Geo-Modus in WebXR...");
-    const arStarted = await this.startAR({
+    const arStartPromise = this.startAR({
       allowGeoGlobal: true
     });
+    const locationReadyPromise = this.requestGeoLocationFromUserGesture();
+    const siteAssetReadyPromise = this.ensurePlacementAssetForExperience(ExperienceMode.GEO_SENSOR);
+    const [arStarted, siteAssetReady, locationReady] = await Promise.all([
+      arStartPromise,
+      siteAssetReadyPromise,
+      locationReadyPromise
+    ]);
 
     if (!arStarted) {
       return false;
     }
 
-    const locationReady = await this.requestGeoLocationFromUserGesture();
-    if (!locationReady) {
+    if (!siteAssetReady || !locationReady) {
       await this.stopAR();
+      if (!siteAssetReady) {
+        this.ui.setSessionState(false, "Geo-Modus beendet: Das Site-Modell konnte nicht geladen werden.");
+        this.ui.setHint("Pruefe den Modellpfad in der Site-JSON.");
+      } else {
+        this.ui.setSessionState(false, "Geo-Modus beendet: Standort ist nicht verfuegbar oder nicht freigegeben.");
+        this.ui.setHint("Der Geo-Modus benoetigt Standortzugriff ueber HTTPS.");
+      }
       return false;
     }
 
@@ -1094,7 +1119,7 @@ export class ARApp {
 
     this.lastFrameTimeMs = 0;
     this.activeSurfaceState = null;
-    this.ui.setMessage("Starte immersive AR...");
+    this.ui.setMessage("AR-Session wird angefragt...");
 
     let result = null;
     try {
@@ -1104,13 +1129,13 @@ export class ARApp {
     } catch (error) {
       this.ui.setSessionState(false, `AR-Start fehlgeschlagen: ${toMessage(error)}`);
       this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
-      return;
+      return false;
     }
 
     if (!result.started) {
       this.ui.setSessionState(false, result.message);
       this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
-      return;
+      return false;
     }
 
     try {
@@ -1118,7 +1143,7 @@ export class ARApp {
     } catch (error) {
       this.ui.setMessage(`Hit-Test konnte nicht initialisiert werden: ${toMessage(error)}`);
       await this.arSessionManager.endSession();
-      return;
+      return false;
     }
 
     this.poseStabilizer.reset();
@@ -1421,6 +1446,7 @@ export class ARApp {
   }
 
   requestGeoLocation() {
+    console.info("[Geolocation] Standort wird angefragt.");
     return this.geoLocationService.requestPermissionAndStart();
   }
 

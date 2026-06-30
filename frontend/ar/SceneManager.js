@@ -5,6 +5,18 @@ import { APP_CONFIG } from "./config.js";
 import { resolveAppUrl } from "./urlUtils.js";
 import { disposeObject3D } from "./utils.js";
 
+const PRECISE_GROUNDING_ASSETS = new Set(["fountain_benches_trees.glb"]);
+
+function needsPreciseGrounding(url) {
+  if (typeof url !== "string") {
+    return false;
+  }
+
+  const path = url.split(/[?#]/, 1)[0].replace(/\\/g, "/");
+  const filename = path.slice(path.lastIndexOf("/") + 1).toLowerCase();
+  return PRECISE_GROUNDING_ASSETS.has(filename);
+}
+
 function setTransparentGrid(grid) {
   const materials = Array.isArray(grid.material) ? grid.material : [grid.material];
   for (const material of materials) {
@@ -151,7 +163,10 @@ export class SceneManager {
 
   async loadPlacementCandidate(loader, candidate) {
     const gltf = await loader.loadAsync(candidate.url);
-    const asset = this.normalizeAsset(gltf.scene);
+    const asset = this.normalizeAsset(gltf.scene, {
+      label: candidate.label,
+      preciseGrounding: needsPreciseGrounding(candidate.url)
+    });
     return {
       object: asset,
       label: candidate.label,
@@ -227,7 +242,7 @@ export class SceneManager {
     };
   }
 
-  normalizeAsset(assetRoot) {
+  normalizeAsset(assetRoot, { label = "Modell", preciseGrounding = false } = {}) {
     const wrapper = new THREE.Group();
     wrapper.name = "placement-asset";
     wrapper.add(assetRoot);
@@ -240,7 +255,7 @@ export class SceneManager {
     });
 
     assetRoot.updateMatrixWorld(true);
-    const rawBox = new THREE.Box3().setFromObject(assetRoot);
+    const rawBox = new THREE.Box3().setFromObject(assetRoot, preciseGrounding);
     const rawSize = rawBox.getSize(new THREE.Vector3());
     const measuredHeight = Math.max(rawSize.y, 0.0001);
     const uniformScale = APP_CONFIG.model.targetHeightMeters / measuredHeight;
@@ -248,14 +263,25 @@ export class SceneManager {
     assetRoot.scale.multiplyScalar(uniformScale);
     assetRoot.updateMatrixWorld(true);
 
-    const normalizedBox = new THREE.Box3().setFromObject(assetRoot);
+    const normalizedBox = new THREE.Box3().setFromObject(assetRoot, preciseGrounding);
     const center = normalizedBox.getCenter(new THREE.Vector3());
     const minY = normalizedBox.min.y;
+
+    if (preciseGrounding) {
+      console.info(
+        `[Placement] Sichtbare Bounding Box fuer ${label}: minY=${minY.toFixed(4)} m, ` +
+          `Hoehe=${normalizedBox.getSize(new THREE.Vector3()).y.toFixed(4)} m.`
+      );
+    }
 
     assetRoot.position.x -= center.x;
     assetRoot.position.y -= minY;
     assetRoot.position.z -= center.z;
     assetRoot.updateMatrixWorld(true);
+
+    if (preciseGrounding) {
+      console.info(`[Placement] Y-Korrektur fuer ${label} angewendet: ${(-minY).toFixed(4)} m.`);
+    }
 
     return wrapper;
   }

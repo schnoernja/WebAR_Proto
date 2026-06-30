@@ -296,6 +296,10 @@ export class GeoLocationService {
 
   handleInitialSuccess(position) {
     this.initialRequestPending = false;
+    const accuracy = position && position.coords ? position.coords.accuracy : null;
+    console.info(
+      `[Geolocation] Standort erhalten${Number.isFinite(accuracy) ? ` (${accuracy.toFixed(1)} m)` : ""}.`
+    );
     this.handleSuccess(position, { forceNotify: true });
     this.startWatch();
   }
@@ -331,6 +335,7 @@ export class GeoLocationService {
 
   handleError(error) {
     const mapped = mapGeoError(error);
+    console.warn(`[Geolocation] Standortanfrage fehlgeschlagen: ${mapped.message}`);
 
     if (mapped.status === "denied") {
       this.stopWatch();

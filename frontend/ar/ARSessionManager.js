@@ -22,7 +22,10 @@ export class ARSessionManager {
   }
 
   async checkSupport() {
+    console.info("[WebXR] AR-Support wird geprueft.");
+
     if (!window.isSecureContext) {
+      console.warn("[WebXR] AR-Support fehlt: HTTPS oder localhost erforderlich.");
       return {
         available: false,
         message: "Immersive AR benoetigt HTTPS oder localhost."
@@ -30,6 +33,7 @@ export class ARSessionManager {
     }
 
     if (!navigator.xr || typeof navigator.xr.isSessionSupported !== "function") {
+      console.warn("[WebXR] AR-Support fehlt: WebXR-Schnittstelle nicht verfuegbar.");
       return {
         available: false,
         message: "Dieser Browser bietet keine WebXR-Schnittstelle."
@@ -38,6 +42,7 @@ export class ARSessionManager {
 
     try {
       const supported = await navigator.xr.isSessionSupported(APP_CONFIG.ar.sessionMode);
+      console.info(`[WebXR] immersive-ar Support: ${supported ? "verfuegbar" : "nicht verfuegbar"}.`);
       return {
         available: supported,
         message: supported
@@ -45,6 +50,7 @@ export class ARSessionManager {
           : "Immersive AR wird auf diesem Geraet oder Browser nicht angeboten."
       };
     } catch (error) {
+      console.error("[WebXR] AR-Supportpruefung fehlgeschlagen:", error);
       return {
         available: false,
         message: `WebXR-Pruefung fehlgeschlagen: ${toMessage(error, "unbekannt")}`
@@ -97,12 +103,15 @@ export class ARSessionManager {
 
     let session = null;
 
+    console.info("[WebXR] immersive-ar Session wird angefragt.");
     try {
       session = await navigator.xr.requestSession(APP_CONFIG.ar.sessionMode, preferredInit);
     } catch (firstError) {
+      console.warn("[WebXR] Session mit optionalen Features fehlgeschlagen; Fallback wird angefragt.");
       try {
         session = await navigator.xr.requestSession(APP_CONFIG.ar.sessionMode, fallbackInit);
       } catch (secondError) {
+        console.error("[WebXR] AR-Session konnte nicht gestartet werden:", secondError);
         return {
           started: false,
           message: `AR-Session konnte nicht gestartet werden: ${toMessage(
@@ -133,6 +142,7 @@ export class ARSessionManager {
 
       this.session = null;
       this.originPose = null;
+      console.error("[WebXR] AR-Session konnte nicht an den Renderer gebunden werden:", error);
 
       return {
         started: false,
@@ -143,6 +153,7 @@ export class ARSessionManager {
       };
     }
 
+    console.info("[WebXR] AR-Session gestartet.");
     return {
       started: true,
       session: this.session,

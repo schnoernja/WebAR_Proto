@@ -208,28 +208,6 @@ function cloneGeoPlacements(placements) {
   return placements.map((placement) => cloneGeoPlacement(placement)).filter((placement) => placement !== null);
 }
 
-function alignBottomToParentGround(object) {
-  if (!object || !object.parent) {
-    return;
-  }
-
-  object.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(object);
-  if (!Number.isFinite(box.min.y)) {
-    return;
-  }
-
-  const parentPosition = new THREE.Vector3();
-  const parentScale = new THREE.Vector3();
-  object.parent.updateMatrixWorld(true);
-  object.parent.getWorldPosition(parentPosition);
-  object.parent.getWorldScale(parentScale);
-
-  const scaleY = Math.abs(parentScale.y) > 1e-6 ? parentScale.y : 1;
-  object.position.y -= (box.min.y - parentPosition.y) / scaleY;
-  object.updateMatrixWorld(true);
-}
-
 export class PlacementController {
   constructor({ scene }) {
     this.scene = scene;
@@ -447,9 +425,6 @@ export class PlacementController {
 
     this.transformRoot.scale.setScalar(this.placementTransform.scaleFactor);
     this.transformRoot.rotation.set(0, this.placementTransform.rotationRad, 0);
-    if (this.asset) {
-      alignBottomToParentGround(this.asset);
-    }
 
     for (const slot of this.geoInstancesRoot.children) {
       const instance = slot.children && slot.children.length ? slot.children[0] : null;
@@ -468,7 +443,6 @@ export class PlacementController {
 
     instance.scale.setScalar(this.placementTransform.scaleFactor);
     instance.rotation.set(0, this.placementTransform.rotationRad, 0);
-    alignBottomToParentGround(instance);
   }
 
   setGeoOrigin(coord) {
@@ -709,13 +683,14 @@ export class PlacementController {
       const slot = new THREE.Group();
       slot.name = `geo-offset-${placement.id}`;
       slot.position.copy(placement.worldPosition);
-      this.geoInstancesRoot.add(slot);
 
       const instance = this.asset ? this.asset.clone(true) : null;
       if (instance) {
-        slot.add(instance);
         this.applyPlacementTransformToInstance(instance);
+        slot.add(instance);
       }
+
+      this.geoInstancesRoot.add(slot);
     }
 
     this.objectRoot.visible = this.presentationVisible;
