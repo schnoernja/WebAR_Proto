@@ -421,7 +421,7 @@ export class ARApp {
     this.syncDebugPanels();
     this.syncCanvasPointerState();
 
-    if (this.siteConfig) {
+    if (this.siteConfig && !this.ui.isUserMode()) {
       this.ui.setMessage(`Site '${this.siteConfig.id}' geladen.`);
       this.ui.setHint("QR-Site geladen. AR (WebXR) mit Geo-Local ist vorausgewaehlt.");
     }

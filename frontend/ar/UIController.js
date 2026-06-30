@@ -235,7 +235,7 @@ const DE_TRANSLATIONS = Object.freeze({
       settings: "Einstellungen"
     },
     placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
-    userPlacementCopy: "Zusatzaktionen fÃ¼r die Benutzeransicht.",
+    userPlacementCopy: "",
     userSurveyAction: "An Umfrage teilnehmen",
     userStopAr: "AR beenden",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
@@ -537,7 +537,7 @@ const EN_TRANSLATIONS = Object.freeze({
       settings: "Settings"
     },
     placementCopy: "Control the visibility of the main cards in the overlay.",
-    userPlacementCopy: "Additional actions for the user view.",
+    userPlacementCopy: "",
     userSurveyAction: "Take survey",
     userStopAr: "Stop AR",
     developerCopy: "Show or hide developer views and debug cards separately.",
@@ -1093,6 +1093,7 @@ export class UIController {
         survey: this.document.getElementById("menu-tab-survey"),
         settings: this.document.getElementById("menu-tab-settings")
       },
+      menuTabList: this.document.querySelector(".menu-tabs"),
       menuCopies: {
         placement: this.document.querySelector('[data-menu-panel="placement"] .menu-copy'),
         developer: this.document.querySelector('[data-menu-panel="developer"] .menu-copy'),
@@ -1186,6 +1187,7 @@ export class UIController {
     this.uiState = {
       supportAvailable: null,
       sessionActive: false,
+      startActionPending: false,
       trackingActive: false,
       surfaceDetected: false,
       stableSurface: false,
@@ -1342,7 +1344,7 @@ export class UIController {
     this.textInputActiveChangeHandler =
       typeof onTextInputActiveChange === "function" ? onTextInputActiveChange : null;
 
-    this.bindButton(this.startButton, onStartAR);
+    this.bindButton(this.startButton, () => this.runStartAction(onStartAR));
     this.bindButton(this.geoActivateLocationButton, onRequestGeolocation);
     this.bindButton(this.placeButton, onPlace);
     this.bindButton(this.resetButton, onResetPlacement);
@@ -1437,6 +1439,19 @@ export class UIController {
 
     button.addEventListener("click", handler);
     this.cleanupCallbacks.push(() => button.removeEventListener("click", handler));
+  }
+
+  async runStartAction(handler) {
+    if (typeof handler !== "function" || this.uiState.startActionPending) {
+      return;
+    }
+
+    this.setStartActionPending(true);
+    try {
+      await handler();
+    } finally {
+      this.setStartActionPending(false);
+    }
   }
 
   bindInput(input, handler) {
@@ -2228,6 +2243,12 @@ export class UIController {
       if (this.staticRefs.menuTabs.settings) {
         this.staticRefs.menuTabs.settings.hidden = true;
       }
+      if (this.staticRefs.menuTabList) {
+        this.staticRefs.menuTabList.hidden = true;
+      }
+      if (this.menuCloseButton) {
+        this.menuCloseButton.hidden = true;
+      }
 
       if (this.uiState.activeMenuTab !== "placement") {
         this.setActiveMenuTab("placement");
@@ -2280,6 +2301,12 @@ export class UIController {
       }
       if (this.staticRefs.menuTabs.settings) {
         this.staticRefs.menuTabs.settings.hidden = false;
+      }
+      if (this.staticRefs.menuTabList) {
+        this.staticRefs.menuTabList.hidden = false;
+      }
+      if (this.menuCloseButton) {
+        this.menuCloseButton.hidden = false;
       }
     }
 
@@ -2372,6 +2399,15 @@ export class UIController {
 
   closeCard(cardKey) {
     this.setCardVisibility(cardKey, false);
+  }
+
+  setStartActionPending(pending) {
+    this.uiState.startActionPending = Boolean(pending);
+    if (this.startButton) {
+      this.startButton.dataset.loading = pending ? "true" : "false";
+      this.startButton.setAttribute("aria-busy", String(Boolean(pending)));
+    }
+    this.refreshButtons();
   }
 
   toggleMenuCard(cardKey) {
@@ -3064,8 +3100,8 @@ export class UIController {
     if (this.startButton) {
       this.startButton.disabled =
         this.uiState.experienceMode === "geo-sensor"
-          ? this.uiState.sessionActive
-          : !this.uiState.supportAvailable || this.uiState.sessionActive;
+          ? this.uiState.sessionActive || this.uiState.startActionPending
+          : !this.uiState.supportAvailable || this.uiState.sessionActive || this.uiState.startActionPending;
     }
 
     if (this.geoActivateLocationButton) {

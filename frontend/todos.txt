@@ -2,11 +2,12 @@ Impressum hinzufügen (Flaticon, 3D Modelle etc verlinken)
 3D Modelle selber ehrstellen
 Barrierefreiheit/Kontraste/Schriftgröße größer
 Sprache umstellen können 
-kostenloses Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Branding")
+anderes Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Branding")
 
 Entwickler-View "verstecken"
-Umfrage hinzufügen zu benutezr-View
 Hilfe-Kachel einbauen im Benutezrview
+
+Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
 
 
 
