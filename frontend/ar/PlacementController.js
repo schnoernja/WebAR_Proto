@@ -709,14 +709,13 @@ export class PlacementController {
       const slot = new THREE.Group();
       slot.name = `geo-offset-${placement.id}`;
       slot.position.copy(placement.worldPosition);
+      this.geoInstancesRoot.add(slot);
 
       const instance = this.asset ? this.asset.clone(true) : null;
       if (instance) {
-        this.applyPlacementTransformToInstance(instance);
         slot.add(instance);
+        this.applyPlacementTransformToInstance(instance);
       }
-
-      this.geoInstancesRoot.add(slot);
     }
 
     this.objectRoot.visible = this.presentationVisible;

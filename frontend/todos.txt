@@ -11,6 +11,8 @@ Menü u Umfrage Button nach 2/3 Minuten leuchten lassen/aufblinken lssen
 
 Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
 
+WICHTIG: AR-Kamera-Zugriff passiert nicht mehr bei AR-starten; alte Logik raussuchen wieder reinbauen
+
 doppelt bei der Umfrage abstimmen können. Setze einen key im localStorage
 
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
