@@ -903,7 +903,12 @@ export class ARApp {
     this.applySitePlacementTransformFromConfig({ force: false });
     this.applySiteLocalObjectsFromConfig({ force: false });
 
-    return this.startAR();
+    this.requestGeoLocation();
+    const arStarted = await this.startAR();
+    if (!arStarted) {
+      this.geoLocationService.stop();
+    }
+    return arStarted;
   }
 
   async stopActiveExperience() {

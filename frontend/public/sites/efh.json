@@ -22,7 +22,7 @@
       "yawDeg": 0
     },
     "transform": {
-      "scaleFactor": 1,
+      "scaleFactor": 3,
       "rotationDeg": 0
     },
     "maxDistanceMeters": 100

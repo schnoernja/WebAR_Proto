@@ -19,7 +19,7 @@
       "yawDeg": 0
     },
     "transform": {
-      "scaleFactor": 1,
+      "scaleFactor": 3,
       "rotationDeg": 0
     },
     "maxDistanceMeters": 100
@@ -29,8 +29,8 @@
       "id": "place-test-a-root",
       "anchor": "viewer-forward",
       "offset": {
-        "x": 0,
-        "z": 5,
+        "x": -10,
+        "z": 16.4,
         "y": 0
       }
     }
