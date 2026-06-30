@@ -237,7 +237,7 @@ const DE_TRANSLATIONS = Object.freeze({
     placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
     userPlacementCopy: "",
     userResetPlacement: "Objekt neu platzieren",
-    userToolbarReset: "Objekt resetten",
+    userToolbarReset: "Objekt neu platzieren",
     userSurveyAction: "An Umfrage teilnehmen",
     userStopAr: "AR beenden",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
@@ -545,7 +545,7 @@ const EN_TRANSLATIONS = Object.freeze({
     placementCopy: "Control the visibility of the main cards in the overlay.",
     userPlacementCopy: "",
     userResetPlacement: "Reposition object",
-    userToolbarReset: "Reset object",
+    userToolbarReset: "Reposition object",
     userSurveyAction: "Take survey",
     userStopAr: "Stop AR",
     developerCopy: "Show or hide developer views and debug cards separately.",
@@ -3287,7 +3287,7 @@ export class UIController {
     }
 
     if (this.userMenuResetButton) {
-      this.userMenuResetButton.hidden = !(isUserMode && sessionActive);
+      this.userMenuResetButton.hidden = true;
     }
 
     if (this.userToolbarActions) {
