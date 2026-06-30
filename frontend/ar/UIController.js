@@ -39,7 +39,7 @@ const UI_MODE = Object.freeze({
   USER: "user"
 });
 const UI_MODE_STORAGE_KEY = "epartwin-ui-mode";
-const USER_MODE_VISIBLE_CARDS = Object.freeze(["placement", "note"]);
+const USER_MODE_VISIBLE_CARDS = Object.freeze(["placement"]);
 const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze([]);
 
 const MAX_GEO_OFFSET_METERS = 20;
@@ -225,7 +225,7 @@ const REGEX_RUNTIME_TRANSLATIONS_EN = Object.freeze([
 const DE_TRANSLATIONS = Object.freeze({
   languageCode: "de",
   menu: {
-    eyebrow: "Steuerung",
+    eyebrow: "",
     title: "Menü",
     tabs: {
       placement: "Platzierung",
@@ -235,9 +235,12 @@ const DE_TRANSLATIONS = Object.freeze({
       settings: "Einstellungen"
     },
     placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
+    userPlacementCopy: "Zusatzaktionen fÃ¼r die Benutzeransicht.",
+    userSurveyAction: "An Umfrage teilnehmen",
+    userStopAr: "AR beenden",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
     helpCopy: "Die Hilfskachel lässt sich jederzeit erneut einblenden.",
-    surveyCopy: "Die Umfragekachel enthält einen Platzhalter für eine spätere Nutzerumfrage.",
+    surveyCopy: "Die eingebettete Nutzerumfrage wird in einer eigenen Kachel geöffnet.",
     settingsCopy: "Die Einstellungenkachel enthält die Sprachumschaltung für die UI.",
     uiModeLabel: "Ansicht",
     uiModes: {
@@ -245,7 +248,7 @@ const DE_TRANSLATIONS = Object.freeze({
       developer: "Entwickler"
     },
     openHelp: "Hilfskachel öffnen",
-    openSurvey: "Umfragekachel öffnen",
+    openSurvey: "Umfrage ein-/ausblenden",
     openSettings: "Einstellungen öffnen",
     developerOptions: {
       geoHeadingReference: "Geo-Local mit Kompassbezug",
@@ -266,6 +269,7 @@ const DE_TRANSLATIONS = Object.freeze({
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
     intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.",
+    userIntro: "Tippe auf 'AR starten' und erlaube Kamera/AR sowie bei Bedarf den Standort.",
     modeLabel: "Hauptmodus",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -310,8 +314,8 @@ const DE_TRANSLATIONS = Object.freeze({
   },
   survey: {
     title: "Umfrage",
-    placeholderTitle: "Platzhalter",
-    placeholderText: "Hier wird künftig eine Nutzerumfrage integriert.",
+    placeholderTitle: "Nutzerumfrage",
+    placeholderText: "Bitte teilen Sie uns Ihre Erfahrungen mit der WebAR-Anwendung mit.",
     recommendationTitle: "Technische Empfehlung",
     recommendationText:
       "Geeignet sind eingebettete Formulare, die anonym genutzt und später exportiert oder per E-Mail ausgewertet werden können.",
@@ -523,7 +527,7 @@ const DE_TRANSLATIONS = Object.freeze({
 const EN_TRANSLATIONS = Object.freeze({
   languageCode: "en",
   menu: {
-    eyebrow: "Controls",
+    eyebrow: "",
     title: "Menu",
     tabs: {
       placement: "Placement",
@@ -533,9 +537,12 @@ const EN_TRANSLATIONS = Object.freeze({
       settings: "Settings"
     },
     placementCopy: "Control the visibility of the main cards in the overlay.",
+    userPlacementCopy: "Additional actions for the user view.",
+    userSurveyAction: "Take survey",
+    userStopAr: "Stop AR",
     developerCopy: "Show or hide developer views and debug cards separately.",
     helpCopy: "The help card can be opened again at any time.",
-    surveyCopy: "The survey card contains a placeholder for a future user survey.",
+    surveyCopy: "The embedded user survey opens in its own card.",
     settingsCopy: "The settings card contains the language switch for the UI.",
     uiModeLabel: "View",
     uiModes: {
@@ -543,7 +550,7 @@ const EN_TRANSLATIONS = Object.freeze({
       developer: "Developer"
     },
     openHelp: "Open help card",
-    openSurvey: "Open survey card",
+    openSurvey: "Show or hide survey",
     openSettings: "Open settings",
     developerOptions: {
       geoHeadingReference: "Geo-Local with compass reference",
@@ -564,6 +571,7 @@ const EN_TRANSLATIONS = Object.freeze({
     eyebrow: "EPARtwin WebAR",
     title: "Object Placement",
     intro: "Choose between free WebXR placement with the stabilized reticle and geo placement in the same WebXR flow with location, IMU, and compass.",
+    userIntro: "Tap 'Start AR' and allow camera/AR and, if requested, location access.",
     modeLabel: "Main mode",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -608,8 +616,8 @@ const EN_TRANSLATIONS = Object.freeze({
   },
   survey: {
     title: "Survey",
-    placeholderTitle: "Placeholder",
-    placeholderText: "A user survey will be integrated here in the future.",
+    placeholderTitle: "User survey",
+    placeholderText: "Please share your experience with the WebAR application.",
     recommendationTitle: "Technical recommendation",
     recommendationText:
       "Suitable choices are embedded forms that can be used anonymously and later exported or reviewed by email or dashboard.",
@@ -957,6 +965,8 @@ export class UIController {
     this.openHelpCardButton = this.document.getElementById("open-help-card-button");
     this.openSurveyCardButton = this.document.getElementById("open-survey-card-button");
     this.openSettingsCardButton = this.document.getElementById("open-settings-card-button");
+    this.userMenuActions = this.document.getElementById("user-menu-actions");
+    this.userMenuSurveyButton = this.document.getElementById("user-menu-survey-button");
     this.menuTabButtons = Array.from(this.document.querySelectorAll("[data-menu-tab]"));
     this.menuTabPanels = Array.from(this.document.querySelectorAll("[data-menu-panel]"));
     this.cardVisibilityToggles = Array.from(this.document.querySelectorAll("[data-card-visibility-toggle]"));
@@ -980,6 +990,8 @@ export class UIController {
     this.closeHelpButton = this.document.getElementById("close-help-button");
     this.closeSurveyButton = this.document.getElementById("close-survey-button");
     this.closeSettingsButton = this.document.getElementById("close-settings-button");
+    this.userToolbarActions = this.document.getElementById("user-ar-toolbar-actions");
+    this.userToolbarStopButton = this.document.getElementById("user-toolbar-stop-button");
 
     this.languageButtons = {
       de: this.document.getElementById("language-de-button"),
@@ -1088,6 +1100,7 @@ export class UIController {
         survey: this.document.querySelector('[data-menu-panel="survey"] .menu-copy'),
         settings: this.document.querySelector('[data-menu-panel="settings"] .menu-copy')
       },
+      placementMenuOptionList: this.document.querySelector('[data-menu-panel="placement"] .menu-option-list'),
       menuUiModeLabel: this.document.getElementById("menu-ui-mode-label"),
       menuVisibilityLabels: {
         placement: this.getVisibilityToggleLabel("placement"),
@@ -1341,6 +1354,8 @@ export class UIController {
     this.bindButton(this.closeHelpButton, () => this.closeCard("help"));
     this.bindButton(this.closeSurveyButton, () => this.closeCard("survey"));
     this.bindButton(this.closeSettingsButton, () => this.closeCard("settings"));
+    this.bindButton(this.userMenuSurveyButton, () => this.toggleMenuCard("survey"));
+    this.bindButton(this.userToolbarStopButton, onStopAR);
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
@@ -1464,10 +1479,7 @@ export class UIController {
       this.openCard("help");
       this.closeMenu();
     });
-    this.bindButton(this.openSurveyCardButton, () => {
-      this.openCard("survey");
-      this.closeMenu();
-    });
+    this.bindButton(this.openSurveyCardButton, () => this.toggleMenuCard("survey"));
     this.bindButton(this.openSettingsCardButton, () => {
       this.openCard("settings");
       this.closeMenu();
@@ -1478,6 +1490,10 @@ export class UIController {
         const tabKey = tabButton.dataset.menuTab || "placement";
         if (tabKey === ACTION_MENU_TABS.help || tabKey === ACTION_MENU_TABS.survey || tabKey === ACTION_MENU_TABS.settings) {
           if (this.isUserMode() && !USER_MODE_ALLOWED_ACTION_TABS.includes(tabKey)) {
+            return;
+          }
+          if (tabKey === ACTION_MENU_TABS.survey) {
+            this.toggleMenuCard(tabKey);
             return;
           }
           this.openCard(tabKey);
@@ -2192,13 +2208,11 @@ export class UIController {
         this.stopButton.hidden = true;
       }
       for (const toggle of this.cardVisibilityToggles) {
-        const cardKey = toggle.dataset.cardVisibilityToggle;
-        const allowed = USER_MODE_VISIBLE_CARDS.includes(cardKey);
         toggle.disabled = true;
-        toggle.checked = allowed;
+        toggle.checked = false;
         const toggleOption = toggle.closest(".menu-option");
         if (toggleOption) {
-          toggleOption.hidden = !allowed;
+          toggleOption.hidden = true;
         }
       }
 
@@ -2272,6 +2286,8 @@ export class UIController {
     this.updateUIModeButtons();
     this.applyAllCardStates();
     this.updateMiniSummaryLayout();
+    this.updateUserModeActions();
+    this.renderModeSpecificCopy();
     this.renderExperienceModeUI();
     this.renderHelpCopy();
     this.refreshButtons();
@@ -2347,12 +2363,62 @@ export class UIController {
   }
 
   openCard(cardKey) {
+    if (cardKey === ACTION_MENU_TABS.survey) {
+      this.ensureSurveyEmbedLoaded();
+    }
     this.setCardVisibility(cardKey, true);
     this.setCardCollapsed(cardKey, false);
   }
 
   closeCard(cardKey) {
     this.setCardVisibility(cardKey, false);
+  }
+
+  toggleMenuCard(cardKey) {
+    if (this.uiState.cardVisibility[cardKey]) {
+      this.closeCard(cardKey);
+    } else {
+      this.openCard(cardKey);
+    }
+    this.closeMenu();
+  }
+
+  ensureSurveyEmbedLoaded() {
+    const tallySrc = "https://tally.so/widgets/embed.js";
+    const view = this.document.defaultView;
+    if (!view) {
+      return;
+    }
+
+    const loadEmbeds = () => {
+      if (view.Tally && typeof view.Tally.loadEmbeds === "function") {
+        view.Tally.loadEmbeds();
+        return;
+      }
+
+      this.document.querySelectorAll("iframe[data-tally-src]:not([src])").forEach((iframe) => {
+        const nextSrc = iframe.dataset.tallySrc;
+        if (nextSrc) {
+          iframe.src = nextSrc;
+        }
+      });
+    };
+
+    if (view.Tally && typeof view.Tally.loadEmbeds === "function") {
+      loadEmbeds();
+      return;
+    }
+
+    if (this.document.querySelector(`script[src="${tallySrc}"]`)) {
+      loadEmbeds();
+      return;
+    }
+
+    const script = this.document.createElement("script");
+    script.src = tallySrc;
+    script.onload = loadEmbeds;
+    script.onerror = loadEmbeds;
+    this.document.body?.appendChild(script);
   }
 
   setLanguage(language) {
@@ -2381,7 +2447,7 @@ export class UIController {
     this.setElementText(this.staticRefs.menuTabs.help, text.menu.tabs.help);
     this.setElementText(this.staticRefs.menuTabs.survey, text.menu.tabs.survey);
     this.setElementText(this.staticRefs.menuTabs.settings, text.menu.tabs.settings);
-    this.setElementText(this.staticRefs.menuCopies.placement, text.menu.placementCopy);
+    this.renderModeSpecificCopy(text);
     this.setElementText(this.staticRefs.menuCopies.developer, text.menu.developerCopy);
     this.setElementText(this.staticRefs.menuCopies.help, text.menu.helpCopy);
     this.setElementText(this.staticRefs.menuCopies.survey, text.menu.surveyCopy);
@@ -2392,6 +2458,8 @@ export class UIController {
     this.setElementText(this.openHelpCardButton, text.menu.openHelp);
     this.setElementText(this.openSurveyCardButton, text.menu.openSurvey);
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
+    this.setElementText(this.userMenuSurveyButton, text.menu.userSurveyAction);
+    this.setElementText(this.userToolbarStopButton, text.menu.userStopAr);
     this.setElementText(this.staticRefs.geoHeadingReferenceToggleLabel, text.menu.developerOptions.geoHeadingReference);
     this.setElementText(
       this.staticRefs.geoHeadingReferenceToggleDescription,
@@ -2407,7 +2475,6 @@ export class UIController {
 
     this.setElementText(this.staticRefs.placementEyebrow, text.placement.eyebrow);
     this.setElementText(this.staticRefs.placementTitle, text.placement.title);
-    this.setElementText(this.staticRefs.placementIntro, text.placement.intro);
     this.setElementText(this.staticRefs.placementModeLabel, text.placement.modeLabel);
     this.setElementText(this.geoActivateLocationButton, text.placement.buttons.activateLocation);
     this.setElementText(this.placeButton, text.placement.buttons.place);
@@ -2546,6 +2613,20 @@ export class UIController {
     const text = this.getText();
     const helpSteps = this.isUserMode() ? text.help.userSteps : text.help.steps;
     this.setParagraphList(this.staticRefs.helpCopy, helpSteps);
+  }
+
+  renderModeSpecificCopy(text = this.getText()) {
+    if (this.staticRefs.menuCopies.placement) {
+      this.staticRefs.menuCopies.placement.textContent = this.isUserMode()
+        ? text.menu.userPlacementCopy
+        : text.menu.placementCopy;
+    }
+
+    if (this.staticRefs.placementIntro) {
+      this.staticRefs.placementIntro.textContent = this.isUserMode()
+        ? text.placement.userIntro
+        : text.placement.intro;
+    }
   }
 
   updateLanguageButtons() {
@@ -2855,20 +2936,23 @@ export class UIController {
 
     if (active) {
       this.closeMenu();
-      this.setCardVisibility("placement", true);
-      this.setCardCollapsed("placement", false);
       if (!this.isUserMode()) {
+        this.setCardVisibility("placement", true);
+        this.setCardCollapsed("placement", false);
         this.setCardVisibility("coord", true);
         this.setCardCollapsed("coord", false);
         this.setCardVisibility("help", false);
       } else {
-        this.setCardVisibility("note", true);
-        this.setCardCollapsed("note", false);
+        this.setCardVisibility("placement", false);
       }
+    } else if (this.isUserMode()) {
+      this.setCardVisibility("placement", true);
+      this.setCardCollapsed("placement", false);
     }
 
     this.renderSystemStates();
     this.refreshButtons();
+    this.updateUserModeActions();
   }
 
   setTrackingState(active) {
@@ -2939,6 +3023,23 @@ export class UIController {
 
     if (this.miniRefs.surface) {
       this.miniRefs.surface.hidden = isUserMode;
+    }
+  }
+
+  updateUserModeActions() {
+    const isUserMode = this.isUserMode();
+    const sessionActive = this.uiState.sessionActive === true;
+
+    if (this.userMenuActions) {
+      this.userMenuActions.hidden = !isUserMode;
+    }
+
+    if (this.userToolbarActions) {
+      this.userToolbarActions.hidden = !(isUserMode && sessionActive);
+    }
+
+    if (this.staticRefs.placementMenuOptionList) {
+      this.staticRefs.placementMenuOptionList.hidden = isUserMode;
     }
   }
 

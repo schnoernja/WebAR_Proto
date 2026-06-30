@@ -43,7 +43,7 @@
           <div id="menu-panel" class="panel menu-panel" role="dialog" aria-modal="false" aria-label="Menue">
             <div class="menu-header">
               <div>
-                <p class="menu-eyebrow">Steuerung</p>
+                <p class="menu-eyebrow"></p>
                 <h2>Menue</h2>
               </div>
               <button
@@ -135,6 +135,11 @@
 
             <section class="menu-tab-panel" data-menu-panel="placement" role="tabpanel">
               <p class="menu-copy">Sichtbarkeit der Hauptkacheln im Overlay steuern.</p>
+              <div id="user-menu-actions" class="user-menu-actions" hidden>
+                <button id="user-menu-survey-button" class="button user-menu-survey-button" type="button">
+                  An Umfrage teilnehmen
+                </button>
+              </div>
               <div class="menu-option-list">
                 <label class="menu-option">
                   <input type="checkbox" data-card-visibility-toggle="placement" checked />
@@ -188,11 +193,9 @@
             </section>
 
             <section class="menu-tab-panel" data-menu-panel="survey" role="tabpanel" hidden>
-              <p class="menu-copy">
-                Die Umfragekachel enthaelt einen Platzhalter fuer eine spaetere Nutzerumfrage.
-              </p>
+              <p class="menu-copy">Die eingebettete Nutzerumfrage wird in einer eigenen Kachel geoeffnet.</p>
               <button id="open-survey-card-button" class="button" type="button">
-                Umfragekachel oeffnen
+                Umfrage ein-/ausblenden
               </button>
             </section>
 
@@ -218,6 +221,11 @@
                 <span id="mini-session" class="mini-pill" data-status="idle">AR: Inaktiv</span>
                 <span id="mini-surface" class="mini-pill" data-status="idle">Fläche: Suche</span>
                 <span id="mini-placement" class="mini-pill" data-status="idle">Objekt platziert: Nein</span>
+              </div>
+              <div id="user-ar-toolbar-actions" class="user-ar-toolbar-actions" hidden>
+                <button id="user-toolbar-stop-button" class="button user-toolbar-button" type="button">
+                  AR beenden
+                </button>
               </div>
             </div>
           </div>
@@ -391,32 +399,23 @@
 
               <div id="card-survey-content" class="card-content" data-card-content="survey">
                 <div class="card-copy-block">
-                  <p id="survey-placeholder-title" class="card-subheading">Platzhalter</p>
-                  <p id="survey-placeholder-text">
-                    Hier wird künftig eine Nutzerumfrage integriert.
-                  </p>
+                  <p id="survey-placeholder-title" class="card-subheading">Nutzerumfrage</p>
+                  <p id="survey-placeholder-text">Bitte teilen Sie uns Ihre Erfahrungen mit der WebAR-Anwendung mit.</p>
                 </div>
 
-                <div class="card-copy-block">
-                  <p id="survey-recommendation-title" class="card-subheading">Technische Empfehlung</p>
-                  <p id="survey-recommendation-text">
-                    Geeignet sind eingebettete Formulare, die anonym genutzt und später exportiert oder per E-Mail ausgewertet werden können.
-                  </p>
-                  <ul id="survey-tool-list" class="card-list survey-tool-list">
-                    <li><strong>Google Forms:</strong> schnell verfügbar, einfach teilbar, Antworten im Google-Workspace auswertbar.</li>
-                    <li><strong>Typeform:</strong> starke mobile UX, gutes Embedding, Fokus auf geführte Frageabläufe.</li>
-                    <li><strong>Tally.so:</strong> leichtgewichtig, iframe-fähig, einfach für anonyme Formulare und Export.</li>
-                    <li><strong>Microsoft Forms:</strong> sinnvoll bei bestehender Microsoft-Umgebung und Auswertung im M365-Kontext.</li>
-                  </ul>
-                </div>
-
-                <div class="card-copy-block">
-                  <p id="survey-requirements-title" class="card-subheading">Wichtige Anforderungen</p>
-                  <ul id="survey-requirements-list" class="card-list survey-requirements-list">
-                    <li>Per iframe in die bestehende UI einbettbar</li>
-                    <li>Optional anonym nutzbar</li>
-                    <li>Export oder Versand der Ergebnisse per E-Mail bzw. Dashboard möglich</li>
-                  </ul>
+                <div class="survey-embed-shell">
+                  <iframe
+                    id="survey-tally-embed"
+                    class="survey-embed-frame"
+                    data-tally-src="https://tally.so/embed/7ReMyR?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"
+                    loading="lazy"
+                    width="100%"
+                    height="914"
+                    frameborder="0"
+                    marginheight="0"
+                    marginwidth="0"
+                    title="Nutzerumfrage EPARtwin WebAR"
+                  ></iframe>
                 </div>
               </div>
             </section>

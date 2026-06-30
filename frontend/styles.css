@@ -270,6 +270,10 @@ body.ar-active .menu-icon span {
   color: var(--warm);
 }
 
+.menu-eyebrow:empty {
+  display: none;
+}
+
 .menu-header h2,
 h2 {
   margin: 0;
@@ -585,6 +589,27 @@ body[data-ui-mode="user"] .hud-logo {
   gap: 6px;
 }
 
+.user-ar-toolbar-actions,
+.user-menu-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.user-ar-toolbar-actions {
+  justify-content: center;
+}
+
+.user-menu-actions {
+  margin-top: 12px;
+}
+
+.user-toolbar-button,
+.user-menu-survey-button {
+  width: 100%;
+}
+
 .mini-pill {
   display: inline-flex;
   align-items: center;
@@ -671,6 +696,31 @@ body.ar-active .mini-pill {
 
 .card-copy-block + .card-copy-block {
   margin-top: 16px;
+}
+
+.survey-panel {
+  max-height: min(78vh, 960px);
+}
+
+.survey-embed-shell {
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(19, 35, 38, 0.08);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.survey-embed-frame {
+  display: block;
+  width: 100%;
+  min-height: 914px;
+  border: 0;
+  background: transparent;
+}
+
+body.ar-active .survey-embed-shell {
+  border-color: rgba(244, 241, 231, 0.1);
+  background: rgba(244, 241, 231, 0.04);
 }
 
 .card-subheading {
@@ -833,6 +883,10 @@ body[data-ui-mode="user"]:not(.ar-active) #render-root canvas {
   pointer-events: none;
 }
 
+body[data-ui-mode="user"] #app-version {
+  display: none;
+}
+
 body[data-ui-mode="user"]:not(.ar-active) .menu-panel {
   background: #ddf1fd;
   color: #10395a;
@@ -843,25 +897,50 @@ body[data-ui-mode="user"]:not(.ar-active) .menu-panel {
 
 body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar,
 body[data-ui-mode="user"]:not(.ar-active) .card-panel {
-  background:
-    linear-gradient(180deg, rgba(221, 241, 253, 0.94), rgba(221, 241, 253, 0.97)),
-    url("assets/design/leaves_background.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: cover;
+  position: relative;
+  background: #ddf1fd;
   color: #10395a;
   border-color: rgba(255, 255, 255, 0.3);
   backdrop-filter: none;
   box-shadow: 0 18px 40px rgba(9, 49, 84, 0.18);
 }
 
+body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar {
+  align-self: center;
+  width: min(340px, calc(100vw - 104px));
+  padding: 16px 18px;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar::before,
+body[data-ui-mode="user"]:not(.ar-active) .card-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("assets/design/leaves_background.png");
+  background-position: right -6px bottom -6px;
+  background-repeat: no-repeat;
+  background-size: 280px auto;
+  opacity: 0.34;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar > *,
+body[data-ui-mode="user"]:not(.ar-active) .card-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
 body[data-ui-mode="user"]:not(.ar-active) .hud-brand {
-  align-items: flex-start;
-  gap: 8px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-direction: column;
 }
 
 body[data-ui-mode="user"]:not(.ar-active) .hud-logo {
-  width: clamp(132px, 34vw, 208px);
+  width: clamp(188px, 46vw, 300px);
   height: auto;
 }
 
@@ -877,6 +956,19 @@ body[data-ui-mode="user"]:not(.ar-active) h1,
 body[data-ui-mode="user"]:not(.ar-active) h2,
 body[data-ui-mode="user"]:not(.ar-active) .welcome-headline {
   color: #10395a;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-toolbar-main {
+  align-items: center;
+  text-align: center;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-caption {
+  display: none;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) .hud-mini-summary {
+  justify-content: center;
 }
 
 body[data-ui-mode="user"]:not(.ar-active) .menu-copy,
@@ -932,16 +1024,152 @@ body[data-ui-mode="user"]:not(.ar-active) .button {
   box-shadow: 0 10px 24px rgba(18, 83, 126, 0.16);
 }
 
+body[data-ui-mode="user"]:not(.ar-active) #start-ar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid #2e85c6;
+  background: rgba(255, 255, 255, 0.96);
+  color: #2e85c6;
+}
+
+body[data-ui-mode="user"]:not(.ar-active) #start-ar-button::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  background: url("assets/design/ar-kamera.png") center / contain no-repeat;
+  flex: 0 0 auto;
+}
+
 body[data-ui-mode="user"]:not(.ar-active) .button:hover:not(:disabled),
 body[data-ui-mode="user"]:not(.ar-active) .button:focus-visible:not(:disabled) {
   border-color: transparent;
   background: #249fd7;
 }
 
+body[data-ui-mode="user"]:not(.ar-active) #start-ar-button:hover:not(:disabled),
+body[data-ui-mode="user"]:not(.ar-active) #start-ar-button:focus-visible:not(:disabled) {
+  border-color: #2e85c6;
+  background: #f6fcff;
+  color: #2e85c6;
+}
+
 body[data-ui-mode="user"]:not(.ar-active) .mini-pill {
   border-color: rgba(53, 171, 226, 0.24);
   background: rgba(53, 171, 226, 0.12);
   color: #155a87;
+}
+
+body[data-ui-mode="user"].ar-active .menu-panel,
+body[data-ui-mode="user"].ar-active .hud-toolbar,
+body[data-ui-mode="user"].ar-active .card-panel {
+  position: relative;
+  background: rgba(221, 241, 253, 0.9);
+  color: #10395a;
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 18px 40px rgba(8, 48, 83, 0.18);
+}
+
+body[data-ui-mode="user"].ar-active .hud-toolbar::before,
+body[data-ui-mode="user"].ar-active .card-panel::before,
+body[data-ui-mode="user"].ar-active .menu-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("assets/design/leaves_background.png");
+  background-position: right -12px bottom -18px;
+  background-repeat: no-repeat;
+  background-size: 260px auto;
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body[data-ui-mode="user"].ar-active .hud-toolbar > *,
+body[data-ui-mode="user"].ar-active .card-panel > *,
+body[data-ui-mode="user"].ar-active .menu-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+body[data-ui-mode="user"].ar-active .menu-header h2,
+body[data-ui-mode="user"].ar-active h1,
+body[data-ui-mode="user"].ar-active h2,
+body[data-ui-mode="user"].ar-active .welcome-headline {
+  color: #10395a;
+}
+
+body[data-ui-mode="user"].ar-active .hud-caption,
+body[data-ui-mode="user"].ar-active .eyebrow,
+body[data-ui-mode="user"].ar-active .card-subheading,
+body[data-ui-mode="user"].ar-active .menu-eyebrow,
+body[data-ui-mode="user"].ar-active .menu-copy,
+body[data-ui-mode="user"].ar-active .panel-intro,
+body[data-ui-mode="user"].ar-active .status-message,
+body[data-ui-mode="user"].ar-active .hint-text,
+body[data-ui-mode="user"].ar-active .help-copy p,
+body[data-ui-mode="user"].ar-active .card-list,
+body[data-ui-mode="user"].ar-active .field-label,
+body[data-ui-mode="user"].ar-active .menu-option,
+body[data-ui-mode="user"].ar-active .state-label {
+  color: rgba(16, 57, 90, 0.82);
+}
+
+body[data-ui-mode="user"].ar-active .floating-menu-button {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(221, 241, 253, 0.92);
+  box-shadow: 0 16px 34px rgba(8, 48, 83, 0.2);
+}
+
+body[data-ui-mode="user"].ar-active .menu-icon span {
+  background: #10395a;
+}
+
+body[data-ui-mode="user"].ar-active .menu-tab,
+body[data-ui-mode="user"].ar-active .menu-mode-button {
+  border-color: rgba(53, 171, 226, 0.28);
+  background: rgba(53, 171, 226, 0.12);
+  color: #155a87;
+}
+
+body[data-ui-mode="user"].ar-active .menu-tab[data-active="true"],
+body[data-ui-mode="user"].ar-active .menu-mode-button[data-active="true"] {
+  border-color: transparent;
+  background: #35abe2;
+  color: #ffffff;
+}
+
+body[data-ui-mode="user"].ar-active .button {
+  border-color: transparent;
+  background: #35abe2;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(18, 83, 126, 0.14);
+}
+
+body[data-ui-mode="user"].ar-active .button:hover:not(:disabled),
+body[data-ui-mode="user"].ar-active .button:focus-visible:not(:disabled) {
+  border-color: transparent;
+  background: #249fd7;
+}
+
+body[data-ui-mode="user"].ar-active .mini-pill {
+  border-color: rgba(53, 171, 226, 0.24);
+  background: rgba(53, 171, 226, 0.14);
+  color: #155a87;
+}
+
+body[data-ui-mode="user"].ar-active .user-toolbar-button {
+  border: 1px solid #2e85c6;
+  background: rgba(255, 255, 255, 0.96);
+  color: #2e85c6;
+}
+
+body[data-ui-mode="user"].ar-active .user-toolbar-button:hover:not(:disabled),
+body[data-ui-mode="user"].ar-active .user-toolbar-button:focus-visible:not(:disabled) {
+  border-color: #2e85c6;
+  background: #f6fcff;
+  color: #2e85c6;
 }
 
 .panel-tag,
