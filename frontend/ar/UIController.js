@@ -886,9 +886,114 @@ function formatDebugBoolean(value) {
   return value ? "true" : "false";
 }
 
-function translateRuntimeText(text, language) {
-  if (!text || language !== "en") {
+const GERMAN_MOJIBAKE_REPLACEMENTS = Object.freeze([
+  [/Ã„/g, "Ä"],
+  [/Ã–/g, "Ö"],
+  [/Ãœ/g, "Ü"],
+  [/Ã¤/g, "ä"],
+  [/Ã¶/g, "ö"],
+  [/Ã¼/g, "ü"],
+  [/ÃŸ/g, "ß"]
+]);
+
+const GERMAN_DISPLAY_TEXT_REPLACEMENTS = Object.freeze([
+  [/Menue/g, "Menü"],
+  [/Begruessung/g, "Begrüßung"],
+  [/schliessen/g, "schließen"],
+  [/laesst/g, "lässt"],
+  [/Oeffnen/g, "Öffnen"],
+  [/Oeffne/g, "Öffne"],
+  [/oeffnen/g, "öffnen"],
+  [/oeffne/g, "öffne"],
+  [/geoeffnet/g, "geöffnet"],
+  [/enthaelt/g, "enthält"],
+  [/\bFuer\b/g, "Für"],
+  [/\bfuer\b/g, "für"],
+  [/Waehle/g, "Wähle"],
+  [/waehle/g, "wähle"],
+  [/vorausgewaehlt/g, "vorausgewählt"],
+  [/ausgewaehlt/g, "ausgewählt"],
+  [/gewaehlt/g, "gewählt"],
+  [/Pruefung/g, "Prüfung"],
+  [/prueft/g, "prüft"],
+  [/Pruefe/g, "Prüfe"],
+  [/pruefe/g, "prüfe"],
+  [/Unterstuetzung/g, "Unterstützung"],
+  [/unterstuetzt/g, "unterstützt"],
+  [/Unterstuetzt/g, "Unterstützt"],
+  [/Geraetestandort/g, "Gerätestandort"],
+  [/Geraetekoordinaten/g, "Gerätekoordinaten"],
+  [/Geraeteposition/g, "Geräteposition"],
+  [/Geraet/g, "Gerät"],
+  [/Rueckkamera/g, "Rückkamera"],
+  [/Ruecken/g, "Rücken"],
+  [/Buehne/g, "Bühne"],
+  [/laedt/g, "lädt"],
+  [/Mehrframe-Pruefung/g, "Mehrframe-Prüfung"],
+  [/Referenzflaeche/g, "Referenzfläche"],
+  [/Bodenflaeche/g, "Bodenfläche"],
+  [/Flaechen/g, "Flächen"],
+  [/Flaeche/g, "Fläche"],
+  [/flaeche/g, "fläche"],
+  [/Bodenhoehe/g, "Bodenhöhe"],
+  [/verfuegbaren/g, "verfügbaren"],
+  [/verfuegbare/g, "verfügbare"],
+  [/verfuegbar/g, "verfügbar"],
+  [/Verfuegbar/g, "Verfügbar"],
+  [/Ungueltig/g, "Ungültig"],
+  [/ungueltig/g, "ungültig"],
+  [/gueltigen/g, "gültigen"],
+  [/gueltige/g, "gültige"],
+  [/gueltiger/g, "gültiger"],
+  [/gueltig/g, "gültig"],
+  [/uebernommen/g, "übernommen"],
+  [/ueberlagert/g, "überlagert"],
+  [/uebertragen/g, "übertragen"],
+  [/ueber die/g, "über die"],
+  [/ueber den/g, "über den"],
+  [/ueber dem/g, "über dem"],
+  [/ueber eine/g, "über eine"],
+  [/ueber einen/g, "über einen"],
+  [/ueber-/g, "über-"],
+  [/ueber /g, "über "],
+  [/zurueckgesetzt/g, "zurückgesetzt"],
+  [/naechsten/g, "nächsten"],
+  [/naechste/g, "nächste"],
+  [/moeglich/g, "möglich"],
+  [/benoetigt/g, "benötigt"],
+  [/Bestaetige/g, "Bestätige"],
+  [/bestaetige/g, "bestätige"],
+  [/Sued/g, "Süd"],
+  [/Druecke/g, "Drücke"],
+  [/unveraendert/g, "unverändert"],
+  [/veraendert/g, "verändert"]
+]);
+
+function normalizeGermanDisplayText(text) {
+  if (typeof text !== "string" || text.length === 0) {
     return text;
+  }
+
+  let normalized = text;
+
+  for (const [pattern, replacement] of GERMAN_MOJIBAKE_REPLACEMENTS) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+
+  for (const [pattern, replacement] of GERMAN_DISPLAY_TEXT_REPLACEMENTS) {
+    normalized = normalized.replace(pattern, replacement);
+  }
+
+  return normalized;
+}
+
+function translateRuntimeText(text, language) {
+  if (!text) {
+    return text;
+  }
+
+  if (language !== "en") {
+    return normalizeGermanDisplayText(text);
   }
 
   if (Object.prototype.hasOwnProperty.call(EXACT_RUNTIME_TRANSLATIONS_EN, text)) {
@@ -2141,11 +2246,14 @@ export class UIController {
 
     if (this.menuButton) {
       this.menuButton.setAttribute("aria-expanded", String(this.uiState.menuOpen));
-      this.menuButton.setAttribute("aria-label", this.uiState.menuOpen ? this.getText().aria.menuClose : this.getText().aria.menuOpen);
+      this.menuButton.setAttribute(
+        "aria-label",
+        this.toDisplayText(this.uiState.menuOpen ? this.getText().aria.menuClose : this.getText().aria.menuOpen)
+      );
     }
 
     if (this.menuCloseButton) {
-      this.menuCloseButton.setAttribute("aria-label", this.getText().aria.menuClose);
+      this.menuCloseButton.setAttribute("aria-label", this.toDisplayText(this.getText().aria.menuClose));
     }
   }
 
@@ -2400,7 +2508,7 @@ export class UIController {
 
     if (refs.toggleButton) {
       refs.toggleButton.setAttribute("aria-expanded", String(!collapsed));
-      refs.toggleButton.setAttribute("aria-label", this.getText().aria.toggleButtons[cardKey] || "");
+      refs.toggleButton.setAttribute("aria-label", this.toDisplayText(this.getText().aria.toggleButtons[cardKey] || ""));
     }
 
     if (refs.toggleIcon) {
@@ -2615,42 +2723,42 @@ export class UIController {
     if (this.experienceModeSelect) {
       const [xrOption, geoSensorOption] = this.experienceModeSelect.options;
       if (xrOption) {
-        xrOption.textContent = text.placement.modeOptions.xr;
+        xrOption.textContent = this.toDisplayText(text.placement.modeOptions.xr);
       }
       if (geoSensorOption) {
-        geoSensorOption.textContent = text.placement.modeOptions.geoSensor;
+        geoSensorOption.textContent = this.toDisplayText(text.placement.modeOptions.geoSensor);
       }
     }
 
     if (this.modeSelect) {
       const [freeOption, geoLocalOption, geoGlobalOption] = this.modeSelect.options;
       if (freeOption) {
-        freeOption.textContent = text.coord.options.free;
+        freeOption.textContent = this.toDisplayText(text.coord.options.free);
       }
       if (geoLocalOption) {
-        geoLocalOption.textContent = text.coord.options.geoLocal;
+        geoLocalOption.textContent = this.toDisplayText(text.coord.options.geoLocal);
       }
       if (geoGlobalOption) {
-        geoGlobalOption.textContent = text.coord.options.geoGlobal;
+        geoGlobalOption.textContent = this.toDisplayText(text.coord.options.geoGlobal);
       }
     }
 
     const settingsGroup = this.document.querySelector(".language-switch");
     if (settingsGroup) {
-      settingsGroup.setAttribute("aria-label", text.aria.languageGroup);
+      settingsGroup.setAttribute("aria-label", this.toDisplayText(text.aria.languageGroup));
     }
 
     if (this.closeWelcomeButton) {
-      this.closeWelcomeButton.setAttribute("aria-label", text.aria.closeButtons.welcome);
+      this.closeWelcomeButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.welcome));
     }
     if (this.closeHelpButton) {
-      this.closeHelpButton.setAttribute("aria-label", text.aria.closeButtons.help);
+      this.closeHelpButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.help));
     }
     if (this.closeSurveyButton) {
-      this.closeSurveyButton.setAttribute("aria-label", text.aria.closeButtons.survey);
+      this.closeSurveyButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.survey));
     }
     if (this.closeSettingsButton) {
-      this.closeSettingsButton.setAttribute("aria-label", text.aria.closeButtons.settings);
+      this.closeSettingsButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.settings));
     }
 
     this.updateLanguageButtons();
@@ -2675,15 +2783,15 @@ export class UIController {
 
   renderModeSpecificCopy(text = this.getText()) {
     if (this.staticRefs.menuCopies.placement) {
-      this.staticRefs.menuCopies.placement.textContent = this.isUserMode()
-        ? text.menu.userPlacementCopy
-        : text.menu.placementCopy;
+      this.staticRefs.menuCopies.placement.textContent = this.toDisplayText(
+        this.isUserMode() ? text.menu.userPlacementCopy : text.menu.placementCopy
+      );
     }
 
     if (this.staticRefs.placementIntro) {
-      this.staticRefs.placementIntro.textContent = this.isUserMode()
-        ? text.placement.userIntro
-        : text.placement.intro;
+      this.staticRefs.placementIntro.textContent = this.toDisplayText(
+        this.isUserMode() ? text.placement.userIntro : text.placement.intro
+      );
     }
 
     this.updateUserPlacementPopup(text);
@@ -2706,9 +2814,13 @@ export class UIController {
     return ref && ref.item ? ref.item.querySelector(".state-label") : null;
   }
 
+  toDisplayText(text) {
+    return this.uiState.language === "de" ? normalizeGermanDisplayText(text) : text;
+  }
+
   setElementText(element, text) {
     if (element) {
-      element.textContent = text;
+      element.textContent = this.toDisplayText(text);
     }
   }
 
@@ -2721,7 +2833,7 @@ export class UIController {
     listElement.replaceChildren(
       ...nextItems.map((item) => {
         const li = this.document.createElement("li");
-        li.textContent = item;
+        li.textContent = this.toDisplayText(item);
         return li;
       })
     );
@@ -2736,7 +2848,7 @@ export class UIController {
     container.replaceChildren(
       ...nextItems.map((item) => {
         const paragraph = this.document.createElement("p");
-        paragraph.textContent = item;
+        paragraph.textContent = this.toDisplayText(item);
         return paragraph;
       })
     );
@@ -2752,8 +2864,8 @@ export class UIController {
       ...nextItems.map((item) => {
         const li = this.document.createElement("li");
         const strong = this.document.createElement("strong");
-        strong.textContent = `${item.name}: `;
-        li.append(strong, item.description);
+        strong.textContent = this.toDisplayText(`${item.name}: `);
+        li.append(strong, this.toDisplayText(item.description));
         return li;
       })
     );
@@ -2769,18 +2881,20 @@ export class UIController {
     }
 
     if (this.startButton) {
-      this.startButton.textContent =
-        isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR;
+      this.startButton.textContent = this.toDisplayText(
+        isGeoSensorMode ? text.placement.buttons.startGeo : text.placement.buttons.startXR
+      );
     }
 
     if (this.geoActivateLocationButton) {
       this.geoActivateLocationButton.hidden = !isGeoSensorMode;
-      this.geoActivateLocationButton.textContent = text.placement.buttons.activateLocation;
+      this.geoActivateLocationButton.textContent = this.toDisplayText(text.placement.buttons.activateLocation);
     }
 
     if (this.stopButton) {
-      this.stopButton.textContent =
-        isGeoSensorMode ? text.placement.buttons.stopGeo : text.placement.buttons.stopXR;
+      this.stopButton.textContent = this.toDisplayText(
+        isGeoSensorMode ? text.placement.buttons.stopGeo : text.placement.buttons.stopXR
+      );
     }
   }
 
@@ -2804,7 +2918,7 @@ export class UIController {
           : mode === "geo-global"
             ? text.coord.options.geoGlobal
             : text.coord.options.free;
-      this.modeBadgeEl.textContent = badgeText;
+      this.modeBadgeEl.textContent = this.toDisplayText(badgeText);
     }
   }
 
@@ -3122,9 +3236,11 @@ export class UIController {
     }
 
     this.userPlacementPopupText.textContent =
-      this.uiState.surfaceDetected || this.uiState.stableSurface
-        ? text.placement.userGuideDetected
-        : text.placement.userGuideSearch;
+      this.toDisplayText(
+        this.uiState.surfaceDetected || this.uiState.stableSurface
+          ? text.placement.userGuideDetected
+          : text.placement.userGuideSearch
+      );
   }
 
   setState(key, text, status) {
@@ -3134,7 +3250,7 @@ export class UIController {
     }
 
     if (ref.value) {
-      ref.value.textContent = text;
+      ref.value.textContent = this.toDisplayText(text);
     }
 
     if (ref.item) {
@@ -3246,7 +3362,7 @@ export class UIController {
       return;
     }
 
-    element.textContent = text;
+    element.textContent = this.toDisplayText(text);
     element.dataset.status = status;
   }
 
@@ -3302,16 +3418,20 @@ export class UIController {
       : null;
 
     if (this.geoRefs.statusBadge) {
-      this.geoRefs.statusBadge.textContent = usesSensorData
-        ? this.getSensorBadgeLabel(this.lastSensorSnapshot, text)
-        : this.getGeoBadgeLabel(this.lastGeoSnapshot, text);
+      this.geoRefs.statusBadge.textContent = this.toDisplayText(
+        usesSensorData
+          ? this.getSensorBadgeLabel(this.lastSensorSnapshot, text)
+          : this.getGeoBadgeLabel(this.lastGeoSnapshot, text)
+      );
       this.geoRefs.statusBadge.dataset.status = severity;
     }
 
     if (this.geoRefs.statusText) {
-      this.geoRefs.statusText.textContent = usesSensorData
-        ? this.getSensorStatusText(this.lastSensorSnapshot, text)
-        : this.getGeoStatusText(this.lastGeoSnapshot, text);
+      this.geoRefs.statusText.textContent = this.toDisplayText(
+        usesSensorData
+          ? this.getSensorStatusText(this.lastSensorSnapshot, text)
+          : this.getGeoStatusText(this.lastGeoSnapshot, text)
+      );
     }
 
     if (this.geoRefs.latitude) {
@@ -3331,16 +3451,18 @@ export class UIController {
     }
 
     if (this.geoRefs.message) {
-      this.geoRefs.message.textContent = usesSensorData
-        ? this.getSensorMessage(this.lastSensorSnapshot, text)
-        : this.getGeoMessage(this.lastGeoSnapshot, text);
+      this.geoRefs.message.textContent = this.toDisplayText(
+        usesSensorData
+          ? this.getSensorMessage(this.lastSensorSnapshot, text)
+          : this.getGeoMessage(this.lastGeoSnapshot, text)
+      );
     }
 
     if (this.geoRefs.help) {
       const helpText = usesSensorData
         ? this.getSensorHelp(this.lastSensorSnapshot, text)
         : this.getGeoHelp(this.lastGeoSnapshot, text);
-      this.geoRefs.help.textContent = helpText;
+      this.geoRefs.help.textContent = this.toDisplayText(helpText);
       this.geoRefs.help.hidden = !helpText;
     }
 

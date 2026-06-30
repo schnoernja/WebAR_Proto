@@ -6,6 +6,7 @@ anderes Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Brand
 
 Entwickler-View "verstecken"
 Hilfe-Kachel einbauen im Benutezrview
+"Unnötige" Hinweise ausblenden (ala Fallback Ansicht aktiv oder sowas)
 
 Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
 

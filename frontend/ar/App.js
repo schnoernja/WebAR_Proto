@@ -338,7 +338,7 @@ export class ARApp {
     this.lastXRPlacementMode = PlacementUIModel.FREE;
     this.geoHeadingReferenceEnabled = false;
     this.geoSensorActive = false;
-    this.activePlacementAssetSource = "default";
+    this.activePlacementAssetSource = null;
     this.geoOffsetUiState = {
       useSiteCalibration: true,
       enabled: false,
@@ -363,11 +363,7 @@ export class ARApp {
       scene: this.sceneManager.getScene()
     });
 
-    const assetInfo = await this.sceneManager.createPlacementAsset();
-    this.placementController.setAsset(assetInfo.object);
-
-    this.ui.setAssetLabel(assetInfo.label);
-    this.activePlacementAssetSource = "default";
+    const assetInfo = await this.prepareInitialPlacementAsset();
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
     this.ui.setGeoHeadingReferenceEnabled(this.geoHeadingReferenceEnabled);
@@ -789,6 +785,39 @@ export class ARApp {
     return !Number.isFinite(accuracyMeters) || accuracyMeters <= MAX_GEO_ORIGIN_ACCURACY_METERS;
   }
 
+  async prepareInitialPlacementAsset() {
+    if (!this.placementController) {
+      return null;
+    }
+
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    const shouldUseSiteAsset =
+      Boolean(placementConfig && placementConfig.assetUrl) &&
+      (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected());
+
+    if (shouldUseSiteAsset) {
+      try {
+        const assetInfo = await this.sceneManager.createPlacementAssetFromUrl(
+          placementConfig.assetUrl,
+          placementConfig.assetLabel
+        );
+        this.placementController.setAsset(assetInfo.object);
+        this.ui.setAssetLabel(assetInfo.label);
+        this.activePlacementAssetSource = placementConfig.assetUrl;
+        return assetInfo;
+      } catch (error) {
+        this.ui.setMessage(`Geo-Modell konnte nicht geladen werden: ${toMessage(error)}`);
+        this.ui.setHint("Pruefe den Modellpfad in der Site-JSON (placement.asset).");
+      }
+    }
+
+    const assetInfo = await this.sceneManager.createPlacementAsset();
+    this.placementController.setAsset(assetInfo.object);
+    this.ui.setAssetLabel(assetInfo.label);
+    this.activePlacementAssetSource = "default";
+    return assetInfo;
+  }
+
   async ensurePlacementAssetForExperience(experienceMode) {
     if (!this.placementController) {
       return false;
@@ -1064,7 +1093,9 @@ export class ARApp {
 
     let result = null;
     try {
-      result = await this.arSessionManager.startSession();
+      result = await this.arSessionManager.startSession({
+        skipSupportCheck: true
+      });
     } catch (error) {
       this.ui.setSessionState(false, `AR-Start fehlgeschlagen: ${toMessage(error)}`);
       this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");

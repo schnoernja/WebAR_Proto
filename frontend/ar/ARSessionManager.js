@@ -52,7 +52,7 @@ export class ARSessionManager {
     }
   }
 
-  async startSession() {
+  async startSession({ skipSupportCheck = false } = {}) {
     if (this.session) {
       return {
         started: true,
@@ -62,12 +62,28 @@ export class ARSessionManager {
       };
     }
 
-    const support = await this.checkSupport();
-    if (!support.available) {
-      return {
-        started: false,
-        message: support.message
-      };
+    if (!skipSupportCheck) {
+      const support = await this.checkSupport();
+      if (!support.available) {
+        return {
+          started: false,
+          message: support.message
+        };
+      }
+    } else {
+      if (!window.isSecureContext) {
+        return {
+          started: false,
+          message: "Immersive AR benoetigt HTTPS oder localhost."
+        };
+      }
+
+      if (!navigator.xr || typeof navigator.xr.requestSession !== "function") {
+        return {
+          started: false,
+          message: "Dieser Browser bietet keine WebXR-Schnittstelle."
+        };
+      }
     }
 
     const preferredInit = {
