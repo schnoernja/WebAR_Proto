@@ -1087,7 +1087,12 @@ body[data-ui-mode="user"]:not(.ar-active) .menu-option {
 
 body[data-ui-mode="user"]:not(.ar-active) .card-toggle-button,
 body[data-ui-mode="user"]:not(.ar-active) .card-close-button {
-  color: #155a87;
+  color: #10395a;
+}
+
+body[data-ui-mode="user"].ar-active .card-toggle-button,
+body[data-ui-mode="user"].ar-active .card-close-button {
+  color: #10395a;
 }
 
 body[data-ui-mode="user"]:not(.ar-active) .button {
