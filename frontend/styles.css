@@ -1659,45 +1659,37 @@ body.ar-active .state-item {
 
 .survey-panel {
   position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 74px);
-  right: calc(env(safe-area-inset-right, 0px) + 12px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
-  left: calc(env(safe-area-inset-left, 0px) + 12px);
+  top: var(--survey-top-offset, calc(env(safe-area-inset-top, 0px) + 132px));
+  left: 50%;
+  right: auto;
+  bottom: auto;
   z-index: 1110;
-  width: auto;
-  max-width: none;
-  max-height: none;
+  width: min(760px, calc(100vw - (var(--survey-side-gap, 12px) * 2)));
+  max-width: calc(100vw - (var(--survey-side-gap, 12px) * 2));
+  height: min(82vh, var(--survey-max-height, calc(100dvh - 156px)));
+  max-height: min(82vh, var(--survey-max-height, calc(100dvh - 156px)));
   min-height: 0;
+  transform: translateX(-50%);
 }
 
 .survey-panel .card-content {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 
-.survey-panel .card-copy-block {
-  flex: 0 0 auto;
-}
-
+.survey-panel .card-copy-block,
 .survey-panel .survey-embed-shell {
   flex: 0 0 auto;
 }
 
 .survey-panel.is-collapsed {
-  bottom: auto;
+  height: auto;
+  max-height: none;
   min-height: 0;
-}
-
-@media (max-width: 720px) {
-  .survey-panel {
-    top: calc(env(safe-area-inset-top, 0px) + 72px);
-    right: calc(env(safe-area-inset-right, 0px) + 10px);
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
-    left: calc(env(safe-area-inset-left, 0px) + 10px);
-  }
 }

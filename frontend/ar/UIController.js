@@ -1067,9 +1067,11 @@ function normalizeRotationDeg(value) {
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
+    this.view = this.document.defaultView || window;
     this.uiContainer = this.document.getElementById("ui-container");
     this.hudRoot = this.document.getElementById("hud");
     this.hudBody = this.document.getElementById("hud-body");
+    this.hudToolbar = this.document.querySelector(".hud-toolbar");
 
     this.menuButton = this.document.getElementById("menu-button");
     this.menuOverlay = this.document.getElementById("menu-overlay");
@@ -1355,6 +1357,12 @@ export class UIController {
     this.textInputReleaseTimeoutId = null;
     this.cleanupCallbacks = [];
     this.developerCardVisibilitySnapshot = null;
+    this.updateSurveyPanelLayout = this.updateSurveyPanelLayout.bind(this);
+
+    if (this.view && typeof this.view.addEventListener === "function") {
+      this.view.addEventListener("resize", this.updateSurveyPanelLayout);
+      this.cleanupCallbacks.push(() => this.view.removeEventListener("resize", this.updateSurveyPanelLayout));
+    }
 
     this.configureTextInputs();
     this.applyMenuState();
@@ -1372,6 +1380,7 @@ export class UIController {
     this.setGeoDebug({});
     this.setPlacementDebug({});
     this.syncCanvasPointerEvents();
+    this.queueSurveyPanelLayoutUpdate();
   }
 
   getText() {
@@ -2445,6 +2454,7 @@ export class UIController {
     this.renderExperienceModeUI();
     this.renderHelpCopy();
     this.refreshButtons();
+    this.queueSurveyPanelLayoutUpdate();
   }
 
   setCardVisibility(cardKey, visible) {
@@ -2514,6 +2524,43 @@ export class UIController {
     if (refs.toggleIcon) {
       refs.toggleIcon.textContent = collapsed ? "+" : "-";
     }
+
+    if (cardKey === ACTION_MENU_TABS.survey) {
+      this.queueSurveyPanelLayoutUpdate();
+    }
+  }
+
+  updateSurveyPanelLayout() {
+    const surveyRoot = this.cardRefs.survey ? this.cardRefs.survey.root : null;
+    if (!surveyRoot || !this.hudToolbar) {
+      return;
+    }
+
+    const toolbarRect = this.hudToolbar.getBoundingClientRect();
+    const viewportWidth = this.view && Number.isFinite(this.view.innerWidth)
+      ? this.view.innerWidth
+      : this.document.documentElement.clientWidth;
+    const viewportHeight = this.view && Number.isFinite(this.view.innerHeight)
+      ? this.view.innerHeight
+      : this.document.documentElement.clientHeight;
+    const sideGap = viewportWidth <= 720 ? 10 : 12;
+    const topOffset = Math.max(Math.round(toolbarRect.bottom + 12), 96);
+    const availableHeight = Math.max(viewportHeight - topOffset - sideGap, 240);
+
+    surveyRoot.style.setProperty("--survey-top-offset", `${topOffset}px`);
+    surveyRoot.style.setProperty("--survey-side-gap", `${sideGap}px`);
+    surveyRoot.style.setProperty("--survey-max-height", `${availableHeight}px`);
+  }
+
+  queueSurveyPanelLayoutUpdate() {
+    if (!this.view || typeof this.view.requestAnimationFrame !== "function") {
+      this.updateSurveyPanelLayout();
+      return;
+    }
+
+    this.view.requestAnimationFrame(() => {
+      this.updateSurveyPanelLayout();
+    });
   }
 
   openCard(cardKey) {
@@ -2522,10 +2569,14 @@ export class UIController {
     }
     this.setCardVisibility(cardKey, true);
     this.setCardCollapsed(cardKey, false);
+    this.queueSurveyPanelLayoutUpdate();
   }
 
   closeCard(cardKey) {
     this.setCardVisibility(cardKey, false);
+    if (cardKey === ACTION_MENU_TABS.survey) {
+      this.queueSurveyPanelLayoutUpdate();
+    }
   }
 
   setStartActionPending(pending) {
@@ -3127,6 +3178,7 @@ export class UIController {
     this.renderSystemStates();
     this.refreshButtons();
     this.updateUserModeActions();
+    this.queueSurveyPanelLayoutUpdate();
   }
 
   setTrackingState(active) {
