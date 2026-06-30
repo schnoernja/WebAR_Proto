@@ -761,7 +761,7 @@ body.ar-active .mini-pill {
 
 .survey-embed-shell {
   margin-top: 16px;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid rgba(19, 35, 38, 0.08);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.7);
@@ -770,7 +770,8 @@ body.ar-active .mini-pill {
 .survey-embed-frame {
   display: block;
   width: 100%;
-  min-height: 914px;
+  height: 1600px;
+  min-height: 1600px;
   border: 0;
   background: transparent;
 }
@@ -1660,14 +1661,14 @@ body.ar-active .state-item {
 .survey-panel {
   position: fixed;
   top: var(--survey-top-offset, calc(env(safe-area-inset-top, 0px) + 132px));
-  left: 50%;
+  left: var(--survey-center-x, 50%);
   right: auto;
   bottom: auto;
   z-index: 1110;
-  width: min(760px, calc(100vw - (var(--survey-side-gap, 12px) * 2)));
+  width: min(var(--survey-width, 520px), calc(100vw - (var(--survey-side-gap, 12px) * 2)));
   max-width: calc(100vw - (var(--survey-side-gap, 12px) * 2));
-  height: min(82vh, var(--survey-max-height, calc(100dvh - 156px)));
-  max-height: min(82vh, var(--survey-max-height, calc(100dvh - 156px)));
+  height: min(92dvh, var(--survey-max-height, calc(100dvh - 156px)));
+  max-height: min(92dvh, var(--survey-max-height, calc(100dvh - 156px)));
   min-height: 0;
   transform: translateX(-50%);
 }
@@ -1681,6 +1682,8 @@ body.ar-active .state-item {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  padding-bottom: max(220px, calc(env(safe-area-inset-bottom, 0px) + 220px));
+  scroll-padding-bottom: max(220px, calc(env(safe-area-inset-bottom, 0px) + 220px));
 }
 
 .survey-panel .card-copy-block,

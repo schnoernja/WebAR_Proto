@@ -2544,11 +2544,23 @@ export class UIController {
       ? this.view.innerHeight
       : this.document.documentElement.clientHeight;
     const sideGap = viewportWidth <= 720 ? 10 : 12;
-    const topOffset = Math.max(Math.round(toolbarRect.bottom + 12), 96);
-    const availableHeight = Math.max(viewportHeight - topOffset - sideGap, 240);
+    const topOffset = Math.max(Math.round(toolbarRect.bottom + (viewportWidth <= 720 ? 6 : 8)), 88);
+    const centerX = Math.round(toolbarRect.left + (toolbarRect.width / 2));
+    const centeredWidthLimit = Math.max(
+      Math.min(centerX - sideGap, viewportWidth - centerX - sideGap) * 2,
+      Math.min(viewportWidth - (sideGap * 2), 280)
+    );
+    const preferredWidth = viewportWidth <= 720 ? viewportWidth - (sideGap * 2) : 520;
+    const surveyWidth = Math.max(
+      Math.min(preferredWidth, viewportWidth - (sideGap * 2), centeredWidthLimit),
+      Math.min(viewportWidth - (sideGap * 2), 280)
+    );
+    const availableHeight = Math.max(viewportHeight - topOffset - sideGap, 280);
 
     surveyRoot.style.setProperty("--survey-top-offset", `${topOffset}px`);
+    surveyRoot.style.setProperty("--survey-center-x", `${centerX}px`);
     surveyRoot.style.setProperty("--survey-side-gap", `${sideGap}px`);
+    surveyRoot.style.setProperty("--survey-width", `${Math.round(surveyWidth)}px`);
     surveyRoot.style.setProperty("--survey-max-height", `${availableHeight}px`);
   }
 
@@ -2564,12 +2576,19 @@ export class UIController {
   }
 
   openCard(cardKey) {
-    if (cardKey === ACTION_MENU_TABS.survey) {
-      this.ensureSurveyEmbedLoaded();
-    }
     this.setCardVisibility(cardKey, true);
     this.setCardCollapsed(cardKey, false);
     this.queueSurveyPanelLayoutUpdate();
+    if (cardKey === ACTION_MENU_TABS.survey) {
+      if (this.view && typeof this.view.requestAnimationFrame === "function") {
+        this.view.requestAnimationFrame(() => {
+          this.ensureSurveyEmbedLoaded();
+          this.queueSurveyPanelLayoutUpdate();
+        });
+      } else {
+        this.ensureSurveyEmbedLoaded();
+      }
+    }
   }
 
   closeCard(cardKey) {
