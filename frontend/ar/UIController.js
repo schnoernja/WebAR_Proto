@@ -59,6 +59,19 @@ const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
   "Starte Geo-Modus...": "Starting geo mode...",
   "Starte immersive AR...": "Starting immersive AR...",
   "Fallback-3D-Ansicht bleibt aktiv.": "Fallback 3D view remains active.",
+  "WebXR nicht verfuegbar, iOS erkannt: Quick-Look-Fallback ist verfuegbar.":
+    "WebXR is unavailable; iOS detected: the Quick Look fallback is available.",
+  "iOS erkannt, aber AR Quick Look wird von diesem Browser nicht angeboten.":
+    "iOS was detected, but this browser does not provide AR Quick Look.",
+  "iOS-Fallback nicht moeglich: USDZ-Datei fehlt.":
+    "The iOS fallback is unavailable: the USDZ file is missing.",
+  "iOS AR benoetigt eine USDZ-Datei fuer dieses Modell.":
+    "iOS AR requires a USDZ file for this model.",
+  "AR Quick Look Link wurde geoeffnet.": "The AR Quick Look link was opened.",
+  "Das Modell wird in Apples AR Quick Look angezeigt.":
+    "The model is being displayed in Apple AR Quick Look.",
+  "Dieses Geraet unterstuetzt keinen bekannten AR-Modus.":
+    "This device does not support a known AR mode.",
   "Geo-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.":
     "Geo mode requires GPS plus compass/IMU access.",
   "Geo-Modus beendet. Fallback-3D-Ansicht aktiv.": "Geo mode ended. Fallback 3D view active.",
@@ -219,6 +232,10 @@ const REGEX_RUNTIME_TRANSLATIONS_EN = Object.freeze([
   {
     pattern: /^XR-Session konnte nicht an den Renderer gebunden werden: (.+)$/,
     replace: (_, detail) => `Could not bind the XR session to the renderer: ${detail}`
+  },
+  {
+    pattern: /^iOS AR benoetigt eine USDZ-Datei fuer dieses Modell: (.+)$/,
+    replace: (_, detail) => `iOS AR requires a USDZ file for this model: ${detail}`
   }
 ]);
 
@@ -270,8 +287,8 @@ const DE_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
-    intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.",
-    userIntro: "Tippe auf 'AR starten' und erlaube Kamera/AR sowie bei Bedarf den Standort.",
+    intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow. Auf iOS wird bei fehlendem WebXR AR Quick Look verwendet.",
+    userIntro: "Tippe auf 'AR starten'. Auf iPhone und iPad wird bei fehlendem WebXR AR Quick Look geöffnet.",
     userGuideTitle: "Objektplatzierung",
     userGuideSearch:
       "Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.",
@@ -578,8 +595,8 @@ const EN_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Object Placement",
-    intro: "Choose between free WebXR placement with the stabilized reticle and geo placement in the same WebXR flow with location, IMU, and compass.",
-    userIntro: "Tap 'Start AR' and allow camera/AR and, if requested, location access.",
+    intro: "Choose between free WebXR placement with the stabilized reticle and geo placement in the same WebXR flow. On iOS, AR Quick Look is used when WebXR is unavailable.",
+    userIntro: "Tap 'Start AR'. On iPhone and iPad, AR Quick Look opens when WebXR is unavailable.",
     userGuideTitle: "Object placement",
     userGuideSearch: "Please point the device at the floor and move it slowly until a surface is detected.",
     userGuideDetected: "Surface detected. Please hold the device still briefly until the object is placed.",

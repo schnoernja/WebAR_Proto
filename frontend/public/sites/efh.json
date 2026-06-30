@@ -8,10 +8,12 @@
     "yawDeg": 0
   },
   "scene": {
-    "asset": "/assets/EFH.glb"
+    "asset": "/assets/EFH.glb",
+    "usdzAsset": "/assets/EFH.usdz"
   },
   "placement": {
     "asset": "assets/EFH.glb",
+    "usdzAsset": "assets/EFH.usdz",
     "target": {
       "lat": 50.984751,
       "lon": 11.044106

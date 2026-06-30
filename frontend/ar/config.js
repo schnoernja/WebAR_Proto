@@ -1,7 +1,9 @@
 export const APP_CONFIG = Object.freeze({
   model: {
     primaryUrl: "./models/tree.glb",
+    primaryQuickLookUrl: "./models/tree.usdz",
     fallbackUrl: "./models/fountain.glb",
+    fallbackQuickLookUrl: "./models/fountain.usdz",
     targetHeightMeters: 2.4
   },
   placement: {

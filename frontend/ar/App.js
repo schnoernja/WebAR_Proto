@@ -1,6 +1,10 @@
 import * as THREE from "three";
+import { APP_CONFIG } from "./config.js";
+import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
+import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js";
 import { ARSessionManager } from "./ARSessionManager.js";
+import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js";
@@ -325,6 +329,14 @@ export class ARApp {
     this.headingService = new HeadingService();
     this.siteLoader = new SiteLoader();
     this.sensorFusion = new SensorFusion();
+    this.arCapabilityDetector = new ArCapabilityDetector({
+      sessionMode: APP_CONFIG.ar.sessionMode
+    });
+    this.iosQuickLookLauncher = new IOSQuickLookLauncher();
+    this.arLauncher = new ArLauncher({
+      capabilityDetector: this.arCapabilityDetector,
+      iosQuickLookLauncher: this.iosQuickLookLauncher
+    });
     this.placementController = null;
     this.arSessionManager = null;
     this.lastFrameTimeMs = 0;
@@ -339,6 +351,7 @@ export class ARApp {
     this.geoHeadingReferenceEnabled = false;
     this.geoSensorActive = false;
     this.activePlacementAssetSource = null;
+    this.activePlacementAssetUrl = null;
     this.geoOffsetUiState = {
       useSiteCalibration: true,
       enabled: false,
@@ -408,9 +421,18 @@ export class ARApp {
     });
     this.ui.setGeoOffsetControlState(this.geoOffsetUiState);
 
-    const support = await this.arSessionManager.checkSupport();
-    this.ui.setSupportState(support.available, support.message);
-    this.ui.setSessionState(false, support.available ? "AR kann gestartet werden." : support.message);
+    const capability = await this.arLauncher.detectCapabilities();
+    if (capability.mode === ARLaunchMode.IOS_QUICK_LOOK) {
+      await Promise.all(
+        this.getIOSQuickLookAssetCandidates().map((url) => this.iosQuickLookLauncher.checkAsset(url))
+      );
+    }
+    const arAvailable = capability.mode !== ARLaunchMode.UNSUPPORTED;
+    this.ui.setSupportState(arAvailable, capability.message);
+    this.ui.setSessionState(
+      false,
+      capability.mode === ARLaunchMode.WEBXR ? "AR kann gestartet werden." : capability.message
+    );
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
@@ -489,6 +511,13 @@ export class ARApp {
           ? this.siteConfig.scene.asset
           : null;
     const assetUrl = normalizeSiteAssetUrl(preferredAssetUrl);
+    const preferredQuickLookAssetUrl =
+      sitePlacement && typeof sitePlacement.usdzAsset === "string" && sitePlacement.usdzAsset.trim()
+        ? sitePlacement.usdzAsset.trim()
+        : this.siteConfig.scene && typeof this.siteConfig.scene.usdzAsset === "string"
+          ? this.siteConfig.scene.usdzAsset
+          : null;
+    const quickLookAssetUrl = normalizeSiteAssetUrl(preferredQuickLookAssetUrl);
     const toleranceMeters = clampSiteToleranceMeters(
       sitePlacement && Number.isFinite(sitePlacement.maxDistanceMeters)
         ? sitePlacement.maxDistanceMeters
@@ -498,6 +527,7 @@ export class ARApp {
     return {
       targetCoord,
       assetUrl,
+      quickLookAssetUrl,
       assetLabel: toAssetLabel(assetUrl),
       calibration:
         sitePlacement && sitePlacement.calibration && typeof sitePlacement.calibration === "object"
@@ -804,6 +834,7 @@ export class ARApp {
         this.placementController.setAsset(assetInfo.object);
         this.ui.setAssetLabel(assetInfo.label);
         this.activePlacementAssetSource = placementConfig.assetUrl;
+        this.activePlacementAssetUrl = assetInfo.sourceUrl;
         return assetInfo;
       } catch (error) {
         this.ui.setMessage(`Geo-Modell konnte nicht geladen werden: ${toMessage(error)}`);
@@ -815,6 +846,7 @@ export class ARApp {
     this.placementController.setAsset(assetInfo.object);
     this.ui.setAssetLabel(assetInfo.label);
     this.activePlacementAssetSource = "default";
+    this.activePlacementAssetUrl = assetInfo.sourceUrl;
     return assetInfo;
   }
 
@@ -840,6 +872,7 @@ export class ARApp {
         );
         this.placementController.setAsset(assetInfo.object);
         this.activePlacementAssetSource = placementConfig.assetUrl;
+        this.activePlacementAssetUrl = assetInfo.sourceUrl;
         this.ui.setAssetLabel(assetInfo.label);
         return true;
       } catch (error) {
@@ -857,6 +890,7 @@ export class ARApp {
       const defaultAssetInfo = await this.sceneManager.createPlacementAsset();
       this.placementController.setAsset(defaultAssetInfo.object);
       this.activePlacementAssetSource = "default";
+      this.activePlacementAssetUrl = defaultAssetInfo.sourceUrl;
       this.ui.setAssetLabel(defaultAssetInfo.label);
       return true;
     } catch (error) {
@@ -865,7 +899,67 @@ export class ARApp {
     }
   }
 
+  getIOSQuickLookAssetCandidates() {
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    return [
+      resolveAppUrl(APP_CONFIG.model.primaryQuickLookUrl),
+      resolveAppUrl(APP_CONFIG.model.fallbackQuickLookUrl),
+      placementConfig ? placementConfig.quickLookAssetUrl : null
+    ].filter((url, index, urls) => Boolean(url) && urls.indexOf(url) === index);
+  }
+
+  getIOSQuickLookAssetUrl() {
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    const shouldUseSiteAsset =
+      Boolean(placementConfig && placementConfig.assetUrl) &&
+      (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected());
+
+    if (shouldUseSiteAsset) {
+      return placementConfig.quickLookAssetUrl;
+    }
+
+    const activeAssetUrl = normalizeSiteAssetUrl(this.activePlacementAssetUrl);
+    const fallbackAssetUrl = normalizeSiteAssetUrl(APP_CONFIG.model.fallbackUrl);
+    return resolveAppUrl(
+      activeAssetUrl === fallbackAssetUrl
+        ? APP_CONFIG.model.fallbackQuickLookUrl
+        : APP_CONFIG.model.primaryQuickLookUrl
+    );
+  }
+
   async startSelectedExperience() {
+    const quickLookAssetUrl = this.getIOSQuickLookAssetUrl();
+    const result = await this.arLauncher.launch({
+      startWebXR: () => this.startSelectedWebXRExperience(),
+      quickLookAssetUrl
+    });
+
+    if (result.mode === ARLaunchMode.WEBXR) {
+      return result.started;
+    }
+
+    if (result.mode === ARLaunchMode.IOS_QUICK_LOOK) {
+      if (!result.started) {
+        this.ui.setSessionState(false, "iOS-Fallback nicht moeglich: USDZ-Datei fehlt.");
+        this.ui.setHint(
+          quickLookAssetUrl
+            ? `iOS AR benoetigt eine USDZ-Datei fuer dieses Modell: ${quickLookAssetUrl}`
+            : "iOS AR benoetigt eine USDZ-Datei fuer dieses Modell."
+        );
+        return false;
+      }
+
+      this.ui.setSessionState(false, "AR Quick Look Link wurde geoeffnet.");
+      this.ui.setHint("Das Modell wird in Apples AR Quick Look angezeigt.");
+      return true;
+    }
+
+    this.ui.setSessionState(false, "Dieses Geraet unterstuetzt keinen bekannten AR-Modus.");
+    this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
+    return false;
+  }
+
+  async startSelectedWebXRExperience() {
     if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
       return false;
     }
