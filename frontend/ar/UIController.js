@@ -237,6 +237,7 @@ const DE_TRANSLATIONS = Object.freeze({
     placementCopy: "Sichtbarkeit der Hauptkacheln im Overlay steuern.",
     userPlacementCopy: "",
     userResetPlacement: "Objekt neu platzieren",
+    userToolbarReset: "Objekt resetten",
     userSurveyAction: "An Umfrage teilnehmen",
     userStopAr: "AR beenden",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
@@ -544,6 +545,7 @@ const EN_TRANSLATIONS = Object.freeze({
     placementCopy: "Control the visibility of the main cards in the overlay.",
     userPlacementCopy: "",
     userResetPlacement: "Reposition object",
+    userToolbarReset: "Reset object",
     userSurveyAction: "Take survey",
     userStopAr: "Stop AR",
     developerCopy: "Show or hide developer views and debug cards separately.",
@@ -1108,6 +1110,7 @@ export class UIController {
     this.closeSurveyButton = this.document.getElementById("close-survey-button");
     this.closeSettingsButton = this.document.getElementById("close-settings-button");
     this.userToolbarActions = this.document.getElementById("user-ar-toolbar-actions");
+    this.userToolbarResetButton = this.document.getElementById("user-toolbar-reset-button");
     this.userToolbarStopButton = this.document.getElementById("user-toolbar-stop-button");
     this.userPlacementPopup = this.document.getElementById("user-placement-popup");
     this.userPlacementPopupTitle = this.document.getElementById("user-placement-popup-title");
@@ -1490,6 +1493,7 @@ export class UIController {
       this.closeMenu();
     });
     this.bindButton(this.userMenuSurveyButton, () => this.toggleMenuCard("survey"));
+    this.bindButton(this.userToolbarResetButton, onResetPlacement);
     this.bindButton(this.userToolbarStopButton, onStopAR);
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
@@ -2693,6 +2697,7 @@ export class UIController {
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
     this.setElementText(this.userMenuResetButton, text.menu.userResetPlacement);
     this.setElementText(this.userMenuSurveyButton, text.menu.userSurveyAction);
+    this.setElementText(this.userToolbarResetButton, text.menu.userToolbarReset);
     this.setElementText(this.userToolbarStopButton, text.menu.userStopAr);
     this.setElementText(this.staticRefs.geoHeadingReferenceToggleLabel, text.menu.developerOptions.geoHeadingReference);
     this.setElementText(
@@ -3367,8 +3372,16 @@ export class UIController {
       this.userMenuResetButton.disabled = !this.uiState.sessionActive;
     }
 
+    if (this.userToolbarResetButton) {
+      this.userToolbarResetButton.disabled = !this.uiState.sessionActive;
+    }
+
     if (this.stopButton) {
       this.stopButton.disabled = !this.uiState.sessionActive;
+    }
+
+    if (this.userToolbarStopButton) {
+      this.userToolbarStopButton.disabled = !this.uiState.sessionActive;
     }
   }
 
