@@ -1,0 +1,92 @@
+{
+  "scenarios": [
+    {
+      "id": "a",
+      "label": "Szenario A",
+      "origin": {
+        "lat": 50.985242,
+        "lon": 11.043993,
+        "h": 0
+      },
+      "orientation": {
+        "yawDeg": 0
+      },
+      "scene": {
+        "asset": "/assets/flowerpots_benches_gras.glb",
+        "usdzAsset": "/assets/flowerpots_benches_gras.usdz"
+      },
+      "placement": {
+        "asset": "assets/flowerpots_benches_gras.glb",
+        "usdzAsset": "assets/flowerpots_benches_gras.usdz",
+        "target": {
+          "lat": 50.985242,
+          "lon": 11.043993
+        },
+        "calibration": {
+          "eastMeters": 0,
+          "northMeters": 0,
+          "yawDeg": 0
+        },
+        "transform": {
+          "scaleFactor": 1,
+          "rotationDeg": 0
+        },
+        "maxDistanceMeters": 100
+      },
+      "objects": [
+        {
+          "id": "scenario-a-root",
+          "offset": {
+            "x": 0,
+            "z": 0,
+            "y": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "label": "Szenario B",
+      "origin": {
+        "lat": 50.984751,
+        "lon": 11.044106,
+        "h": 0
+      },
+      "orientation": {
+        "yawDeg": 0
+      },
+      "scene": {
+        "asset": "/assets/fountain_benches_trees.glb",
+        "usdzAsset": "/assets/fountain_benches_trees.usdz"
+      },
+      "placement": {
+        "asset": "assets/fountain_benches_trees.glb",
+        "usdzAsset": "assets/fountain_benches_trees.usdz",
+        "target": {
+          "lat": 50.984751,
+          "lon": 11.044106
+        },
+        "calibration": {
+          "eastMeters": 10.5,
+          "northMeters": -1.6,
+          "yawDeg": 0
+        },
+        "transform": {
+          "scaleFactor": 3,
+          "rotationDeg": 0
+        },
+        "maxDistanceMeters": 100
+      },
+      "objects": [
+        {
+          "id": "scenario-b-root",
+          "offset": {
+            "x": -10,
+            "z": 16.4,
+            "y": 0
+          }
+        }
+      ]
+    }
+  ]
+}

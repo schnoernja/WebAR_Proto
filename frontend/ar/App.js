@@ -345,6 +345,8 @@ export class ARApp {
     this.isUIInteracting = false;
     this.isTextInputActive = false;
     this.siteConfig = null;
+    this.activeScenarioId = null;
+    this.scenarioSwitchPending = false;
     this.selectedExperienceMode = ExperienceMode.XR;
     this.selectedPlacementMode = PlacementUIModel.FREE;
     this.lastXRPlacementMode = PlacementUIModel.FREE;
@@ -416,6 +418,7 @@ export class ARApp {
       onGeoOffsetChange: (state) => this.applyGeoOffsetState(state),
       onGeoOffsetAdopt: (state) => this.adoptGeoOffsetAsSiteCalibration(state),
       onGeoOffsetReset: () => this.resetGeoOffsetState(),
+      onToggleScenario: () => this.switchToNextScenario(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
@@ -461,31 +464,131 @@ export class ARApp {
       return;
     }
 
+    const scenarios = this.getScenarios();
+    this.activeScenarioId = scenarios.length ? scenarios[0].id : null;
+    this.syncScenarioSwitchControl();
+
     try {
-      await this.geoSceneManager.loadSite(this.siteConfig);
+      await this.geoSceneManager.loadSite(this.getActiveSiteConfig());
       this.selectedExperienceMode = ExperienceMode.XR;
       this.selectedPlacementMode = PlacementUIModel.GEO_LOCAL;
       this.lastXRPlacementMode = PlacementUIModel.GEO_LOCAL;
     } catch (error) {
       this.siteConfig = null;
+      this.activeScenarioId = null;
+      this.syncScenarioSwitchControl();
       this.ui.setMessage(`Site-Szene konnte nicht geladen werden: ${toMessage(error)}`);
       this.ui.setHint("Fallback-3D-Ansicht aktiv. Geo-Global-Modus bleibt deaktiviert.");
     }
   }
 
-  getSiteGeoPlacementConfig() {
+  getScenarios() {
+    return this.siteConfig && Array.isArray(this.siteConfig.scenarios) ? this.siteConfig.scenarios : [];
+  }
+
+  getActiveScenario() {
+    const scenarios = this.getScenarios();
+    return scenarios.find((scenario) => scenario.id === this.activeScenarioId) || null;
+  }
+
+  getActiveSiteConfig() {
     if (!this.siteConfig) {
       return null;
     }
 
+    const scenario = this.getActiveScenario();
+    if (!scenario) {
+      return this.siteConfig;
+    }
+
+    return {
+      ...this.siteConfig,
+      origin: scenario.origin || this.siteConfig.origin,
+      orientation: scenario.orientation || this.siteConfig.orientation,
+      scene: scenario.scene,
+      objects: scenario.objects,
+      placement: scenario.placement
+    };
+  }
+
+  getActivePlacementConfigOwner() {
+    return this.getActiveScenario() || this.siteConfig;
+  }
+
+  syncScenarioSwitchControl() {
+    this.ui.setScenarioSwitchState({
+      scenarios: this.getScenarios().map((scenario) => ({
+        id: scenario.id,
+        label: scenario.label
+      })),
+      activeId: this.activeScenarioId,
+      pending: this.scenarioSwitchPending
+    });
+  }
+
+  async switchToNextScenario() {
+    const scenarios = this.getScenarios();
+    if (this.scenarioSwitchPending || scenarios.length < 2) {
+      return false;
+    }
+
+    const activeIndex = Math.max(0, scenarios.findIndex((scenario) => scenario.id === this.activeScenarioId));
+    const previousScenarioId = this.activeScenarioId;
+    const nextScenario = scenarios[(activeIndex + 1) % scenarios.length];
+
+    this.scenarioSwitchPending = true;
+    this.syncScenarioSwitchControl();
+
+    try {
+      this.resetPlacement();
+      this.activeScenarioId = nextScenario.id;
+      await this.geoSceneManager.loadSite(this.getActiveSiteConfig());
+      this.applySiteGeoTargetFromConfig({ force: true });
+      this.applySiteGeoCalibrationFromConfig({ force: true });
+      this.applySitePlacementTransformFromConfig({ force: true });
+      this.applySiteLocalObjectsFromConfig({ force: true });
+
+      const assetReady = await this.ensurePlacementAssetForExperience(this.selectedExperienceMode);
+      if (!assetReady) {
+        throw new Error("Szenario-Modell konnte nicht geladen werden.");
+      }
+
+      const activeSiteConfig = this.getActiveSiteConfig();
+      if (this.geoSensorActive && activeSiteConfig && activeSiteConfig.origin) {
+        this.sensorFusion.setOrigin(activeSiteConfig.origin);
+      }
+
+      this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
+      this.syncPresentationVisibility();
+      this.ui.setMessage(`Szenario '${nextScenario.label}' aktiv.`);
+      this.ui.setHint("Das vorherige Placement wurde zurückgesetzt. Richte das Gerät neu aus, um das Szenario zu platzieren.");
+      return true;
+    } catch (error) {
+      this.activeScenarioId = previousScenarioId;
+      await this.geoSceneManager.loadSite(this.getActiveSiteConfig());
+      this.ui.setMessage(`Szenariowechsel fehlgeschlagen: ${toMessage(error)}`);
+      this.ui.setHint("Das vorherige Szenario bleibt aktiv.");
+      return false;
+    } finally {
+      this.scenarioSwitchPending = false;
+      this.syncScenarioSwitchControl();
+    }
+  }
+
+  getSiteGeoPlacementConfig() {
+    const activeSiteConfig = this.getActiveSiteConfig();
+    if (!activeSiteConfig) {
+      return null;
+    }
+
     const sitePlacement =
-      this.siteConfig.placement && typeof this.siteConfig.placement === "object"
-        ? this.siteConfig.placement
+      activeSiteConfig.placement && typeof activeSiteConfig.placement === "object"
+        ? activeSiteConfig.placement
         : null;
     const targetSource =
       sitePlacement && sitePlacement.target && typeof sitePlacement.target === "object"
         ? sitePlacement.target
-        : this.siteConfig.origin;
+        : activeSiteConfig.origin;
     const latitude = Number.isFinite(targetSource && targetSource.lat)
       ? targetSource.lat
       : targetSource && Number.isFinite(targetSource.latitude)
@@ -507,15 +610,15 @@ export class ARApp {
     const preferredAssetUrl =
       sitePlacement && typeof sitePlacement.asset === "string" && sitePlacement.asset.trim()
         ? sitePlacement.asset.trim()
-        : this.siteConfig.scene && typeof this.siteConfig.scene.asset === "string"
-          ? this.siteConfig.scene.asset
+        : activeSiteConfig.scene && typeof activeSiteConfig.scene.asset === "string"
+          ? activeSiteConfig.scene.asset
           : null;
     const assetUrl = normalizeSiteAssetUrl(preferredAssetUrl);
     const preferredQuickLookAssetUrl =
       sitePlacement && typeof sitePlacement.usdzAsset === "string" && sitePlacement.usdzAsset.trim()
         ? sitePlacement.usdzAsset.trim()
-        : this.siteConfig.scene && typeof this.siteConfig.scene.usdzAsset === "string"
-          ? this.siteConfig.scene.usdzAsset
+        : activeSiteConfig.scene && typeof activeSiteConfig.scene.usdzAsset === "string"
+          ? activeSiteConfig.scene.usdzAsset
           : null;
     const quickLookAssetUrl = normalizeSiteAssetUrl(preferredQuickLookAssetUrl);
     const toleranceMeters = clampSiteToleranceMeters(
@@ -612,8 +715,8 @@ export class ARApp {
       return false;
     }
 
-    const siteObjects =
-      this.siteConfig && Array.isArray(this.siteConfig.objects) ? this.siteConfig.objects : null;
+    const activeSiteConfig = this.getActiveSiteConfig();
+    const siteObjects = activeSiteConfig && Array.isArray(activeSiteConfig.objects) ? activeSiteConfig.objects : null;
     this.placementController.setGeoObjects(siteObjects);
     return Array.isArray(siteObjects) && siteObjects.length > 0;
   }
@@ -742,12 +845,13 @@ export class ARApp {
       return null;
     }
 
+    const placementConfigOwner = this.getActivePlacementConfigOwner();
     const sitePlacement =
-      this.siteConfig.placement && typeof this.siteConfig.placement === "object"
-        ? this.siteConfig.placement
+      placementConfigOwner && placementConfigOwner.placement && typeof placementConfigOwner.placement === "object"
+        ? placementConfigOwner.placement
         : {};
-    if (!this.siteConfig.placement || typeof this.siteConfig.placement !== "object") {
-      this.siteConfig.placement = sitePlacement;
+    if (!placementConfigOwner.placement || typeof placementConfigOwner.placement !== "object") {
+      placementConfigOwner.placement = sitePlacement;
     }
 
     const baseCalibration = normalizeGeoCalibration(sitePlacement.calibration);
@@ -756,7 +860,7 @@ export class ARApp {
       northMeters: baseCalibration.northMeters + clampGeoOffsetMeters(state.northMeters),
       yawDeg: baseCalibration.yawDeg
     };
-    this.siteConfig.placement.calibration = adoptedCalibration;
+    placementConfigOwner.placement.calibration = adoptedCalibration;
 
     const nextState = this.applyGeoOffsetState({
       ...this.geoOffsetUiState,
@@ -1144,14 +1248,15 @@ export class ARApp {
     }
 
     this.requestGeoLocation();
-    if (!this.siteConfig.origin) {
+    const activeSiteConfig = this.getActiveSiteConfig();
+    if (!activeSiteConfig || !activeSiteConfig.origin) {
       this.ui.setSessionState(false, "Geo-Modus benoetigt in der Site-JSON eine origin-Koordinate.");
       this.ui.setHint("Fuer QR-basiertes Placement nutze AR (WebXR) mit Geo-Local.");
       await this.stopAR();
       return false;
     }
     const started = await this.sensorFusion.start({
-      origin: this.siteConfig.origin
+      origin: activeSiteConfig.origin
     });
 
     if (!started) {
@@ -1753,8 +1858,8 @@ export class ARApp {
     if (this.geoSensorActive && !hasARSession) {
       const enuPosition = geoSensorSnapshot && geoSensorSnapshot.enuPosition ? geoSensorSnapshot.enuPosition : null;
       this.ui.setGeoDebug({
-        originLatitude: this.siteConfig && this.siteConfig.origin ? this.siteConfig.origin.lat : null,
-        originLongitude: this.siteConfig && this.siteConfig.origin ? this.siteConfig.origin.lon : null,
+        originLatitude: this.getActiveSiteConfig()?.origin?.lat ?? null,
+        originLongitude: this.getActiveSiteConfig()?.origin?.lon ?? null,
         targetLatitude: geoSensorSnapshot && geoSensorSnapshot.position ? geoSensorSnapshot.position.lat : null,
         targetLongitude: geoSensorSnapshot && geoSensorSnapshot.position ? geoSensorSnapshot.position.lon : null,
         xMeters: enuPosition ? enuPosition.e : null,

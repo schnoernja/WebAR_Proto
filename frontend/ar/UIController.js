@@ -304,6 +304,7 @@ const DE_TRANSLATIONS = Object.freeze({
       activateLocation: "Standort aktivieren",
       place: "Objekt setzen",
       reset: "Neu platzieren",
+      switchScenario: "Szenario wechseln",
       stopXR: "AR beenden",
       stopGeo: "Geo stoppen"
     }
@@ -611,6 +612,7 @@ const EN_TRANSLATIONS = Object.freeze({
       activateLocation: "Enable location",
       place: "Place object",
       reset: "Reposition",
+      switchScenario: "Switch scenario",
       stopXR: "Stop AR",
       stopGeo: "Stop Geo"
     }
@@ -1129,6 +1131,7 @@ export class UIController {
     this.userToolbarActions = this.document.getElementById("user-ar-toolbar-actions");
     this.userToolbarResetButton = this.document.getElementById("user-toolbar-reset-button");
     this.userToolbarStopButton = this.document.getElementById("user-toolbar-stop-button");
+    this.scenarioToggleButton = this.document.getElementById("scenario-toggle-button");
     this.userPlacementPopup = this.document.getElementById("user-placement-popup");
     this.userPlacementPopupTitle = this.document.getElementById("user-placement-popup-title");
     this.userPlacementPopupText = this.document.getElementById("user-placement-popup-text");
@@ -1377,6 +1380,11 @@ export class UIController {
     this.textInputReleaseTimeoutId = null;
     this.cleanupCallbacks = [];
     this.developerCardVisibilitySnapshot = null;
+    this.scenarioSwitchState = {
+      scenarios: [],
+      activeId: null,
+      pending: false
+    };
     this.updateSurveyPanelLayout = this.updateSurveyPanelLayout.bind(this);
 
     if (this.view && typeof this.view.addEventListener === "function") {
@@ -1484,6 +1492,7 @@ export class UIController {
     onGeoOffsetChange,
     onGeoOffsetAdopt,
     onGeoOffsetReset,
+    onToggleScenario,
     onUIInteractionChange,
     onTextInputActiveChange
   }) {
@@ -1512,6 +1521,7 @@ export class UIController {
     this.bindButton(this.userMenuSurveyButton, () => this.toggleMenuCard("survey"));
     this.bindButton(this.userToolbarResetButton, onResetPlacement);
     this.bindButton(this.userToolbarStopButton, onStopAR);
+    this.bindButton(this.scenarioToggleButton, onToggleScenario);
 
     this.bindInput(this.geoTargetInputs.latitude, () => this.updateGeoTargetDraftFromInputs());
     this.bindInput(this.geoTargetInputs.longitude, () => this.updateGeoTargetDraftFromInputs());
@@ -1535,6 +1545,41 @@ export class UIController {
     this.bindTextInputActivity();
 
     this.refreshButtons();
+  }
+
+  setScenarioSwitchState({ scenarios = [], activeId = null, pending = false } = {}) {
+    this.scenarioSwitchState = {
+      scenarios: Array.isArray(scenarios) ? scenarios : [],
+      activeId: typeof activeId === "string" ? activeId : null,
+      pending: Boolean(pending)
+    };
+    this.renderScenarioSwitchButton();
+  }
+
+  renderScenarioSwitchButton() {
+    if (!this.scenarioToggleButton) {
+      return;
+    }
+
+    const { scenarios, activeId, pending } = this.scenarioSwitchState;
+    const canSwitch = scenarios.length > 1;
+    this.scenarioToggleButton.hidden = !canSwitch;
+    this.scenarioToggleButton.disabled = !canSwitch || pending;
+
+    if (!canSwitch) {
+      return;
+    }
+
+    const activeIndex = Math.max(
+      0,
+      scenarios.findIndex((scenario) => scenario && scenario.id === activeId)
+    );
+    const nextScenario = scenarios[(activeIndex + 1) % scenarios.length];
+    const label = nextScenario && nextScenario.label ? nextScenario.label : "";
+    const text = this.getText().placement.buttons.switchScenario;
+    const buttonText = label ? `${text}: ${label}` : text;
+    this.scenarioToggleButton.textContent = this.toDisplayText(buttonText);
+    this.scenarioToggleButton.setAttribute("aria-label", this.toDisplayText(buttonText));
   }
 
   bindGeoHeadingReferenceControl(handler) {
@@ -2736,6 +2781,7 @@ export class UIController {
     this.setElementText(this.geoActivateLocationButton, text.placement.buttons.activateLocation);
     this.setElementText(this.placeButton, text.placement.buttons.place);
     this.setElementText(this.resetButton, text.placement.buttons.reset);
+    this.renderScenarioSwitchButton();
 
     this.setElementText(this.staticRefs.welcomeTitle, text.welcome.title);
     this.setElementText(this.staticRefs.welcomeHeadline, text.welcome.headline);

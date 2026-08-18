@@ -198,6 +198,46 @@ function normalizePlacement(placement) {
   };
 }
 
+function normalizeScenarios(scenarios) {
+  if (!Array.isArray(scenarios)) {
+    return [];
+  }
+
+  const ids = new Set();
+  const normalized = [];
+
+  for (let index = 0; index < scenarios.length; index += 1) {
+    const scenario = scenarios[index];
+    if (!scenario || typeof scenario !== "object") {
+      continue;
+    }
+
+    const id =
+      typeof scenario.id === "string" && scenario.id.trim()
+        ? sanitizeSiteId(scenario.id)
+        : `scenario-${index + 1}`;
+    if (!id || ids.has(id)) {
+      throw new Error("Site-Konfiguration ungültig: Szenario-ID fehlt oder ist doppelt.");
+    }
+
+    ids.add(id);
+    normalized.push({
+      id,
+      label:
+        typeof scenario.label === "string" && scenario.label.trim()
+          ? scenario.label.trim()
+          : `Szenario ${index + 1}`,
+      origin: normalizeOrigin(scenario.origin),
+      orientation: scenario.orientation == null ? null : normalizeOrientation(scenario.orientation),
+      scene: normalizeScene(scenario.scene),
+      objects: normalizeObjects(scenario.objects),
+      placement: normalizePlacement(scenario.placement)
+    });
+  }
+
+  return normalized;
+}
+
 export class SiteLoader {
   constructor({ locationRef = window.location, fetchImpl = window.fetch.bind(window) } = {}) {
     this.location = locationRef;
@@ -221,7 +261,8 @@ export class SiteLoader {
       orientation: normalizeOrientation(rawConfig.orientation),
       scene: normalizeScene(rawConfig.scene),
       objects: normalizeObjects(rawConfig.objects),
-      placement: normalizePlacement(rawConfig.placement)
+      placement: normalizePlacement(rawConfig.placement),
+      scenarios: normalizeScenarios(rawConfig.scenarios)
     };
   }
 

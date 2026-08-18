@@ -1,5 +1,5 @@
 Impressum hinzufügen (Flaticon, 3D Modelle etc verlinken)
-3D Modelle selber ehrstellen
+3D Modelle selber ehrstellen BZW checken ob man die in diesem Rahmen nutzen darf
 Barrierefreiheit/Kontraste/Schriftgröße größer
 Sprache umstellen können 
 anderes Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Branding")
@@ -14,6 +14,11 @@ Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 IPhone Support
 
+verdeckung
+
 doppelt bei der Umfrage abstimmen können. Setze einen key im localStorage
 
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
+
+Klimawerte irgendwie einbauen??
+Umfrage Fragen von Anja einbauen
