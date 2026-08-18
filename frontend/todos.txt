@@ -6,13 +6,13 @@ anderes Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Brand
 
 Entwickler-View "verstecken"
 Hilfe-Kachel einbauen im Benutzerview bzw kleines Intro-Gif oder sonstiegs
-"Unnötige" Hinweise ausblenden (ala Fallback Ansicht aktiv oder sowas)
 Menü u Umfrage Button nach 2/3 Minuten leuchten lassen/aufblinken lssen
 
 Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
 
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
-IPhone Support
+
+IPhone Support sicherstellen -- TESTEN!!
 
 verdeckung
 
@@ -20,5 +20,4 @@ doppelt bei der Umfrage abstimmen können. Setze einen key im localStorage
 
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
 
-Klimawerte irgendwie einbauen??
-Umfrage Fragen von Anja einbauen
+Klimawerte irgendwie einbauen?? Aber das ist bis zur Klimawoche so irrelevant eigentlich

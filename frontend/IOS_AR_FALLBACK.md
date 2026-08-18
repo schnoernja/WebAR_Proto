@@ -2,22 +2,25 @@
 
 ## Startarchitektur
 
-`ArCapabilityDetector` prueft beim Initialisieren zuerst echten WebXR-Support mit
+`ArCapabilityDetector` prüft beim Initialisieren zuerst echten WebXR-Support mit
 `navigator.xr.isSessionSupported("immersive-ar")`. WebXR hat immer Prioritaet.
-Nur wenn WebXR nicht verfuegbar ist, wird auf iPhone/iPad einschliesslich des
-iPadOS-Desktop-User-Agents geprueft, ob der Browser `rel="ar"` fuer Apple AR
-Quick Look anbietet.
+Für iPhone/iPad wird zusätzlich der iPadOS-Desktop-User-Agent erkannt. Öffnet
+ein Nutzer eine gültige QR-Site (`?site=...`), startet `AR starten` den
+Browser-Sensorpfad anstelle von Quick Look.
 
-`ArLauncher` verwendet das gecachte Ergebnis beim Klick auf `AR starten`:
+Die Startwege sind:
 
 - WebXR: Der bestehende `ARApp`-/`ARSessionManager`-Flow wird aufgerufen.
-- iOS Quick Look: `IOSQuickLookLauncher` klickt unmittelbar aus der
-  Nutzeraktion einen temporaeren `<a rel="ar">`-Link.
+- iPhone/iPad mit QR-Site: Der Browser fordert unmittelbar aus dem Klick Kamera,
+  Standort sowie Bewegungs-/Kompasszugriff an. `SensorFusion` berechnet die
+  Kamerapose relativ zum Site-Ursprung, während `GeoSceneManager` die aktive
+  Szenendatei rendert.
+- iOS ohne QR-Site: `IOSQuickLookLauncher` kann weiterhin unmittelbar aus der
+  Nutzeraktion einen temporären `<a rel="ar">`-Link öffnen.
 - Kein bekannter Modus: Die bestehende Statusanzeige zeigt eine Fehlermeldung.
 
-Die Capability- und USDZ-Pruefung erfolgt vor dem Klick. Dadurch bleibt die fuer
-`requestSession()` beziehungsweise Quick Look erforderliche transiente
-Nutzeraktivierung erhalten.
+Die Anfragen für Kamera, Standort und Orientierung werden im selben Klick
+gestartet, damit die auf iOS erforderliche Nutzeraktivierung erhalten bleibt.
 
 ## Asset-Zuordnung
 
@@ -48,18 +51,16 @@ jeweiligen GLB-Dateien entsprechen. Der nginx-Container liefert `.usdz` als
 iPhone-/iPad-Generationen getestet und nach Moeglichkeit durch Mesh- und
 Texturoptimierung verkleinert werden. Die Archivstruktur selbst ist gueltig.
 
-## Technische Grenzen gegenueber WebXR
+## Technische Grenzen gegenüber WebXR
 
-- Quick Look fuehrt keinen eigenen WebXR-Hit-Test- oder Render-Loop aus.
-- Three.js-Szenensteuerung, DOM-Debug-Overlay und PlacementController laufen
-  nicht innerhalb von Quick Look.
-- Freie, Geo-Local- und Geo-Global-Platzierung koennen nicht 1:1 uebernommen
-  werden; Quick Look steuert Platzierung und Interaktion selbst.
-- Standort, IMU, Kompass, Reticle-Stabilisierung und Placement-Lock bleiben
-  Funktionen des WebXR-Pfads.
-- Pro GLB-Modell ist ein separates, vorab erzeugtes USDZ-Asset erforderlich.
-- Quick Look meldet seinen spaeteren Lebenszyklus nicht als WebXR-Session an die
-  Webseite zurueck.
+- Der Browser-Sensorpfad liefert keine ARKit-/WebXR-Flächenerkennung, keinen
+  Hit-Test und keine Bodenverankerung. Die Szene folgt nur GPS und
+  Geräteorientierung; ihre Lage kann daher driften.
+- Szenariowechsel, Three.js-Szenensteuerung, Kameraansicht sowie das bestehende
+  UI bleiben im Browser verfügbar.
+- Die Sensorfreigaben benötigen HTTPS und können vom Nutzer abgelehnt werden.
+- Quick Look bleibt für Seiten ohne QR-Site separat bestehen; dabei gelten
+  weiterhin dessen Einschränkungen für UI und Szenensteuerung.
 
 ## Referenzen
 

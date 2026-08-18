@@ -287,12 +287,13 @@ const DE_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
-    intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow. Auf iOS wird bei fehlendem WebXR AR Quick Look verwendet.",
-    userIntro: "Tippe auf 'AR starten'. Auf iPhone und iPad wird bei fehlendem WebXR AR Quick Look geöffnet.",
+    intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung. iPhone-QR-Sites nutzen Kamera, Standort und Kompass direkt im Browser.",
+    userIntro: "Tippe auf 'AR starten'.",
     userGuideTitle: "Objektplatzierung",
     userGuideSearch:
       "Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.",
     userGuideDetected: "Flaeche erkannt. Bitte halte das Geraet kurz ruhig, bis das Objekt platziert wird.",
+    userGuideSensor: "Standort und Kompass werden bestimmt. Halte das iPhone ruhig und richte es auf die Szene.",
     modeLabel: "Hauptmodus",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -596,11 +597,12 @@ const EN_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Object Placement",
-    intro: "Choose between free WebXR placement with the stabilized reticle and geo placement in the same WebXR flow. On iOS, AR Quick Look is used when WebXR is unavailable.",
-    userIntro: "Tap 'Start AR'. On iPhone and iPad, AR Quick Look opens when WebXR is unavailable.",
+    intro: "Choose between free WebXR placement with the stabilized reticle and geo placement. iPhone QR sites use the camera, location, and compass directly in the browser.",
+    userIntro: "Tap 'Start AR'.",
     userGuideTitle: "Object placement",
     userGuideSearch: "Please point the device at the floor and move it slowly until a surface is detected.",
     userGuideDetected: "Surface detected. Please hold the device still briefly until the object is placed.",
+    userGuideSensor: "Location and compass are being determined. Hold the iPhone still and point it at the scene.",
     modeLabel: "Main mode",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -1563,10 +1565,11 @@ export class UIController {
 
     const { scenarios, activeId, pending } = this.scenarioSwitchState;
     const canSwitch = scenarios.length > 1;
-    this.scenarioToggleButton.hidden = !canSwitch;
-    this.scenarioToggleButton.disabled = !canSwitch || pending;
+    const sessionActive = this.uiState.sessionActive === true;
+    this.scenarioToggleButton.hidden = !canSwitch || !sessionActive;
+    this.scenarioToggleButton.disabled = !canSwitch || !sessionActive || pending;
 
-    if (!canSwitch) {
+    if (!canSwitch || !sessionActive) {
       return;
     }
 
@@ -3263,6 +3266,7 @@ export class UIController {
     }
 
     this.renderSystemStates();
+    this.renderScenarioSwitchButton();
     this.refreshButtons();
     this.updateUserModeActions();
     this.queueSurveyPanelLayoutUpdate();
@@ -3376,7 +3380,9 @@ export class UIController {
 
     this.userPlacementPopupText.textContent =
       this.toDisplayText(
-        this.uiState.surfaceDetected || this.uiState.stableSurface
+        this.uiState.experienceMode === "geo-sensor"
+          ? text.placement.userGuideSensor
+          : this.uiState.surfaceDetected || this.uiState.stableSurface
           ? text.placement.userGuideDetected
           : text.placement.userGuideSearch
       );

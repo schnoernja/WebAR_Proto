@@ -425,16 +425,24 @@ export class ARApp {
     this.ui.setGeoOffsetControlState(this.geoOffsetUiState);
 
     const capability = await this.arLauncher.detectCapabilities();
-    if (capability.mode === ARLaunchMode.IOS_QUICK_LOOK) {
+    if (capability.mode === ARLaunchMode.IOS_QUICK_LOOK && !this.siteConfig) {
       await Promise.all(
         this.getIOSQuickLookAssetCandidates().map((url) => this.iosQuickLookLauncher.checkAsset(url))
       );
     }
-    const arAvailable = capability.mode !== ARLaunchMode.UNSUPPORTED;
-    this.ui.setSupportState(arAvailable, capability.message);
+    const arAvailable = capability.mode !== ARLaunchMode.UNSUPPORTED || capability.isIOS;
+    const supportMessage =
+      capability.isIOS && capability.mode !== ARLaunchMode.WEBXR && this.siteConfig
+        ? "iPhone-Browser-AR ist für diese QR-Site verfügbar."
+        : capability.message;
+    this.ui.setSupportState(arAvailable, supportMessage);
     this.ui.setSessionState(
       false,
-      capability.mode === ARLaunchMode.WEBXR ? "AR kann gestartet werden." : capability.message
+      capability.mode === ARLaunchMode.WEBXR
+        ? "AR kann gestartet werden."
+        : capability.isIOS && capability.mode !== ARLaunchMode.WEBXR && this.siteConfig
+          ? "iPhone-Browser-AR kann gestartet werden."
+          : supportMessage
     );
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
@@ -1032,6 +1040,11 @@ export class ARApp {
   }
 
   async startSelectedExperience() {
+    const capability = this.arCapabilityDetector.getLastResult();
+    if (capability && capability.isIOS && capability.mode !== ARLaunchMode.WEBXR && this.siteConfig) {
+      return this.startIOSBrowserSensorFallback();
+    }
+
     const quickLookAssetUrl = this.getIOSQuickLookAssetUrl();
     const result = await this.arLauncher.launch({
       startWebXR: () => this.startSelectedWebXRExperience(),
@@ -1061,6 +1074,72 @@ export class ARApp {
     this.ui.setSessionState(false, "Dieses Geraet unterstuetzt keinen bekannten AR-Modus.");
     this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
     return false;
+  }
+
+  async startIOSBrowserSensorFallback() {
+    if (this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
+      return false;
+    }
+
+    const activeSiteConfig = this.getActiveSiteConfig();
+    if (!activeSiteConfig || !activeSiteConfig.origin) {
+      this.ui.setSessionState(false, "iPhone-Browser-AR benötigt eine Site mit Ursprungskoordinaten.");
+      this.ui.setHint("Öffne die Anwendung über den QR-Link mit einem gültigen ?site=... Parameter.");
+      return false;
+    }
+
+    this.selectedExperienceMode = ExperienceMode.GEO_SENSOR;
+    this.selectedPlacementMode = PlacementUIModel.GEO_GLOBAL;
+    this.ui.setExperienceMode(this.selectedExperienceMode);
+    this.ui.setPlacementMode(this.selectedPlacementMode);
+    this.applySiteGeoTargetFromConfig({ force: true });
+    this.applySiteGeoCalibrationFromConfig({ force: true });
+    this.applySitePlacementTransformFromConfig({ force: true });
+    this.applySiteLocalObjectsFromConfig({ force: true });
+    this.lastFrameTimeMs = 0;
+
+    // Berechtigungen müssen auf iOS direkt aus der Nutzeraktion angefordert werden.
+    const sensorStartPromise = this.sensorFusion.start({
+      origin: activeSiteConfig.origin
+    });
+    const cameraStartPromise = this.requestGeoCameraFromUserGesture();
+    const locationReadyPromise = this.requestGeoLocationFromUserGesture();
+    const [sensorStarted, cameraStarted, locationReady] = await Promise.all([
+      sensorStartPromise,
+      cameraStartPromise,
+      locationReadyPromise
+    ]);
+
+    if (!sensorStarted || !cameraStarted || !locationReady) {
+      this.sensorFusion.stop();
+      this.geoLocationService.stop();
+      this.sceneManager.stopCameraVideo();
+      this.sceneManager.setGeoMode(false);
+      this.sceneManager.resetFallbackView();
+      this.syncPresentationVisibility();
+      if (!sensorStarted) {
+        const sensorSnapshot = this.sensorFusion.getSnapshot();
+        this.ui.setSessionState(false, sensorSnapshot.message || "iPhone-Browser-AR konnte nicht gestartet werden.");
+        this.ui.setHint("iPhone-Browser-AR benötigt Standort- sowie Kompass-/Bewegungsfreigabe.");
+      }
+      this.ui.setTrackingState(false);
+      this.ui.setSurfaceState(false, false);
+      this.ui.setPlacementState(false);
+      this.syncDebugPanels();
+      return false;
+    }
+
+    this.geoSensorActive = true;
+    this.syncPresentationVisibility();
+    this.ui.setSessionState(true, `iPhone-Browser-AR aktiv. Site '${this.siteConfig.id}' geladen.`);
+    this.ui.setTrackingState(false);
+    this.ui.setSurfaceState(false, false);
+    this.ui.setPlacementState(false);
+    this.syncDebugPanels(null, null, this.sensorFusion.getSnapshot());
+    this.ui.setHint(
+      "Kamera, Standort und Kompass sind aktiv. Die Szenenposition folgt GPS und Orientierung, jedoch ohne Bodenverankerung."
+    );
+    return true;
   }
 
   async startSelectedWebXRExperience() {
