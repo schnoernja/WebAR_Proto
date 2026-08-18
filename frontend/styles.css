@@ -1703,10 +1703,11 @@ body.ar-active .state-item {
   z-index: 1110;
   width: min(var(--survey-width, 520px), calc(100vw - (var(--survey-side-gap, 12px) * 2)));
   max-width: calc(100vw - (var(--survey-side-gap, 12px) * 2));
-  height: min(92dvh, var(--survey-max-height, calc(100dvh - 156px)));
-  max-height: min(92dvh, var(--survey-max-height, calc(100dvh - 156px)));
+  height: var(--survey-max-height, calc(100vh - 156px));
+  max-height: var(--survey-max-height, calc(100vh - 156px));
   min-height: 0;
   transform: translateX(-50%);
+  overscroll-behavior: contain;
 }
 
 .survey-panel .card-content {
@@ -1717,6 +1718,7 @@ body.ar-active .state-item {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   padding-bottom: max(220px, calc(env(safe-area-inset-bottom, 0px) + 220px));
   scroll-padding-bottom: max(220px, calc(env(safe-area-inset-bottom, 0px) + 220px));

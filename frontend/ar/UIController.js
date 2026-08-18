@@ -1388,10 +1388,12 @@ export class UIController {
       pending: false
     };
     this.updateSurveyPanelLayout = this.updateSurveyPanelLayout.bind(this);
+    this.handleSurveyViewportResize = this.handleSurveyViewportResize.bind(this);
+    this.lastSurveyViewportWidth = null;
 
     if (this.view && typeof this.view.addEventListener === "function") {
-      this.view.addEventListener("resize", this.updateSurveyPanelLayout);
-      this.cleanupCallbacks.push(() => this.view.removeEventListener("resize", this.updateSurveyPanelLayout));
+      this.view.addEventListener("resize", this.handleSurveyViewportResize);
+      this.cleanupCallbacks.push(() => this.view.removeEventListener("resize", this.handleSurveyViewportResize));
     }
 
     this.configureTextInputs();
@@ -2612,6 +2614,7 @@ export class UIController {
     const viewportHeight = this.view && Number.isFinite(this.view.innerHeight)
       ? this.view.innerHeight
       : this.document.documentElement.clientHeight;
+    this.lastSurveyViewportWidth = viewportWidth;
     const sideGap = viewportWidth <= 720 ? 10 : 12;
     const topOffset = Math.max(Math.round(toolbarRect.bottom + (viewportWidth <= 720 ? 6 : 8)), 88);
     const centerX = Math.round(toolbarRect.left + (toolbarRect.width / 2));
@@ -2631,6 +2634,21 @@ export class UIController {
     surveyRoot.style.setProperty("--survey-side-gap", `${sideGap}px`);
     surveyRoot.style.setProperty("--survey-width", `${Math.round(surveyWidth)}px`);
     surveyRoot.style.setProperty("--survey-max-height", `${availableHeight}px`);
+  }
+
+  handleSurveyViewportResize() {
+    const viewportWidth = this.view && Number.isFinite(this.view.innerWidth)
+      ? this.view.innerWidth
+      : this.document.documentElement.clientWidth;
+
+    if (
+      Number.isFinite(this.lastSurveyViewportWidth) &&
+      Math.abs(viewportWidth - this.lastSurveyViewportWidth) < 1
+    ) {
+      return;
+    }
+
+    this.queueSurveyPanelLayoutUpdate();
   }
 
   queueSurveyPanelLayoutUpdate() {
