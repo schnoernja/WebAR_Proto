@@ -12,7 +12,7 @@ Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
 
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 
-IPhone Support sicherstellen -- TESTEN!!
+IPhone Support sicherstellen --> Kamera etc wird abgefragt aber Objekt wird nicht auf Boden platziert
 
 verdeckung
 
@@ -21,3 +21,4 @@ doppelt bei der Umfrage abstimmen können. Setze einen key im localStorage
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
 
 Klimawerte irgendwie einbauen?? Aber das ist bis zur Klimawoche so irrelevant eigentlich
+

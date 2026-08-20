@@ -10,7 +10,7 @@ export class ArLauncher {
     return this.capabilityDetector.detect();
   }
 
-  async launch({ startWebXR, quickLookAssetUrl }) {
+  async launch({ startWebXR, startIOSSLAM, quickLookAssetUrl }) {
     const capability = this.capabilityDetector.getLastResult();
 
     if (!capability) {
@@ -29,8 +29,16 @@ export class ArLauncher {
       };
     }
 
+    if (capability.mode === ARLaunchMode.IOS_SLAM && typeof startIOSSLAM === "function") {
+      console.info("[AR] iOS erkannt: In-Browser SLAM AR wird gestartet.");
+      return {
+        mode: capability.mode,
+        started: await startIOSSLAM()
+      };
+    }
+
     if (capability.mode === ARLaunchMode.IOS_QUICK_LOOK) {
-      console.info("[AR] WebXR nicht verfuegbar, iOS erkannt: Quick-Look-Fallback wird gestartet.");
+      console.info("[AR] WebXR nicht verfuegbar: Quick-Look-Fallback wird gestartet.");
       return {
         mode: capability.mode,
         ...this.iosQuickLookLauncher.open(quickLookAssetUrl)

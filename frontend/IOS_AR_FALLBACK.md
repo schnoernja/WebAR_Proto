@@ -10,13 +10,10 @@ Browser-Sensorpfad anstelle von Quick Look.
 
 Die Startwege sind:
 
-- WebXR: Der bestehende `ARApp`-/`ARSessionManager`-Flow wird aufgerufen.
-- iPhone/iPad mit QR-Site: Der Browser fordert unmittelbar aus dem Klick Kamera,
-  Standort sowie Bewegungs-/Kompasszugriff an. `SensorFusion` berechnet die
-  Kamerapose relativ zum Site-Ursprung, während `GeoSceneManager` die aktive
-  Szenendatei rendert.
-- iOS ohne QR-Site: `IOSQuickLookLauncher` kann weiterhin unmittelbar aus der
-  Nutzeraktion einen temporären `<a rel="ar">`-Link öffnen.
+- WebXR: Der bestehende `ARApp`-/`ARSessionManager`-Flow wird aufgerufen (Android/Desktop).
+- iPhone/iPad (In-Browser SLAM): `IOSSLAMTracker` startet über WebAssembly (AlvaAR) und IMU ein 6-DoF-Kamera-Tracking mit optischer Bodenflächenerkennung (Hit-Testing) direkt im Browser. Das Kachel-HUD, Menüs und Umfrage-Links bleiben vollständig erhalten.
+- iPhone/iPad mit Geo-Global-Site: Falls explizit der sensorbasierte Geo-Modus gewählt wird, berechnet `SensorFusion` die Kamerapose relativ zum Site-Ursprung.
+- iOS Quick Look Fallback: `IOSQuickLookLauncher` kann bei Bedarf weiterhin ein USDZ-Modell in Quick Look öffnen.
 - Kein bekannter Modus: Die bestehende Statusanzeige zeigt eine Fehlermeldung.
 
 Die Anfragen für Kamera, Standort und Orientierung werden im selben Klick

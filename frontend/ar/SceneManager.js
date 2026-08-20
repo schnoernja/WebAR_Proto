@@ -328,12 +328,16 @@ export class SceneManager {
     this.setPresentationMode(isActive ? "geo" : "fallback");
   }
 
+  setSLAMMode(isActive) {
+    this.setPresentationMode(isActive ? "slam" : "fallback");
+  }
+
   setPresentationMode(mode) {
-    this.presentationMode = mode === "geo" ? "geo" : mode === "xr" ? "xr" : "fallback";
-    this.isARMode = this.presentationMode === "xr";
+    this.presentationMode = mode === "geo" ? "geo" : mode === "slam" ? "slam" : mode === "xr" ? "xr" : "fallback";
+    this.isARMode = this.presentationMode === "xr" || this.presentationMode === "slam";
     this.fallbackStage.visible = this.presentationMode === "fallback";
     if (this.cameraVideo) {
-      this.cameraVideo.hidden = this.presentationMode !== "geo";
+      this.cameraVideo.hidden = this.presentationMode !== "geo" && this.presentationMode !== "slam";
     }
     if (this.controls) {
       this.controls.enabled = this.presentationMode === "fallback";

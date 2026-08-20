@@ -1,5 +1,6 @@
 export const ARLaunchMode = Object.freeze({
   WEBXR: "webxr",
+  IOS_SLAM: "ios-slam",
   IOS_QUICK_LOOK: "ios-quick-look",
   UNSUPPORTED: "unsupported"
 });
@@ -61,11 +62,12 @@ export class ArCapabilityDetector {
     if (webXRSupported) {
       mode = ARLaunchMode.WEBXR;
       message = "WebXR immersive-ar ist verfuegbar.";
+    } else if (isIOS) {
+      mode = ARLaunchMode.IOS_SLAM;
+      message = "iPhone erkannt: In-Browser AR mit Boden-SLAM ist verfuegbar.";
     } else if (quickLookSupported) {
       mode = ARLaunchMode.IOS_QUICK_LOOK;
       message = "WebXR nicht verfuegbar, iOS erkannt: Quick-Look-Fallback ist verfuegbar.";
-    } else if (isIOS) {
-      message = "iOS erkannt, aber AR Quick Look wird von diesem Browser nicht angeboten.";
     }
 
     this.lastResult = {
