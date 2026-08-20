@@ -12,8 +12,9 @@ const DEFAULT_CAMERA_CONFIG = Object.freeze({
   audio: false
 });
 
-const DEFAULT_PROCESSING_WIDTH = 480;
-const DEFAULT_PROCESSING_HEIGHT = 640;
+// Optimierte Arbeitsauflösung für flüssige Wasm-SLAM-Verarbeitung (30-60 FPS auf iPhones)
+const TARGET_PROCESSING_WIDTH = 480;
+const ESTIMATED_CAMERA_HEIGHT_METERS = 1.35; // Typische Smartphone-Haltehöhe über dem Boden
 
 function toErrorMessage(error) {
   if (error instanceof Error && error.message) {
@@ -38,23 +39,23 @@ export class IOSSLAMTracker {
 
     this.active = false;
     this.tracking = false;
-    this.lastTrackingTime = 0;
     this.consecutiveTrackedFrames = 0;
     this.lostFrames = 0;
 
-    this.processingWidth = DEFAULT_PROCESSING_WIDTH;
-    this.processingHeight = DEFAULT_PROCESSING_HEIGHT;
+    this.processingWidth = 480;
+    this.processingHeight = 640;
 
-    // Wiederverwendbare Three.js-Objekte zur Vermeidung von GC-Last im Frame-Loop
+    // Boden-Ebene: Normalenvektor nach oben (0, 1, 0), Abstand 1.35m unter der Startkamera
+    this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), ESTIMATED_CAMERA_HEIGHT_METERS);
     this.tempPlaneQuaternion = new THREE.Quaternion();
     this.tempPlanePosition = new THREE.Vector3();
     this.tempCameraDirection = new THREE.Vector3();
     this.raycaster = new THREE.Raycaster();
-    this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     this.intersectionPoint = new THREE.Vector3();
 
     this.lastHitPose = null;
     this.lastCameraPose = null;
+    this.groundHeight = -ESTIMATED_CAMERA_HEIGHT_METERS;
   }
 
   async start({ videoElement } = {}) {
@@ -92,24 +93,37 @@ export class IOSSLAMTracker {
       this.videoElement.muted = true;
       this.videoElement.hidden = false;
       await this.videoElement.play();
+
+      // Warten bis erste Videoframes decodiert sind
+      await new Promise((resolve) => {
+        if (this.videoElement.readyState >= 2 && this.videoElement.videoWidth > 0) {
+          resolve();
+        } else {
+          const onLoaded = () => {
+            this.videoElement.removeEventListener("loadeddata", onLoaded);
+            resolve();
+          };
+          this.videoElement.addEventListener("loadeddata", onLoaded);
+          // Timeout Fallback
+          setTimeout(resolve, 500);
+        }
+      });
     } catch (camError) {
       this.stop();
       throw new Error(`Kamerazugriff fehlgeschlagen: ${toErrorMessage(camError)}`);
     }
 
-    // 3. Verarbeitungs-Canvas einrichten
+    // 3. Verarbeitungs-Canvas einrichten mit korrekter Aspect Ratio
     const videoW = this.videoElement.videoWidth || 1280;
     const videoH = this.videoElement.videoHeight || 720;
     const aspectRatio = videoW / Math.max(videoH, 1);
 
-    if (aspectRatio < 1) {
-      // Portrait
-      this.processingWidth = DEFAULT_PROCESSING_WIDTH;
-      this.processingHeight = Math.round(DEFAULT_PROCESSING_WIDTH / aspectRatio);
-    } else {
-      // Landscape or general
-      this.processingHeight = DEFAULT_PROCESSING_HEIGHT;
-      this.processingWidth = Math.round(DEFAULT_PROCESSING_HEIGHT * aspectRatio);
+    this.processingWidth = TARGET_PROCESSING_WIDTH;
+    this.processingHeight = Math.round(TARGET_PROCESSING_WIDTH / aspectRatio);
+
+    // Auf gerade Pixelmaße runden
+    if (this.processingHeight % 2 !== 0) {
+      this.processingHeight += 1;
     }
 
     this.canvas.width = this.processingWidth;
@@ -120,9 +134,10 @@ export class IOSSLAMTracker {
     try {
       this.alva = await AlvaAR.Initialize(this.processingWidth, this.processingHeight);
       this.applyPose = AlvaARConnectorTHREE.Initialize(THREE);
-      console.info("[IOSSLAMTracker] AlvaAR Wasm SLAM erfolgreich initialisiert.", {
+      console.info("[IOSSLAMTracker] AlvaAR Wasm SLAM initialisiert.", {
         width: this.processingWidth,
-        height: this.processingHeight
+        height: this.processingHeight,
+        aspectRatio: aspectRatio.toFixed(3)
       });
     } catch (alvaError) {
       this.stop();
@@ -154,12 +169,16 @@ export class IOSSLAMTracker {
     this.ctx.drawImage(this.videoElement, 0, 0, this.processingWidth, this.processingHeight);
     const frame = this.ctx.getImageData(0, 0, this.processingWidth, this.processingHeight);
 
-    // 2. Pose mit IMU oder rein optisch berechnen
+    // 2. Pose berechnen (mit IMU falls vorhanden)
     let rawPose = null;
-    if (this.imu && this.imu.orientation && Array.isArray(this.imu.motion)) {
+    if (this.imu && this.imu.orientation && Array.isArray(this.imu.motion) && this.imu.motion.length > 0) {
       rawPose = this.alva.findCameraPoseWithIMU(frame, this.imu.orientation, this.imu.motion);
+      this.imu.clear(); // Wichtig: Puffer nach jedem Frame leeren!
     } else {
       rawPose = this.alva.findCameraPose(frame);
+      if (this.imu && typeof this.imu.clear === "function") {
+        this.imu.clear();
+      }
     }
 
     if (rawPose) {
@@ -180,45 +199,52 @@ export class IOSSLAMTracker {
         };
       }
 
-      // 4. Bodenebene (Plane) oder Hit-Test ermitteln
+      // 4. Bodenebene (Plane) oder Boden-Raycast berechnen
       let hitPose = null;
       let planeDetected = false;
 
-      // Versuche primär explizite Plane Estimation aus AlvaAR
+      // Option A: Prüfe explizite Plane Estimation aus AlvaAR
       const rawPlane = typeof this.alva.findPlane === "function" ? this.alva.findPlane() : null;
       if (rawPlane && rawPlane.length >= 16) {
         this.applyPose(rawPlane, this.tempPlaneQuaternion, this.tempPlanePosition);
         hitPose = {
           position: this.tempPlanePosition.clone(),
-          quaternion: this.tempPlaneQuaternion.clone()
+          quaternion: new THREE.Quaternion() // Flach auf dem Boden
         };
+        this.groundHeight = this.tempPlanePosition.y;
         planeDetected = true;
       } else if (camera) {
-        // Fallback: Raycast entlang der Blickrichtung auf die Bodenebene
+        // Option B: Raycast vom Kamera-Ursprung auf die Bodenebene
         camera.getWorldDirection(this.tempCameraDirection);
         this.raycaster.set(camera.position, this.tempCameraDirection);
 
+        // Schneide mit der Bodenebene
         const intersect = this.raycaster.ray.intersectPlane(this.groundPlane, this.intersectionPoint);
-        if (intersect && intersect.distanceTo(camera.position) > 0.4 && intersect.distanceTo(camera.position) < 8.0) {
+        const distanceToCam = intersect ? intersect.distanceTo(camera.position) : 0;
+
+        if (intersect && distanceToCam >= 0.5 && distanceToCam <= 12.0) {
           hitPose = {
             position: this.intersectionPoint.clone(),
             quaternion: new THREE.Quaternion()
           };
           planeDetected = true;
         } else {
-          // Standardposition vor der Kamera auf dem Boden
+          // Fallback: Plaziere stabil vor der Kamera auf Bodenhöhe
           const forwardGround = new THREE.Vector3(this.tempCameraDirection.x, 0, this.tempCameraDirection.z).normalize();
-          const targetPos = camera.position.clone().addScaledVector(forwardGround, 1.8);
-          targetPos.y = 0;
-          hitPose = {
-            position: targetPos,
-            quaternion: new THREE.Quaternion()
-          };
-          planeDetected = true;
+          if (forwardGround.lengthSq() > 0.01) {
+            const targetPos = camera.position.clone().addScaledVector(forwardGround, 1.85);
+            targetPos.y = this.groundHeight;
+            hitPose = {
+              position: targetPos,
+              quaternion: new THREE.Quaternion()
+            };
+            planeDetected = true;
+          }
         }
       }
 
-      const isStable = this.consecutiveTrackedFrames >= 4;
+      // Stabilität: Nach 3 aufeinanderfolgenden Frames gilt die Fläche als stabil
+      const isStable = this.consecutiveTrackedFrames >= 3;
       this.lastHitPose = hitPose;
 
       return {
@@ -230,9 +256,19 @@ export class IOSSLAMTracker {
       };
     }
 
-    // Tracking verloren
+    // Tracking für diesen Frame kurz verloren -> Grace Frames nutzen, um Flackern zu verhindern
     this.lostFrames += 1;
-    if (this.lostFrames > 12) {
+    if (this.lostFrames <= 6 && this.lastHitPose) {
+      return {
+        tracking: true,
+        surfaceDetected: true,
+        isStable: this.consecutiveTrackedFrames >= 3,
+        pose: this.lastHitPose,
+        cameraPose: this.lastCameraPose
+      };
+    }
+
+    if (this.lostFrames > 10) {
       this.tracking = false;
       this.consecutiveTrackedFrames = 0;
     }
@@ -248,7 +284,11 @@ export class IOSSLAMTracker {
 
   reset() {
     if (this.alva && typeof this.alva.reset === "function") {
-      this.alva.reset();
+      try {
+        this.alva.reset();
+      } catch (_) {
+        // ignore
+      }
     }
     if (this.imu && typeof this.imu.clear === "function") {
       this.imu.clear();

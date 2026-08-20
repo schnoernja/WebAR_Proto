@@ -14,6 +14,13 @@ export class PoseStabilizer {
     this.tmpMeanQuaternion = new THREE.Quaternion();
   }
 
+  setConfig(config) {
+    if (config && typeof config === "object") {
+      this.config = { ...this.config, ...config };
+    }
+    this.reset();
+  }
+
   reset() {
     this.samples.length = 0;
     this.smoothedPose = null;

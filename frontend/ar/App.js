@@ -40,6 +40,17 @@ const GEO_OFFSET_LIMIT_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
+const SLAM_STABILIZER_CONFIG = Object.freeze({
+  positionSmoothing: 16,
+  rotationSmoothing: 14,
+  positionDeadbandMeters: 0.004,
+  rotationDeadbandRad: 0.03,
+  stabilityWindowSize: 5,
+  stableFramesRequired: 3,
+  maxPositionDeviationMeters: 0.06,
+  maxRotationDeviationRad: 0.15
+});
+
 function normalizeExperienceMode(mode) {
   return mode === ExperienceMode.GEO_SENSOR ? ExperienceMode.GEO_SENSOR : ExperienceMode.XR;
 }
@@ -1106,7 +1117,7 @@ export class ARApp {
 
     this.sceneManager.setSLAMMode(true);
     this.placementController.enterARMode();
-    this.poseStabilizer.reset();
+    this.poseStabilizer.setConfig(SLAM_STABILIZER_CONFIG);
 
     try {
       await this.iosSlamTracker.start({
@@ -1243,6 +1254,7 @@ export class ARApp {
     this.applySiteGeoCalibrationFromConfig({ force: false });
     this.applySitePlacementTransformFromConfig({ force: false });
     this.applySiteLocalObjectsFromConfig({ force: false });
+    this.poseStabilizer.setConfig(APP_CONFIG.stabilizer);
 
     // requestSession must be invoked before any awaited permission or asset work.
     const arStartPromise = this.startAR();
