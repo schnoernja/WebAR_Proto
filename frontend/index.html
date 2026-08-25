@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
   />
   <title>EPARtwin WebAR</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=user-toolbar-20260825" />
   <script type="importmap">
     {
       "imports": {
@@ -17,7 +17,17 @@
     }
   </script>
 </head>
-<body>
+<body data-ui-mode="user">
+  <script>
+    try {
+      const persistedUIMode = window.localStorage.getItem("epartwin-ui-mode");
+      if (persistedUIMode === "user" || persistedUIMode === "developer") {
+        document.body.setAttribute("data-ui-mode", persistedUIMode);
+      }
+    } catch (_error) {
+      // Der sichere Standard bleibt die Benutzeransicht.
+    }
+  </script>
   <div id="app-shell">
     <div id="app-version" aria-label="Anwendungsversion">v.0.24</div>
     <div id="render-root" aria-label="3D viewport"></div>
@@ -117,7 +127,7 @@
                   class="menu-mode-button"
                   type="button"
                   data-ui-mode-option="user"
-                  aria-pressed="false"
+                  aria-pressed="true"
                 >
                   Benutzer
                 </button>
@@ -126,7 +136,7 @@
                   class="menu-mode-button"
                   type="button"
                   data-ui-mode-option="developer"
-                  aria-pressed="true"
+                  aria-pressed="false"
                 >
                   Entwickler
                 </button>
@@ -225,10 +235,10 @@
                 <span id="mini-surface" class="mini-pill" data-status="idle">Fläche: Suche</span>
                 <span id="mini-placement" class="mini-pill" data-status="idle">Objekt platziert: Nein</span>
               </div>
-              <button id="scenario-toggle-button" class="button scenario-toggle-button" type="button" hidden>
-                Szenario wechseln
-              </button>
               <div id="user-ar-toolbar-actions" class="user-ar-toolbar-actions" hidden>
+                <button id="scenario-toggle-button" class="button scenario-toggle-button" type="button" hidden>
+                  Szenario wechseln
+                </button>
                 <button id="user-toolbar-reset-button" class="button user-toolbar-button user-toolbar-reset-button" type="button">
                   Objekt neu platzieren
                 </button>
@@ -314,7 +324,7 @@
                   Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.
                 </p>
                 <div class="coord-grid">
-                  <label class="field field-full">
+                  <label class="field field-full startup-developer-only">
                     <span class="field-label">Hauptmodus</span>
                     <select id="experience-mode-select" class="field-input">
                       <option value="xr">AR (WebXR)</option>
@@ -333,13 +343,13 @@
                   <button id="geo-activate-location-button" class="button" type="button" hidden>
                     Standort aktivieren
                   </button>
-                  <button id="place-button" class="button" type="button">
+                  <button id="place-button" class="button startup-developer-only" type="button">
                     Objekt setzen
                   </button>
-                  <button id="reset-button" class="button" type="button">
+                  <button id="reset-button" class="button startup-developer-only" type="button">
                     Neu platzieren
                   </button>
-                  <button id="stop-ar-button" class="button button-ghost" type="button">
+                  <button id="stop-ar-button" class="button button-ghost startup-developer-only" type="button">
                     AR beenden
                   </button>
                 </div>
@@ -959,6 +969,6 @@
     </div>
   </noscript>
 
-    <script type="module" src="./webxr.js?v=scene-b-editor-20260825"></script>
+    <script type="module" src="./webxr.js?v=startup-grounding-20260825"></script>
 </body>
 </html>

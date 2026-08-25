@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=scene-b-editor-20260825";
+import { ARApp } from "./ar/App.js?v=startup-grounding-20260825";
 
 const app = new ARApp();
 

@@ -5,7 +5,10 @@ import { APP_CONFIG } from "./config.js";
 import { resolveAppUrl } from "./urlUtils.js";
 import { disposeObject3D } from "./utils.js";
 
-const PRECISE_GROUNDING_ASSETS = new Set(["fountain_benches_trees.glb"]);
+const PRECISE_GROUNDING_ASSETS = new Set([
+  "fountain_benches_trees.glb",
+  "scene_b_environment_final_webar.glb"
+]);
 
 function needsPreciseGrounding(url) {
   if (typeof url !== "string") {
@@ -259,13 +262,14 @@ export class SceneManager {
     });
 
     assetRoot.updateMatrixWorld(true);
-    const rawBox = new THREE.Box3().setFromObject(assetRoot, preciseGrounding);
-    const rawSize = rawBox.getSize(new THREE.Vector3());
-    const measuredHeight = Math.max(rawSize.y, 0.0001);
-    const uniformScale = preserveSourceScale ? 1 : APP_CONFIG.model.targetHeightMeters / measuredHeight;
-
-    assetRoot.scale.multiplyScalar(uniformScale);
-    assetRoot.updateMatrixWorld(true);
+    if (!preserveSourceScale) {
+      const rawBox = new THREE.Box3().setFromObject(assetRoot, preciseGrounding);
+      const rawSize = rawBox.getSize(new THREE.Vector3());
+      const measuredHeight = Math.max(rawSize.y, 0.0001);
+      const uniformScale = APP_CONFIG.model.targetHeightMeters / measuredHeight;
+      assetRoot.scale.multiplyScalar(uniformScale);
+      assetRoot.updateMatrixWorld(true);
+    }
 
     const normalizedBox = new THREE.Box3().setFromObject(assetRoot, preciseGrounding);
     const center = normalizedBox.getCenter(new THREE.Vector3());

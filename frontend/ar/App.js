@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
-import { SceneManager } from "./SceneManager.js?v=scene-b-editor-20260825";
+import { SceneManager } from "./SceneManager.js?v=startup-grounding-20260825";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
 import { IOSSLAMTracker } from "./IOSSLAMTracker.js";

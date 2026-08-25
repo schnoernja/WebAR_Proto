@@ -594,13 +594,8 @@ body[data-ui-mode="user"] .hud-logo {
 }
 
 .scenario-toggle-button {
-  position: fixed;
-  z-index: 1210;
-  right: max(14px, env(safe-area-inset-right, 0px));
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-  left: max(14px, env(safe-area-inset-left, 0px));
-  width: min(420px, calc(100vw - 28px));
-  margin: 0 auto;
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 .user-ar-toolbar-actions,
@@ -612,8 +607,9 @@ body[data-ui-mode="user"] .hud-logo {
 }
 
 .user-ar-toolbar-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   justify-content: center;
-  flex-wrap: nowrap;
   align-items: stretch;
 }
 
@@ -939,6 +935,11 @@ body.ar-active .button {
 
 body[data-ui-mode="user"]:not(.ar-active) {
   background: #2e85c6;
+}
+
+body[data-ui-mode="user"] [data-card]:not([data-card="placement"]),
+body[data-ui-mode="user"] .startup-developer-only {
+  display: none;
 }
 
 body[data-ui-mode="user"]:not(.ar-active)::before {
