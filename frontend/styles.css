@@ -937,7 +937,7 @@ body[data-ui-mode="user"]:not(.ar-active) {
   background: #2e85c6;
 }
 
-body[data-ui-mode="user"] [data-card]:not([data-card="placement"]),
+body[data-ui-mode="user"] [data-card]:not([data-card="placement"]):not([data-card="survey"]),
 body[data-ui-mode="user"] .startup-developer-only {
   display: none;
 }
