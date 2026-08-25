@@ -629,6 +629,10 @@ body[data-ui-mode="user"] .hud-logo {
   min-width: 0;
 }
 
+body[data-ui-mode="developer"] .user-ar-toolbar-actions .user-toolbar-button {
+  display: none;
+}
+
 .user-menu-survey-button {
   border-color: transparent;
   background: #5ab776;
@@ -1441,6 +1445,10 @@ body.ar-active .field-input {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+body[data-ui-mode="developer"] .offset-panel {
+  max-height: min(70vh, 680px);
 }
 
 .offset-toggle-row {

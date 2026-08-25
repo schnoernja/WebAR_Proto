@@ -293,7 +293,7 @@ const DE_TRANSLATIONS = Object.freeze({
     userGuideSearch:
       "Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.",
     userGuideDetected: "Flaeche erkannt. Bitte halte das Geraet kurz ruhig, bis das Objekt platziert wird.",
-    userGuideSensor: "Standort und Kompass werden bestimmt. Halte das iPhone ruhig und richte es auf die Szene.",
+    userGuideSensor: "Standort und Kompass werden bestimmt. Halte das iPhone ruhig und richte es auf den Boden.",
     modeLabel: "Hauptmodus",
     modeOptions: {
       xr: "AR (WebXR)",
@@ -3633,7 +3633,8 @@ export class UIController {
     }
 
     if (this.userToolbarActions) {
-      this.userToolbarActions.hidden = !(isUserMode && sessionActive);
+      const hasScenarioSwitch = this.scenarioSwitchState.scenarios.length > 1;
+      this.userToolbarActions.hidden = !(sessionActive && (isUserMode || hasScenarioSwitch));
     }
 
     if (this.staticRefs.placementMenuOptionList) {

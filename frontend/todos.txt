@@ -1,24 +1,21 @@
 Impressum hinzufügen (Flaticon, 3D Modelle etc verlinken)
-3D Modelle selber ehrstellen BZW checken ob man die in diesem Rahmen nutzen darf
+3D Modelle ordentlich in Impressum hinterlegen, Icons beachten, Daten (Klima) beachten
 Barrierefreiheit/Kontraste/Schriftgröße größer
-Sprache umstellen können 
+Sprache umstellen können
 anderes Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Branding")
 
-Entwickler-View "verstecken"
-Hilfe-Kachel einbauen im Benutzerview bzw kleines Intro-Gif oder sonstiegs
-Menü u Umfrage Button nach 2/3 Minuten leuchten lassen/aufblinken lssen
-
-Fehlercodes rauskopierbar und an Tally sendbar? Oder irgendwie abfangbar
+Entwickler-View "verstecken"  --> Erst kurz vor Erprobung
+Hilfe-Kachel einbauen im Benutzerview bzw kleines Intro-Gif oder sonstiges
 
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 
-IPhone Support sicherstellen --> Kamera etc wird abgefragt aber Objekt wird nicht auf Boden platziert
+IPhone Support sicherstellen --> Kamera etc wird abgefragt aber Objekt wird noch nicht korrekt auf Boden platziert
 
-verdeckung
-
-doppelt bei der Umfrage abstimmen können. Setze einen key im localStorage
-
-Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
+Problem Efeu/Gebäudebegrünung: SEHR viele Reticles bei so großer Fläche wenn als 3D-Modell. Plane mit Textur sähe doof aus
 
 Klimawerte irgendwie einbauen?? Aber das ist bis zur Klimawoche so irrelevant eigentlich
+
+
+
+Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
 

@@ -1,0 +1,17 @@
+Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)
+
+Kühlungseffekt von begrünten Fassaden: ca. 4 Grad kühler als nicht begrünte Fassaden (Kumar et al. 2024)
+
+Kühlungseffekt von Shrubs/ Sträuchern, Gras (da ich zu Hochbeeten keine eigenen Auswertungen finden konnte): ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad
+
+ 
+
+Quellen:
+
+Li et al. 2024: https://doi.org/10.1038/s43247-024-01908-4
+
+Schwaab et al. 2021: https://doi.org/10.1038/s41467-021-26768-w
+
+Kumar et al. 2024: https://doi.org/10.1016/j.xinn.2024.100588
+
+Zhang 2020: https://doi.org/10.1038/s41598-020-74559-y

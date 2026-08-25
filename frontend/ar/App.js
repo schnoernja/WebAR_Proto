@@ -580,6 +580,7 @@ export class ARApp {
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
       this.applySiteLocalObjectsFromConfig({ force: true });
+      this.applySiteObjectTransformsFromConfig({ force: true });
 
       const assetReady = await this.ensurePlacementAssetForExperience(this.selectedExperienceMode);
       if (!assetReady) {
@@ -599,6 +600,11 @@ export class ARApp {
     } catch (error) {
       this.activeScenarioId = previousScenarioId;
       await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
+      this.applySiteGeoTargetFromConfig({ force: true });
+      this.applySiteGeoCalibrationFromConfig({ force: true });
+      this.applySitePlacementTransformFromConfig({ force: true });
+      this.applySiteLocalObjectsFromConfig({ force: true });
+      this.applySiteObjectTransformsFromConfig({ force: true });
       this.ui.setMessage(`Szenariowechsel fehlgeschlagen: ${toMessage(error)}`);
       this.ui.setHint("Das vorherige Szenario bleibt aktiv.");
       return false;
