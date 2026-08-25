@@ -1,5 +1,9 @@
 import { resolveAppUrl } from "../urlUtils.js";
 
+const SITE_ID_ALIASES = Object.freeze({
+  klimawochefhe: "klimawocheFHE"
+});
+
 function sanitizeSiteId(siteId) {
   if (typeof siteId !== "string") {
     return null;
@@ -10,7 +14,7 @@ function sanitizeSiteId(siteId) {
     return null;
   }
 
-  return trimmed.toLowerCase();
+  return SITE_ID_ALIASES[trimmed.toLowerCase()] || trimmed;
 }
 
 function ensureFiniteNumber(value, label) {

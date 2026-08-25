@@ -165,7 +165,7 @@ export class SceneManager {
     const gltf = await loader.loadAsync(candidate.url);
     const asset = this.normalizeAsset(gltf.scene, {
       label: candidate.label,
-      preciseGrounding: needsPreciseGrounding(candidate.url) || candidate.preserveSourceScale === true,
+      preciseGrounding: needsPreciseGrounding(candidate.url),
       preserveSourceScale: candidate.preserveSourceScale === true
     });
     return {

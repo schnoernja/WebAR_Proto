@@ -502,7 +502,7 @@ export class ARApp {
     this.syncScenarioSwitchControl();
 
     try {
-      await this.geoSceneManager.loadSite(this.getActiveSiteConfig());
+      await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
       this.selectedExperienceMode = ExperienceMode.XR;
       this.selectedPlacementMode = PlacementUIModel.GEO_LOCAL;
       this.lastXRPlacementMode = PlacementUIModel.GEO_LOCAL;
@@ -575,7 +575,7 @@ export class ARApp {
     try {
       this.resetPlacement();
       this.activeScenarioId = nextScenario.id;
-      await this.geoSceneManager.loadSite(this.getActiveSiteConfig());
+      await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
@@ -598,7 +598,7 @@ export class ARApp {
       return true;
     } catch (error) {
       this.activeScenarioId = previousScenarioId;
-      await this.geoSceneManager.loadSite(this.getActiveSiteConfig());
+      await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
       this.ui.setMessage(`Szenariowechsel fehlgeschlagen: ${toMessage(error)}`);
       this.ui.setHint("Das vorherige Szenario bleibt aktiv.");
       return false;
@@ -1257,13 +1257,21 @@ export class ARApp {
     });
     const cameraStartPromise = this.requestGeoCameraFromUserGesture();
     const locationReadyPromise = this.requestGeoLocationFromUserGesture();
-    const [sensorStarted, cameraStarted, locationReady] = await Promise.all([
+    const siteSceneReadyPromise = this.geoSceneManager
+      .ensureSceneAsset()
+      .then(() => true)
+      .catch((error) => {
+        this.ui.setMessage(`Site-Szene konnte nicht geladen werden: ${toMessage(error)}`);
+        return false;
+      });
+    const [sensorStarted, cameraStarted, locationReady, siteSceneReady] = await Promise.all([
       sensorStartPromise,
       cameraStartPromise,
-      locationReadyPromise
+      locationReadyPromise,
+      siteSceneReadyPromise
     ]);
 
-    if (!sensorStarted || !cameraStarted || !locationReady) {
+    if (!sensorStarted || !cameraStarted || !locationReady || !siteSceneReady) {
       this.sensorFusion.stop();
       this.geoLocationService.stop();
       this.sceneManager.stopCameraVideo();
@@ -1274,6 +1282,9 @@ export class ARApp {
         const sensorSnapshot = this.sensorFusion.getSnapshot();
         this.ui.setSessionState(false, sensorSnapshot.message || "iPhone-Browser-AR konnte nicht gestartet werden.");
         this.ui.setHint("iPhone-Browser-AR benötigt Standort- sowie Kompass-/Bewegungsfreigabe.");
+      } else if (!siteSceneReady) {
+        this.ui.setSessionState(false, "iPhone-Browser-AR konnte die Site-Szene nicht laden.");
+        this.ui.setHint("Prüfe den Modellpfad in der Site-JSON und starte danach erneut.");
       }
       this.ui.setTrackingState(false);
       this.ui.setSurfaceState(false, false);

@@ -44,6 +44,7 @@ export class GeoSceneManager {
     this.root.visible = false;
 
     this.sceneAssetRoot = null;
+    this.sceneAssetUrl = null;
     this.objectMarkersRoot = new THREE.Group();
     this.objectMarkersRoot.name = "geo-global-markers";
     this.root.add(this.objectMarkersRoot);
@@ -52,7 +53,7 @@ export class GeoSceneManager {
     this.scene.add(this.root);
   }
 
-  async loadSite(siteConfig) {
+  async loadSite(siteConfig, { loadSceneAsset = true } = {}) {
     this.clearSite();
     this.siteConfig = siteConfig || null;
 
@@ -66,11 +67,8 @@ export class GeoSceneManager {
         : 0;
     this.root.rotation.set(0, THREE.MathUtils.degToRad(yawDeg), 0);
 
-    if (this.siteConfig.scene && this.siteConfig.scene.asset) {
-      const gltf = await this.loader.loadAsync(resolveAppUrl(this.siteConfig.scene.asset));
-      this.sceneAssetRoot = gltf.scene;
-      this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
-      this.root.add(this.sceneAssetRoot);
+    if (loadSceneAsset) {
+      await this.ensureSceneAsset();
     }
 
     for (const objectConfig of this.siteConfig.objects) {
@@ -93,6 +91,32 @@ export class GeoSceneManager {
     };
   }
 
+  async ensureSceneAsset() {
+    const asset = this.siteConfig && this.siteConfig.scene ? this.siteConfig.scene.asset : null;
+    if (!asset) {
+      return null;
+    }
+
+    const assetUrl = resolveAppUrl(asset);
+    if (this.sceneAssetRoot && this.sceneAssetUrl === assetUrl) {
+      return this.sceneAssetRoot;
+    }
+
+    if (this.sceneAssetRoot) {
+      this.root.remove(this.sceneAssetRoot);
+      disposeObject3D(this.sceneAssetRoot);
+      this.sceneAssetRoot = null;
+      this.sceneAssetUrl = null;
+    }
+
+    const gltf = await this.loader.loadAsync(assetUrl);
+    this.sceneAssetRoot = gltf.scene;
+    this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
+    this.sceneAssetUrl = assetUrl;
+    this.root.add(this.sceneAssetRoot);
+    return this.sceneAssetRoot;
+  }
+
   setVisible(visible) {
     this.root.visible = Boolean(visible) && Boolean(this.siteConfig);
   }
@@ -102,6 +126,7 @@ export class GeoSceneManager {
       this.root.remove(this.sceneAssetRoot);
       disposeObject3D(this.sceneAssetRoot);
       this.sceneAssetRoot = null;
+      this.sceneAssetUrl = null;
     }
 
     for (const child of [...this.objectMarkersRoot.children]) {
