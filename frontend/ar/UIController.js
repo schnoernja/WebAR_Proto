@@ -1559,7 +1559,7 @@ export class UIController {
     this.bindLanguageControls();
     this.bindGeoHeadingReferenceControl(onGeoHeadingReferenceToggle);
     this.bindInteractionSurface(this.uiContainer);
-    this.bindInteractionSurface(this.hudRoot);
+    this.bindInteractionSurface(this.hudRoot, { exclude: this.cardRefs.survey ? this.cardRefs.survey.root : null });
     this.bindDeviceCoordinateCopy();
     this.bindGeoOffsetControls({
       onGeoOffsetToggle,
@@ -1804,36 +1804,57 @@ export class UIController {
     }
   }
 
-  bindInteractionSurface(surface) {
+  bindInteractionSurface(surface, { exclude = null } = {}) {
     if (!surface) {
       return;
     }
 
     const handleTouchStart = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
       this.beginUIInteraction();
     };
     const handleTouchEnd = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
       this.scheduleUIInteractionRelease();
     };
     const handleTouchCancel = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
       this.scheduleUIInteractionRelease();
     };
     const handlePointerDown = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
       this.beginUIInteraction();
     };
     const handlePointerUp = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
       this.scheduleUIInteractionRelease();
     };
     const handlePointerCancel = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
       this.scheduleUIInteractionRelease();
     };
     const handleClick = (event) => {
+      if (exclude && exclude.contains(event.target)) {
+        return;
+      }
       event.stopPropagation();
     };
 
@@ -2839,7 +2860,10 @@ export class UIController {
     this.lastSurveyViewportWidth = viewportWidth;
     this.lastSurveyViewportHeight = viewportHeight;
     const sideGap = viewportWidth <= 720 ? 10 : 12;
-    const topOffset = Math.max(Math.round(toolbarRect.bottom + (viewportWidth <= 720 ? 6 : 8)), 88);
+    const viewportTop = visualViewport && Number.isFinite(visualViewport.offsetTop)
+      ? visualViewport.offsetTop
+      : 0;
+    const topOffset = Math.max(Math.round(toolbarRect.bottom), Math.round(viewportTop));
     const centerX = Math.round(toolbarRect.left + (toolbarRect.width / 2));
     const centeredWidthLimit = Math.max(
       Math.min(centerX - sideGap, viewportWidth - centerX - sideGap) * 2,
@@ -2850,7 +2874,7 @@ export class UIController {
       Math.min(preferredWidth, viewportWidth - (sideGap * 2), centeredWidthLimit),
       Math.min(viewportWidth - (sideGap * 2), 280)
     );
-    const availableHeight = Math.max(viewportHeight - topOffset - sideGap, 280);
+    const availableHeight = Math.max(viewportHeight + viewportTop - topOffset - sideGap, 160);
 
     surveyRoot.style.setProperty("--survey-top-offset", `${topOffset}px`);
     surveyRoot.style.setProperty("--survey-center-x", `${centerX}px`);
