@@ -1404,10 +1404,15 @@ export class UIController {
     this.updateSurveyPanelLayout = this.updateSurveyPanelLayout.bind(this);
     this.handleSurveyViewportResize = this.handleSurveyViewportResize.bind(this);
     this.lastSurveyViewportWidth = null;
+    this.lastSurveyViewportHeight = null;
 
     if (this.view && typeof this.view.addEventListener === "function") {
       this.view.addEventListener("resize", this.handleSurveyViewportResize);
       this.cleanupCallbacks.push(() => this.view.removeEventListener("resize", this.handleSurveyViewportResize));
+    }
+    if (this.view && this.view.visualViewport && typeof this.view.visualViewport.addEventListener === "function") {
+      this.view.visualViewport.addEventListener("resize", this.handleSurveyViewportResize);
+      this.cleanupCallbacks.push(() => this.view.visualViewport.removeEventListener("resize", this.handleSurveyViewportResize));
     }
 
     this.configureTextInputs();
@@ -2820,13 +2825,19 @@ export class UIController {
     }
 
     const toolbarRect = this.hudToolbar.getBoundingClientRect();
-    const viewportWidth = this.view && Number.isFinite(this.view.innerWidth)
-      ? this.view.innerWidth
-      : this.document.documentElement.clientWidth;
-    const viewportHeight = this.view && Number.isFinite(this.view.innerHeight)
-      ? this.view.innerHeight
-      : this.document.documentElement.clientHeight;
+    const visualViewport = this.view && this.view.visualViewport;
+    const viewportWidth = visualViewport && Number.isFinite(visualViewport.width)
+      ? visualViewport.width
+      : this.view && Number.isFinite(this.view.innerWidth)
+        ? this.view.innerWidth
+        : this.document.documentElement.clientWidth;
+    const viewportHeight = visualViewport && Number.isFinite(visualViewport.height)
+      ? visualViewport.height
+      : this.view && Number.isFinite(this.view.innerHeight)
+        ? this.view.innerHeight
+        : this.document.documentElement.clientHeight;
     this.lastSurveyViewportWidth = viewportWidth;
+    this.lastSurveyViewportHeight = viewportHeight;
     const sideGap = viewportWidth <= 720 ? 10 : 12;
     const topOffset = Math.max(Math.round(toolbarRect.bottom + (viewportWidth <= 720 ? 6 : 8)), 88);
     const centerX = Math.round(toolbarRect.left + (toolbarRect.width / 2));
@@ -2849,13 +2860,23 @@ export class UIController {
   }
 
   handleSurveyViewportResize() {
-    const viewportWidth = this.view && Number.isFinite(this.view.innerWidth)
-      ? this.view.innerWidth
-      : this.document.documentElement.clientWidth;
+    const visualViewport = this.view && this.view.visualViewport;
+    const viewportWidth = visualViewport && Number.isFinite(visualViewport.width)
+      ? visualViewport.width
+      : this.view && Number.isFinite(this.view.innerWidth)
+        ? this.view.innerWidth
+        : this.document.documentElement.clientWidth;
+    const viewportHeight = visualViewport && Number.isFinite(visualViewport.height)
+      ? visualViewport.height
+      : this.view && Number.isFinite(this.view.innerHeight)
+        ? this.view.innerHeight
+        : this.document.documentElement.clientHeight;
 
     if (
       Number.isFinite(this.lastSurveyViewportWidth) &&
-      Math.abs(viewportWidth - this.lastSurveyViewportWidth) < 1
+      Number.isFinite(this.lastSurveyViewportHeight) &&
+      Math.abs(viewportWidth - this.lastSurveyViewportWidth) < 1 &&
+      Math.abs(viewportHeight - this.lastSurveyViewportHeight) < 1
     ) {
       return;
     }

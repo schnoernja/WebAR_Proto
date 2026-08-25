@@ -12,10 +12,10 @@
         "yawDeg": 0
       },
       "scene": {
-        "asset": "/models/scene_a_environment_final.glb?v=scene-a-20260825"
+        "asset": "/models/scene_a_environment_final.glb?v=planter-material-20260825"
       },
       "placement": {
-        "asset": "/models/scene_a_environment_final.glb?v=scene-a-20260825",
+        "asset": "/models/scene_a_environment_final.glb?v=planter-material-20260825",
         "target": {
           "lat": 50.985242,
           "lon": 11.043993
@@ -68,10 +68,10 @@
         "yawDeg": 0
       },
       "scene": {
-        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260825"
+        "asset": "/models/scene_b_environment_final_webar.glb?v=planter-material-20260825"
       },
       "placement": {
-        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260825",
+        "asset": "/models/scene_b_environment_final_webar.glb?v=planter-material-20260825",
         "target": {
           "lat": 50.984751,
           "lon": 11.044106
