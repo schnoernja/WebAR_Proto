@@ -6,8 +6,7 @@ import { resolveAppUrl } from "./urlUtils.js";
 import { disposeObject3D } from "./utils.js";
 
 const PRECISE_GROUNDING_ASSETS = new Set([
-  "fountain_benches_trees.glb",
-  "scene_b_environment_final_webar.glb"
+  "fountain_benches_trees.glb"
 ]);
 
 function needsPreciseGrounding(url) {
