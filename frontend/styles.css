@@ -1740,6 +1740,10 @@ body.ar-active .state-item {
   overscroll-behavior: contain;
 }
 
+body[data-ui-mode="user"] .survey-panel.card-panel {
+  position: fixed;
+}
+
 .survey-panel .card-content {
   display: flex;
   flex-direction: column;
