@@ -3,9 +3,11 @@ Impressum hinzufügen (Flaticon, 3D Modelle etc verlinken)
 Barrierefreiheit/Kontraste/Schriftgröße größer
 Sprache umstellen können
 anderes Umfragetool finden (aktuelles (Tally) ist nur begrenzt kostenlos; "Branding")
+--> hat Anja hierzu Ideen/Wünsche?
 
 Entwickler-View "verstecken"  --> Erst kurz vor Erprobung
-Hilfe-Kachel einbauen im Benutzerview bzw kleines Intro-Gif oder sonstiges
+
+Hilfe-Kachel einbauen im Benutzerview bzw kleines Intro-Gif oder sonstiges --> Wenn App-Flow final für Erprobung ist
 
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 
@@ -16,6 +18,7 @@ Problem Efeu/Gebäudebegrünung: SEHR viele Reticles bei so großer Fläche wenn
 Klimawerte irgendwie einbauen?? Aber das ist bis zur Klimawoche so irrelevant eigentlich
 
 
+evt neue/bessere Modelle
 
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
 
