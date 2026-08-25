@@ -30,6 +30,19 @@
           "rotationDeg": 0,
           "preserveSourceScale": true
         },
+        "editableNodes": [
+          { "node": "Bench_links", "label": "Bench_links" },
+          { "node": "Bench_obenlinks", "label": "Bench_obenlinks" },
+          { "node": "Bench_obenrechts", "label": "Bench_obenrechts" },
+          { "node": "Bench_rechts", "label": "Bench_rechts" },
+          { "node": "Hochbeetlinks", "label": "Hochbeetlinks" },
+          { "node": "Hochbeetrechts", "label": "Hochbeetrechts" },
+          { "node": "table", "label": "table" },
+          { "node": "Tree_01", "label": "tree01" },
+          { "node": "Tree_02", "label": "tree02" },
+          { "node": "Tree_03", "label": "tree03" },
+          { "node": "Tree_04", "label": "tree04" }
+        ],
         "maxDistanceMeters": 100
       },
       "objects": [
@@ -55,33 +68,45 @@
         "yawDeg": 0
       },
       "scene": {
-        "asset": "/assets/fountain_benches_trees.glb",
-        "usdzAsset": "/assets/fountain_benches_trees.usdz"
+        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260825"
       },
       "placement": {
-        "asset": "assets/fountain_benches_trees.glb",
-        "usdzAsset": "assets/fountain_benches_trees.usdz",
+        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260825",
         "target": {
           "lat": 50.984751,
           "lon": 11.044106
         },
         "calibration": {
-          "eastMeters": 10.5,
-          "northMeters": -1.6,
+          "eastMeters": 0,
+          "northMeters": 0,
           "yawDeg": 0
         },
         "transform": {
-          "scaleFactor": 3,
-          "rotationDeg": 0
+          "scaleFactor": 1,
+          "rotationDeg": 0,
+          "preserveSourceScale": true
         },
+        "editableNodes": [
+          { "node": "Bench_obenlinks", "label": "Bench_obenlinks" },
+          { "node": "Bench_obenrechts", "label": "Bench_obenrechts" },
+          { "node": "Brunnen", "label": "brunnen" },
+          { "node": "Hochbeetlinks", "label": "hochbeetlinks" },
+          { "node": "Hochbeetrechts", "label": "hochbeetrechts" },
+          { "node": "Hochbeetrechts001", "label": "hochbeetrechts.001" },
+          { "node": "Tree_01001", "label": "tree_links" },
+          { "node": "Tree_01002", "label": "tree_links2" },
+          { "node": "Tree_01", "label": "tree_mitte" },
+          { "node": "Tree_02", "label": "tree_rechts2" },
+          { "node": "Tree_03", "label": "tree_rechts" }
+        ],
         "maxDistanceMeters": 100
       },
       "objects": [
         {
           "id": "scenario-b-root",
           "offset": {
-            "x": -10,
-            "z": 16.4,
+            "x": 0,
+            "z": 0,
             "y": 0
           }
         }

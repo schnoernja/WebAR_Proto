@@ -263,6 +263,7 @@ export class PlacementController {
     this.geoCalibration = normalizeGeoCalibration(null);
     this.placementTransform = normalizePlacementTransform(null);
     this.objectTransforms = [];
+    this.editableObjectNodes = null;
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
     this.localObjects = cloneLocalObjectConfigs(null);
@@ -274,6 +275,9 @@ export class PlacementController {
     this.scene.add(this.reticle);
 
     this.asset = null;
+    this.animationClips = [];
+    this.assetMixer = null;
+    this.geoInstanceMixers = [];
     this.currentSurfaceState = null;
     this.inARMode = false;
     this.placed = false;
@@ -339,18 +343,57 @@ export class PlacementController {
     return reticle;
   }
 
-  setAsset(asset) {
+  setAsset(asset, animationClips = []) {
+    this.stopAssetMixer();
+    this.clearGeoInstances();
+
     if (this.asset) {
       this.transformRoot.remove(this.asset);
       disposeObject3D(this.asset);
     }
 
     this.asset = asset;
+    this.animationClips = Array.isArray(animationClips) ? animationClips : [];
     this.initializeEditableObjectNodes(this.asset);
     this.transformRoot.add(this.asset);
+    this.assetMixer = this.createAnimationMixer(this.asset);
     this.applyObjectTransformsToAsset(this.asset);
     this.applyPlacementTransform();
     this.showFallbackPreview();
+  }
+
+  createAnimationMixer(root) {
+    if (!root || !this.animationClips.length) {
+      return null;
+    }
+
+    const mixer = new THREE.AnimationMixer(root);
+    for (const clip of this.animationClips) {
+      mixer.clipAction(clip).play();
+    }
+    return mixer;
+  }
+
+  stopAssetMixer() {
+    if (!this.assetMixer) {
+      return;
+    }
+
+    this.assetMixer.stopAllAction();
+    if (this.asset) {
+      this.assetMixer.uncacheRoot(this.asset);
+    }
+    this.assetMixer = null;
+  }
+
+  updateAnimations(deltaSeconds) {
+    const delta = Number.isFinite(deltaSeconds) ? Math.max(deltaSeconds, 0) : 0;
+    if (this.assetMixer && this.transformRoot.visible) {
+      this.assetMixer.update(delta);
+    }
+    for (const entry of this.geoInstanceMixers) {
+      entry.mixer.update(delta);
+    }
   }
 
   setGeoObjects(objectConfigs) {
@@ -498,7 +541,25 @@ export class PlacementController {
         depth: Number.isFinite(node.userData.placementNodeDepth) ? node.userData.placementNodeDepth : 0
       });
     });
-    return targets;
+    if (!Array.isArray(this.editableObjectNodes)) {
+      return targets;
+    }
+
+    const targetsByName = new Map(targets.map((target) => [target.name, target]));
+    return this.editableObjectNodes.reduce((filtered, definition) => {
+      const target = targetsByName.get(definition.node);
+      if (target) {
+        filtered.push({ ...target, name: definition.label, depth: 1 });
+      }
+      return filtered;
+    }, []);
+  }
+
+  setEditableObjectNodes(nodes) {
+    this.editableObjectNodes = Array.isArray(nodes)
+      ? nodes.map((entry) => ({ node: entry.node, label: entry.label || entry.node }))
+      : null;
+    return this.getEditableObjectNodes();
   }
 
   setObjectTransforms(transforms) {
@@ -834,6 +895,10 @@ export class PlacementController {
         this.applyObjectTransformsToAsset(instance);
         this.applyPlacementTransformToInstance(instance);
         slot.add(instance);
+        const mixer = this.createAnimationMixer(instance);
+        if (mixer) {
+          this.geoInstanceMixers.push({ mixer, root: instance });
+        }
       }
 
       this.geoInstancesRoot.add(slot);
@@ -900,6 +965,12 @@ export class PlacementController {
   }
 
   clearGeoInstances() {
+    for (const entry of this.geoInstanceMixers) {
+      entry.mixer.stopAllAction();
+      entry.mixer.uncacheRoot(entry.root);
+    }
+    this.geoInstanceMixers = [];
+
     for (const child of [...this.geoInstancesRoot.children]) {
       this.geoInstancesRoot.remove(child);
       disposeObject3D(child);
@@ -974,6 +1045,8 @@ export class PlacementController {
   }
 
   dispose() {
+    this.stopAssetMixer();
+    this.clearGeoInstances();
     this.scene.remove(this.objectRoot);
     this.scene.remove(this.reticle);
 

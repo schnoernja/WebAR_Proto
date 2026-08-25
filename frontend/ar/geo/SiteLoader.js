@@ -203,6 +203,30 @@ function normalizeObjectTransforms(transforms) {
   });
 }
 
+function normalizeEditableNodes(nodes) {
+  if (nodes == null) {
+    return null;
+  }
+
+  if (!Array.isArray(nodes)) {
+    throw new Error("Site-Konfiguration ungueltig: placement.editableNodes muss eine Liste sein.");
+  }
+
+  const nodeNames = new Set();
+  return nodes.map((entry, index) => {
+    const node = entry && typeof entry.node === "string" ? entry.node.trim() : "";
+    if (!node || nodeNames.has(node)) {
+      throw new Error(`Site-Konfiguration ungueltig: placement.editableNodes[${index}] benoetigt einen eindeutigen node-Wert.`);
+    }
+    nodeNames.add(node);
+
+    return {
+      node,
+      label: entry && typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : node
+    };
+  });
+}
+
 function normalizePlacement(placement) {
   if (placement == null) {
     return null;
@@ -224,6 +248,7 @@ function normalizePlacement(placement) {
   const calibration = normalizePlacementCalibration(placement.calibration);
   const transform = normalizePlacementTransform(placement.transform);
   const objectTransforms = normalizeObjectTransforms(placement.objectTransforms);
+  const editableNodes = normalizeEditableNodes(placement.editableNodes);
   const maxDistanceMeters = Number.isFinite(placement.maxDistanceMeters)
     ? placement.maxDistanceMeters
     : null;
@@ -239,6 +264,7 @@ function normalizePlacement(placement) {
     calibration,
     transform,
     objectTransforms,
+    editableNodes,
     maxDistanceMeters
   };
 }

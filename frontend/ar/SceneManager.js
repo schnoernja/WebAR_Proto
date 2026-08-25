@@ -170,6 +170,7 @@ export class SceneManager {
     });
     return {
       object: asset,
+      animations: Array.isArray(gltf.animations) ? gltf.animations : [],
       label: candidate.label,
       sourceUrl: candidate.url,
       usedPlaceholder: false
@@ -237,6 +238,7 @@ export class SceneManager {
     const placeholder = this.createPlaceholderModel();
     return {
       object: placeholder,
+      animations: [],
       label: "Platzhalter",
       sourceUrl: "placeholder",
       usedPlaceholder: true,

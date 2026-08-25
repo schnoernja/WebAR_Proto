@@ -2,20 +2,20 @@ import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
-import { SceneManager } from "./SceneManager.js";
+import { SceneManager } from "./SceneManager.js?v=scene-b-editor-20260825";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
 import { IOSSLAMTracker } from "./IOSSLAMTracker.js";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
-import { PlacementController, PlacementMode } from "./PlacementController.js";
+import { PlacementController, PlacementMode } from "./PlacementController.js?v=scene-b-editor-20260825";
 import { UIController } from "./UIController.js";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
-import { SiteLoader } from "./geo/SiteLoader.js";
+import { SiteLoader } from "./geo/SiteLoader.js?v=scene-b-editor-20260825";
 import { SensorFusion } from "./geo/SensorFusion.js";
-import { GeoSceneManager } from "./geo/GeoSceneManager.js";
+import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=scene-b-editor-20260825";
 
 const ExperienceMode = Object.freeze({
   XR: "xr",
@@ -675,6 +675,8 @@ export class ARApp {
           : null,
       objectTransforms:
         sitePlacement && Array.isArray(sitePlacement.objectTransforms) ? sitePlacement.objectTransforms : [],
+      editableNodes:
+        sitePlacement && Array.isArray(sitePlacement.editableNodes) ? sitePlacement.editableNodes : null,
       toleranceMeters
     };
   }
@@ -819,6 +821,7 @@ export class ARApp {
     }
 
     const placementConfig = this.getSiteGeoPlacementConfig();
+    this.placementController.setEditableObjectNodes(placementConfig ? placementConfig.editableNodes : null);
     this.objectTransformUiState = placementConfig ? placementConfig.objectTransforms : [];
     this.placementController.setObjectTransforms(this.objectTransformUiState);
     this.syncObjectTransformEditor();
@@ -1021,7 +1024,7 @@ export class ARApp {
           placementConfig.assetLabel,
           { preserveSourceScale: placementConfig.transform && placementConfig.transform.preserveSourceScale === true }
         );
-        this.placementController.setAsset(assetInfo.object);
+        this.placementController.setAsset(assetInfo.object, assetInfo.animations);
         this.applySiteObjectTransformsFromConfig({ force: true });
         this.ui.setAssetLabel(assetInfo.label);
         this.activePlacementAssetSource = placementConfig.assetUrl;
@@ -1034,7 +1037,7 @@ export class ARApp {
     }
 
     const assetInfo = await this.sceneManager.createPlacementAsset();
-    this.placementController.setAsset(assetInfo.object);
+    this.placementController.setAsset(assetInfo.object, assetInfo.animations);
     this.applySiteObjectTransformsFromConfig({ force: true });
     this.ui.setAssetLabel(assetInfo.label);
     this.activePlacementAssetSource = "default";
@@ -1063,7 +1066,7 @@ export class ARApp {
           placementConfig.assetLabel,
           { preserveSourceScale: placementConfig.transform && placementConfig.transform.preserveSourceScale === true }
         );
-        this.placementController.setAsset(assetInfo.object);
+        this.placementController.setAsset(assetInfo.object, assetInfo.animations);
         this.applySiteObjectTransformsFromConfig({ force: true });
         this.activePlacementAssetSource = placementConfig.assetUrl;
         this.activePlacementAssetUrl = assetInfo.sourceUrl;
@@ -1082,7 +1085,7 @@ export class ARApp {
 
     try {
       const defaultAssetInfo = await this.sceneManager.createPlacementAsset();
-      this.placementController.setAsset(defaultAssetInfo.object);
+      this.placementController.setAsset(defaultAssetInfo.object, defaultAssetInfo.animations);
       this.applySiteObjectTransformsFromConfig({ force: true });
       this.activePlacementAssetSource = "default";
       this.activePlacementAssetUrl = defaultAssetInfo.sourceUrl;
@@ -1667,6 +1670,8 @@ export class ARApp {
 
   handleFrame(timeMs, frame) {
     const deltaSeconds = this.computeDeltaSeconds(timeMs);
+    this.placementController?.updateAnimations?.(deltaSeconds);
+    this.geoSceneManager?.updateAnimations?.(deltaSeconds);
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       if (this.isTextInputActive) {

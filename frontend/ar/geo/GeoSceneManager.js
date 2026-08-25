@@ -45,6 +45,7 @@ export class GeoSceneManager {
 
     this.sceneAssetRoot = null;
     this.sceneAssetUrl = null;
+    this.sceneAssetMixer = null;
     this.objectMarkersRoot = new THREE.Group();
     this.objectMarkersRoot.name = "geo-global-markers";
     this.root.add(this.objectMarkersRoot);
@@ -103,6 +104,11 @@ export class GeoSceneManager {
     }
 
     if (this.sceneAssetRoot) {
+      if (this.sceneAssetMixer) {
+        this.sceneAssetMixer.stopAllAction();
+        this.sceneAssetMixer.uncacheRoot(this.sceneAssetRoot);
+        this.sceneAssetMixer = null;
+      }
       this.root.remove(this.sceneAssetRoot);
       disposeObject3D(this.sceneAssetRoot);
       this.sceneAssetRoot = null;
@@ -114,7 +120,22 @@ export class GeoSceneManager {
     this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
     this.sceneAssetUrl = assetUrl;
     this.root.add(this.sceneAssetRoot);
+    if (Array.isArray(gltf.animations) && gltf.animations.length) {
+      this.sceneAssetMixer = new THREE.AnimationMixer(this.sceneAssetRoot);
+      for (const clip of gltf.animations) {
+        this.sceneAssetMixer.clipAction(clip).play();
+      }
+    }
     return this.sceneAssetRoot;
+  }
+
+  updateAnimations(deltaSeconds) {
+    if (!this.sceneAssetMixer || !this.root.visible) {
+      return;
+    }
+
+    const delta = Number.isFinite(deltaSeconds) ? Math.max(deltaSeconds, 0) : 0;
+    this.sceneAssetMixer.update(delta);
   }
 
   setVisible(visible) {
@@ -123,6 +144,11 @@ export class GeoSceneManager {
 
   clearSite() {
     if (this.sceneAssetRoot) {
+      if (this.sceneAssetMixer) {
+        this.sceneAssetMixer.stopAllAction();
+        this.sceneAssetMixer.uncacheRoot(this.sceneAssetRoot);
+        this.sceneAssetMixer = null;
+      }
       this.root.remove(this.sceneAssetRoot);
       disposeObject3D(this.sceneAssetRoot);
       this.sceneAssetRoot = null;
