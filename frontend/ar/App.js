@@ -380,6 +380,7 @@ export class ARApp {
       rotationEnabled: false,
       rotationDeg: 0
     };
+    this.objectTransformUiState = [];
 
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
@@ -401,6 +402,7 @@ export class ARApp {
     this.applySiteGeoTargetFromConfig({ force: true });
     this.applySiteGeoCalibrationFromConfig({ force: true });
     this.applySitePlacementTransformFromConfig({ force: true });
+    this.applySiteObjectTransformsFromConfig({ force: true });
     this.applySiteLocalObjectsFromConfig({ force: true });
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
@@ -434,11 +436,14 @@ export class ARApp {
       onGeoOffsetChange: (state) => this.applyGeoOffsetState(state),
       onGeoOffsetAdopt: (state) => this.adoptGeoOffsetAsSiteCalibration(state),
       onGeoOffsetReset: () => this.resetGeoOffsetState(),
+      onObjectTransformsChange: (transforms) => this.applyObjectTransformsState(transforms),
+      onObjectTransformsAdopt: (transforms) => this.adoptObjectTransformsAsSiteConfig(transforms),
       onToggleScenario: () => this.switchToNextScenario(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
     this.ui.setGeoOffsetControlState(this.geoOffsetUiState);
+    this.syncObjectTransformEditor();
 
     const capability = await this.arLauncher.detectCapabilities();
     if (capability.mode === ARLaunchMode.IOS_QUICK_LOOK && !this.siteConfig) {
@@ -668,6 +673,8 @@ export class ARApp {
         sitePlacement && sitePlacement.transform && typeof sitePlacement.transform === "object"
           ? sitePlacement.transform
           : null,
+      objectTransforms:
+        sitePlacement && Array.isArray(sitePlacement.objectTransforms) ? sitePlacement.objectTransforms : [],
       toleranceMeters
     };
   }
@@ -804,6 +811,56 @@ export class ARApp {
     const effectiveTransform = mergePlacementTransform(baseTransform, this.geoOffsetUiState);
     this.placementController.setPlacementTransform(effectiveTransform);
     return Boolean(effectiveTransform);
+  }
+
+  applySiteObjectTransformsFromConfig({ force = false } = {}) {
+    if (!this.placementController || (!force && !this.isGeoPlacementModeSelected())) {
+      return false;
+    }
+
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    this.objectTransformUiState = placementConfig ? placementConfig.objectTransforms : [];
+    this.placementController.setObjectTransforms(this.objectTransformUiState);
+    this.syncObjectTransformEditor();
+    return this.objectTransformUiState.length > 0;
+  }
+
+  applyObjectTransformsState(transforms) {
+    if (!this.placementController) {
+      return [];
+    }
+
+    this.objectTransformUiState = this.placementController.setObjectTransforms(transforms);
+    return this.objectTransformUiState;
+  }
+
+  adoptObjectTransformsAsSiteConfig(transforms) {
+    if (!this.siteConfig) {
+      this.ui.setMessage("Keine Site geladen. Einzelobjekt-Transformation kann nicht in die JSON-Konfiguration uebernommen werden.");
+      return null;
+    }
+
+    const placementConfigOwner = this.getActivePlacementConfigOwner();
+    if (!placementConfigOwner.placement || typeof placementConfigOwner.placement !== "object") {
+      placementConfigOwner.placement = {};
+    }
+
+    const adoptedTransforms = this.applyObjectTransformsState(transforms);
+    placementConfigOwner.placement.objectTransforms = adoptedTransforms;
+    this.ui.setMessage(`${adoptedTransforms.length} Einzelobjekt-Transformation(en) in die JSON-Konfiguration uebernommen.`);
+    this.ui.setHint("Die Werte gelten sofort in dieser Sitzung. Fuer eine dauerhafte Änderung kopiere sie in die Site-JSON.");
+    return adoptedTransforms;
+  }
+
+  syncObjectTransformEditor() {
+    if (!this.ui || !this.placementController) {
+      return;
+    }
+
+    this.ui.setObjectTransformTargets(
+      this.placementController.getEditableObjectNodes(),
+      this.placementController.getObjectTransforms()
+    );
   }
 
   applyGeoOffsetState(state = {}) {
@@ -961,9 +1018,11 @@ export class ARApp {
       try {
         const assetInfo = await this.sceneManager.createPlacementAssetFromUrl(
           placementConfig.assetUrl,
-          placementConfig.assetLabel
+          placementConfig.assetLabel,
+          { preserveSourceScale: placementConfig.transform && placementConfig.transform.preserveSourceScale === true }
         );
         this.placementController.setAsset(assetInfo.object);
+        this.applySiteObjectTransformsFromConfig({ force: true });
         this.ui.setAssetLabel(assetInfo.label);
         this.activePlacementAssetSource = placementConfig.assetUrl;
         this.activePlacementAssetUrl = assetInfo.sourceUrl;
@@ -976,6 +1035,7 @@ export class ARApp {
 
     const assetInfo = await this.sceneManager.createPlacementAsset();
     this.placementController.setAsset(assetInfo.object);
+    this.applySiteObjectTransformsFromConfig({ force: true });
     this.ui.setAssetLabel(assetInfo.label);
     this.activePlacementAssetSource = "default";
     this.activePlacementAssetUrl = assetInfo.sourceUrl;
@@ -1000,9 +1060,11 @@ export class ARApp {
       try {
         const assetInfo = await this.sceneManager.createPlacementAssetFromUrl(
           placementConfig.assetUrl,
-          placementConfig.assetLabel
+          placementConfig.assetLabel,
+          { preserveSourceScale: placementConfig.transform && placementConfig.transform.preserveSourceScale === true }
         );
         this.placementController.setAsset(assetInfo.object);
+        this.applySiteObjectTransformsFromConfig({ force: true });
         this.activePlacementAssetSource = placementConfig.assetUrl;
         this.activePlacementAssetUrl = assetInfo.sourceUrl;
         this.ui.setAssetLabel(assetInfo.label);
@@ -1021,6 +1083,7 @@ export class ARApp {
     try {
       const defaultAssetInfo = await this.sceneManager.createPlacementAsset();
       this.placementController.setAsset(defaultAssetInfo.object);
+      this.applySiteObjectTransformsFromConfig({ force: true });
       this.activePlacementAssetSource = "default";
       this.activePlacementAssetUrl = defaultAssetInfo.sourceUrl;
       this.ui.setAssetLabel(defaultAssetInfo.label);

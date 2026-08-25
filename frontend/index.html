@@ -838,6 +838,31 @@
                     Tests reset
                   </button>
                 </div>
+
+                <div class="object-transform-editor">
+                  <p class="hint-text">
+                    Einzelne, benannte Bestandteile des geladenen GLB-Modells bearbeiten. Der Versatz gilt im lokalen Modellkoordinatensystem.
+                  </p>
+                  <label class="field-group">
+                    <span class="field-label">Einzelobjekt</span>
+                    <select id="object-transform-select" class="field-input"></select>
+                  </label>
+                  <div class="object-transform-grid">
+                    <label class="offset-slider-block"><span class="field-label">X-Versatz</span><input id="object-transform-x" class="offset-range-input" type="range" min="-10" max="10" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Y-Versatz</span><input id="object-transform-y" class="offset-range-input" type="range" min="-10" max="10" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Z-Versatz</span><input id="object-transform-z" class="offset-range-input" type="range" min="-10" max="10" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Skalierung</span><input id="object-transform-scale" class="offset-range-input" type="range" min="0.1" max="3" step="0.01" value="1" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Y-Rotation</span><input id="object-transform-rotation" class="offset-range-input" type="range" min="0" max="360" step="1" value="0" /></label>
+                  </div>
+                  <div class="coord-actions">
+                    <button id="object-transform-adopt-button" class="button" type="button">Einzelobjekt-Transformation in JSON übernehmen</button>
+                    <button id="object-transform-reset-button" class="button button-ghost" type="button">Ausgewähltes Objekt zurücksetzen</button>
+                  </div>
+                  <label class="field-group">
+                    <span class="field-label">JSON-Ausgabe für placement</span>
+                    <textarea id="object-transform-json" class="field-input object-transform-json" rows="8" readonly></textarea>
+                  </label>
+                </div>
               </div>
             </section>
 

@@ -1497,6 +1497,32 @@ body.ar-active .offset-slider-block {
   opacity: 0.5;
 }
 
+.object-transform-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid rgba(19, 35, 38, 0.12);
+  padding-top: 14px;
+}
+
+body.ar-active .object-transform-editor {
+  border-color: rgba(244, 241, 231, 0.16);
+}
+
+.object-transform-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.object-transform-json {
+  min-height: 136px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
 .geo-item,
 .debug-item,
 .state-item {
@@ -1666,7 +1692,8 @@ body.ar-active .state-item {
   .coord-grid,
   .geo-grid,
   .debug-grid,
-  .state-grid {
+  .state-grid,
+  .object-transform-grid {
     grid-template-columns: 1fr;
   }
 

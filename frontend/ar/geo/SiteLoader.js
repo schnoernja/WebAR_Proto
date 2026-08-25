@@ -10,7 +10,7 @@ function sanitizeSiteId(siteId) {
     return null;
   }
 
-  return trimmed;
+  return trimmed.toLowerCase();
 }
 
 function ensureFiniteNumber(value, label) {
@@ -156,8 +156,47 @@ function normalizePlacementTransform(transform) {
 
   return {
     scaleFactor: Number.isFinite(scaleSource) ? scaleSource : 1,
-    rotationDeg: Number.isFinite(rotationSource) ? rotationSource : 0
+    rotationDeg: Number.isFinite(rotationSource) ? rotationSource : 0,
+    preserveSourceScale: transform.preserveSourceScale === true
   };
+}
+
+function normalizeObjectTransforms(transforms) {
+  if (transforms == null) {
+    return [];
+  }
+
+  if (!Array.isArray(transforms)) {
+    throw new Error("Site-Konfiguration ungueltig: placement.objectTransforms muss eine Liste sein.");
+  }
+
+  const nodePaths = new Set();
+  return transforms.map((transform, index) => {
+    if (!transform || typeof transform !== "object") {
+      throw new Error(`Site-Konfiguration ungueltig: placement.objectTransforms[${index}] muss ein Objekt sein.`);
+    }
+
+    const nodePath = typeof transform.nodePath === "string" ? transform.nodePath.trim() : "";
+    if (!nodePath || nodePaths.has(nodePath)) {
+      throw new Error("Site-Konfiguration ungueltig: Jeder Objekt-Transform benoetigt einen eindeutigen nodePath.");
+    }
+    nodePaths.add(nodePath);
+
+    const position = transform.position && typeof transform.position === "object" ? transform.position : {};
+    const scaleSource = Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : transform.scale;
+    const rotationSource = Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : transform.rotation;
+    return {
+      nodePath,
+      node: typeof transform.node === "string" && transform.node.trim() ? transform.node.trim() : null,
+      position: {
+        x: Number.isFinite(position.x) ? position.x : 0,
+        y: Number.isFinite(position.y) ? position.y : 0,
+        z: Number.isFinite(position.z) ? position.z : 0
+      },
+      scaleFactor: Number.isFinite(scaleSource) && scaleSource > 0 ? scaleSource : 1,
+      rotationDeg: Number.isFinite(rotationSource) ? rotationSource : 0
+    };
+  });
 }
 
 function normalizePlacement(placement) {
@@ -180,11 +219,12 @@ function normalizePlacement(placement) {
   const target = normalizePlacementTarget(placement.target);
   const calibration = normalizePlacementCalibration(placement.calibration);
   const transform = normalizePlacementTransform(placement.transform);
+  const objectTransforms = normalizeObjectTransforms(placement.objectTransforms);
   const maxDistanceMeters = Number.isFinite(placement.maxDistanceMeters)
     ? placement.maxDistanceMeters
     : null;
 
-  if (!asset && !usdzAsset && !target && !calibration && !transform && maxDistanceMeters === null) {
+  if (!asset && !usdzAsset && !target && !calibration && !transform && objectTransforms.length === 0 && maxDistanceMeters === null) {
     return null;
   }
 
@@ -194,6 +234,7 @@ function normalizePlacement(placement) {
     target,
     calibration,
     transform,
+    objectTransforms,
     maxDistanceMeters
   };
 }

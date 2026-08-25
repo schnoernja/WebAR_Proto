@@ -112,6 +112,41 @@ function normalizePlacementTransform(transform) {
   };
 }
 
+function normalizeObjectTransforms(transforms) {
+  if (!Array.isArray(transforms)) {
+    return [];
+  }
+
+  const nodePaths = new Set();
+  return transforms.reduce((normalized, transform) => {
+    if (!transform || typeof transform !== "object") {
+      return normalized;
+    }
+
+    const nodePath = typeof transform.nodePath === "string" ? transform.nodePath.trim() : "";
+    if (!nodePath || nodePaths.has(nodePath)) {
+      return normalized;
+    }
+
+    const position = transform.position && typeof transform.position === "object" ? transform.position : {};
+    const scaleSource = Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : transform.scale;
+    const rotationSource = Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : transform.rotation;
+    nodePaths.add(nodePath);
+    normalized.push({
+      nodePath,
+      node: typeof transform.node === "string" && transform.node.trim() ? transform.node.trim() : null,
+      position: {
+        x: Number.isFinite(position.x) ? position.x : 0,
+        y: Number.isFinite(position.y) ? position.y : 0,
+        z: Number.isFinite(position.z) ? position.z : 0
+      },
+      scaleFactor: Number.isFinite(scaleSource) && scaleSource > 0 ? scaleSource : 1,
+      rotationDeg: Number.isFinite(rotationSource) ? rotationSource : 0
+    });
+    return normalized;
+  }, []);
+}
+
 function cloneLocalObjectConfig(objectConfig) {
   if (!objectConfig || typeof objectConfig !== "object") {
     return null;
@@ -227,6 +262,7 @@ export class PlacementController {
     this.geoOriginAnchor = null;
     this.geoCalibration = normalizeGeoCalibration(null);
     this.placementTransform = normalizePlacementTransform(null);
+    this.objectTransforms = [];
     this.geoReferenceForward = null;
     this.geoReferenceRight = null;
     this.localObjects = cloneLocalObjectConfigs(null);
@@ -310,7 +346,9 @@ export class PlacementController {
     }
 
     this.asset = asset;
+    this.initializeEditableObjectNodes(this.asset);
     this.transformRoot.add(this.asset);
+    this.applyObjectTransformsToAsset(this.asset);
     this.applyPlacementTransform();
     this.showFallbackPreview();
   }
@@ -416,6 +454,113 @@ export class PlacementController {
       scaleFactor: this.placementTransform.scaleFactor,
       rotationDeg: this.placementTransform.rotationDeg
     };
+  }
+
+  initializeEditableObjectNodes(asset) {
+    if (!asset) {
+      return;
+    }
+
+    const root = asset.children && asset.children.length ? asset.children[0] : null;
+    if (!root) {
+      return;
+    }
+
+    const visit = (node, path, depth) => {
+      node.userData.placementNodePath = path.join("/");
+      node.userData.placementNodeBase = {
+        position: [node.position.x, node.position.y, node.position.z],
+        scale: [node.scale.x, node.scale.y, node.scale.z],
+        quaternion: [node.quaternion.x, node.quaternion.y, node.quaternion.z, node.quaternion.w]
+      };
+      node.userData.placementNodeDepth = depth;
+      node.children.forEach((child, index) => visit(child, [...path, index], depth + 1));
+    };
+
+    visit(root, [], 0);
+  }
+
+  getEditableObjectNodes() {
+    if (!this.asset) {
+      return [];
+    }
+
+    const targets = [];
+    this.asset.traverse((node) => {
+      const nodePath = node.userData && node.userData.placementNodePath;
+      if (!nodePath || !node.name || (!node.isMesh && node.children.length === 0)) {
+        return;
+      }
+
+      targets.push({
+        nodePath,
+        name: node.name,
+        depth: Number.isFinite(node.userData.placementNodeDepth) ? node.userData.placementNodeDepth : 0
+      });
+    });
+    return targets;
+  }
+
+  setObjectTransforms(transforms) {
+    this.objectTransforms = normalizeObjectTransforms(transforms);
+    this.applyObjectTransformsToAsset(this.asset);
+    for (const slot of this.geoInstancesRoot.children) {
+      const instance = slot.children && slot.children.length ? slot.children[0] : null;
+      this.applyObjectTransformsToAsset(instance);
+    }
+    return this.getObjectTransforms();
+  }
+
+  getObjectTransforms() {
+    return this.objectTransforms.map((transform) => ({
+      nodePath: transform.nodePath,
+      node: transform.node,
+      position: { ...transform.position },
+      scaleFactor: transform.scaleFactor,
+      rotationDeg: transform.rotationDeg
+    }));
+  }
+
+  applyObjectTransformsToAsset(asset) {
+    if (!asset) {
+      return;
+    }
+
+    const nodesByPath = new Map();
+    asset.traverse((node) => {
+      const base = node.userData && node.userData.placementNodeBase;
+      const nodePath = node.userData && node.userData.placementNodePath;
+      if (!base || !nodePath) {
+        return;
+      }
+
+      node.position.set(base.position[0], base.position[1], base.position[2]);
+      node.scale.set(base.scale[0], base.scale[1], base.scale[2]);
+      node.quaternion.set(base.quaternion[0], base.quaternion[1], base.quaternion[2], base.quaternion[3]);
+      nodesByPath.set(nodePath, node);
+    });
+
+    for (const transform of this.objectTransforms) {
+      const node = nodesByPath.get(transform.nodePath);
+      if (!node) {
+        continue;
+      }
+
+      const base = node.userData.placementNodeBase;
+      node.position.set(
+        base.position[0] + transform.position.x,
+        base.position[1] + transform.position.y,
+        base.position[2] + transform.position.z
+      );
+      node.scale.set(
+        base.scale[0] * transform.scaleFactor,
+        base.scale[1] * transform.scaleFactor,
+        base.scale[2] * transform.scaleFactor
+      );
+      node.quaternion
+        .set(base.quaternion[0], base.quaternion[1], base.quaternion[2], base.quaternion[3])
+        .multiply(new THREE.Quaternion().setFromAxisAngle(WORLD_UP, THREE.MathUtils.degToRad(transform.rotationDeg)));
+    }
   }
 
   applyPlacementTransform() {
@@ -686,6 +831,7 @@ export class PlacementController {
 
       const instance = this.asset ? this.asset.clone(true) : null;
       if (instance) {
+        this.applyObjectTransformsToAsset(instance);
         this.applyPlacementTransformToInstance(instance);
         slot.add(instance);
       }

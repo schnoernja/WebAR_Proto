@@ -1179,6 +1179,17 @@ export class UIController {
       adoptButton: this.document.getElementById("geo-offset-adopt-button"),
       resetButton: this.document.getElementById("geo-offset-reset-button")
     };
+    this.objectTransformRefs = {
+      select: this.document.getElementById("object-transform-select"),
+      xRange: this.document.getElementById("object-transform-x"),
+      yRange: this.document.getElementById("object-transform-y"),
+      zRange: this.document.getElementById("object-transform-z"),
+      scaleRange: this.document.getElementById("object-transform-scale"),
+      rotationRange: this.document.getElementById("object-transform-rotation"),
+      adoptButton: this.document.getElementById("object-transform-adopt-button"),
+      resetButton: this.document.getElementById("object-transform-reset-button"),
+      jsonOutput: this.document.getElementById("object-transform-json")
+    };
 
     this.geoDebugRefs = {
       originLatitude: this.document.getElementById("debug-origin-latitude"),
@@ -1371,6 +1382,9 @@ export class UIController {
       rotationEnabled: false,
       rotationDeg: 0
     };
+    this.objectTransformTargets = [];
+    this.objectTransformDrafts = [];
+    this.selectedObjectTransformPath = null;
     this.latestGeoPosition = null;
     this.lastGeoSnapshot = createGeoSnapshotDefaults();
     this.lastSensorSnapshot = createSensorSnapshotDefaults();
@@ -1496,6 +1510,8 @@ export class UIController {
     onGeoOffsetChange,
     onGeoOffsetAdopt,
     onGeoOffsetReset,
+    onObjectTransformsChange,
+    onObjectTransformsAdopt,
     onToggleScenario,
     onUIInteractionChange,
     onTextInputActiveChange
@@ -1546,6 +1562,7 @@ export class UIController {
       onGeoOffsetAdopt,
       onGeoOffsetReset
     });
+    this.bindObjectTransformControls({ onObjectTransformsChange, onObjectTransformsAdopt });
     this.bindTextInputActivity();
 
     this.refreshButtons();
@@ -2303,6 +2320,201 @@ export class UIController {
 
     if (this.geoOffsetRefs.rotationValue) {
       this.geoOffsetRefs.rotationValue.textContent = this.formatGeoRotationValue(this.geoOffsetDraft.rotationDeg);
+    }
+  }
+
+  bindObjectTransformControls({ onObjectTransformsChange, onObjectTransformsAdopt } = {}) {
+    if (this.objectTransformRefs.select) {
+      const handleSelect = () => {
+        this.selectedObjectTransformPath = this.objectTransformRefs.select.value || null;
+        this.renderObjectTransformControls();
+      };
+      this.objectTransformRefs.select.addEventListener("change", handleSelect);
+      this.cleanupCallbacks.push(() => this.objectTransformRefs.select.removeEventListener("change", handleSelect));
+    }
+
+    for (const input of [
+      this.objectTransformRefs.xRange,
+      this.objectTransformRefs.yRange,
+      this.objectTransformRefs.zRange,
+      this.objectTransformRefs.scaleRange,
+      this.objectTransformRefs.rotationRange
+    ]) {
+      if (!input) {
+        continue;
+      }
+      const handleInput = () => {
+        this.updateSelectedObjectTransformDraft();
+        this.renderObjectTransformControls();
+        if (typeof onObjectTransformsChange === "function") {
+          onObjectTransformsChange(this.getObjectTransformDrafts());
+        }
+      };
+      input.addEventListener("input", handleInput);
+      this.cleanupCallbacks.push(() => input.removeEventListener("input", handleInput));
+    }
+
+    if (this.objectTransformRefs.resetButton) {
+      const handleReset = () => {
+        if (!this.selectedObjectTransformPath) {
+          return;
+        }
+        this.objectTransformDrafts = this.objectTransformDrafts.filter(
+          (transform) => transform.nodePath !== this.selectedObjectTransformPath
+        );
+        this.renderObjectTransformControls();
+        if (typeof onObjectTransformsChange === "function") {
+          onObjectTransformsChange(this.getObjectTransformDrafts());
+        }
+      };
+      this.objectTransformRefs.resetButton.addEventListener("click", handleReset);
+      this.cleanupCallbacks.push(() => this.objectTransformRefs.resetButton.removeEventListener("click", handleReset));
+    }
+
+    if (this.objectTransformRefs.adoptButton) {
+      const handleAdopt = () => {
+        if (typeof onObjectTransformsAdopt === "function") {
+          onObjectTransformsAdopt(this.getObjectTransformDrafts());
+        }
+      };
+      this.objectTransformRefs.adoptButton.addEventListener("click", handleAdopt);
+      this.cleanupCallbacks.push(() => this.objectTransformRefs.adoptButton.removeEventListener("click", handleAdopt));
+    }
+  }
+
+  setObjectTransformTargets(targets = [], transforms = []) {
+    this.objectTransformTargets = Array.isArray(targets) ? targets : [];
+    this.objectTransformDrafts = Array.isArray(transforms) ? transforms.map((transform) => ({
+      nodePath: transform.nodePath,
+      node: transform.node || null,
+      position: {
+        x: Number.isFinite(transform.position && transform.position.x) ? transform.position.x : 0,
+        y: Number.isFinite(transform.position && transform.position.y) ? transform.position.y : 0,
+        z: Number.isFinite(transform.position && transform.position.z) ? transform.position.z : 0
+      },
+      scaleFactor: Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : 1,
+      rotationDeg: Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : 0
+    })) : [];
+
+    const selectedTargetExists = this.objectTransformTargets.some(
+      (target) => target.nodePath === this.selectedObjectTransformPath
+    );
+    this.selectedObjectTransformPath = selectedTargetExists
+      ? this.selectedObjectTransformPath
+      : this.objectTransformTargets.length
+        ? this.objectTransformTargets[0].nodePath
+        : null;
+    this.renderObjectTransformControls();
+  }
+
+  getSelectedObjectTransformTarget() {
+    return this.objectTransformTargets.find((target) => target.nodePath === this.selectedObjectTransformPath) || null;
+  }
+
+  getSelectedObjectTransformDraft() {
+    const target = this.getSelectedObjectTransformTarget();
+    if (!target) {
+      return null;
+    }
+
+    return this.objectTransformDrafts.find((transform) => transform.nodePath === target.nodePath) || {
+      nodePath: target.nodePath,
+      node: target.name,
+      position: { x: 0, y: 0, z: 0 },
+      scaleFactor: 1,
+      rotationDeg: 0
+    };
+  }
+
+  updateSelectedObjectTransformDraft() {
+    const target = this.getSelectedObjectTransformTarget();
+    if (!target) {
+      return;
+    }
+
+    const draft = this.getSelectedObjectTransformDraft();
+    const nextDraft = {
+      ...draft,
+      node: target.name,
+      position: {
+        x: this.objectTransformRefs.xRange ? Number.parseFloat(this.objectTransformRefs.xRange.value) || 0 : draft.position.x,
+        y: this.objectTransformRefs.yRange ? Number.parseFloat(this.objectTransformRefs.yRange.value) || 0 : draft.position.y,
+        z: this.objectTransformRefs.zRange ? Number.parseFloat(this.objectTransformRefs.zRange.value) || 0 : draft.position.z
+      },
+      scaleFactor: this.objectTransformRefs.scaleRange
+        ? Math.max(0.1, Number.parseFloat(this.objectTransformRefs.scaleRange.value) || 1)
+        : draft.scaleFactor,
+      rotationDeg: this.objectTransformRefs.rotationRange
+        ? normalizeRotationDeg(Number.parseFloat(this.objectTransformRefs.rotationRange.value))
+        : draft.rotationDeg
+    };
+    this.objectTransformDrafts = [
+      ...this.objectTransformDrafts.filter((transform) => transform.nodePath !== target.nodePath),
+      nextDraft
+    ];
+  }
+
+  getObjectTransformDrafts() {
+    return this.objectTransformDrafts.map((transform) => ({
+      nodePath: transform.nodePath,
+      node: transform.node,
+      position: { ...transform.position },
+      scaleFactor: transform.scaleFactor,
+      rotationDeg: transform.rotationDeg
+    }));
+  }
+
+  renderObjectTransformControls() {
+    const target = this.getSelectedObjectTransformTarget();
+    const draft = this.getSelectedObjectTransformDraft();
+    const disabled = !target || !draft;
+
+    if (this.objectTransformRefs.select) {
+      this.objectTransformRefs.select.replaceChildren();
+      if (!this.objectTransformTargets.length) {
+        const option = this.document.createElement("option");
+        option.textContent = "Keine benannten Einzelobjekte verfügbar";
+        option.value = "";
+        this.objectTransformRefs.select.append(option);
+      } else {
+        for (const item of this.objectTransformTargets) {
+          const option = this.document.createElement("option");
+          option.value = item.nodePath;
+          option.textContent = `${"  ".repeat(Math.max(0, item.depth - 1))}${item.name}`;
+          option.selected = item.nodePath === this.selectedObjectTransformPath;
+          this.objectTransformRefs.select.append(option);
+        }
+      }
+      this.objectTransformRefs.select.disabled = disabled;
+    }
+
+    const values = draft || { position: { x: 0, y: 0, z: 0 }, scaleFactor: 1, rotationDeg: 0 };
+    const fields = [
+      [this.objectTransformRefs.xRange, values.position.x, 2],
+      [this.objectTransformRefs.yRange, values.position.y, 2],
+      [this.objectTransformRefs.zRange, values.position.z, 2],
+      [this.objectTransformRefs.scaleRange, values.scaleFactor, 2],
+      [this.objectTransformRefs.rotationRange, values.rotationDeg, 0]
+    ];
+    for (const [input, value, precision] of fields) {
+      if (!input) {
+        continue;
+      }
+      input.value = Number(value).toFixed(precision);
+      input.disabled = disabled;
+    }
+    if (this.objectTransformRefs.adoptButton) {
+      this.objectTransformRefs.adoptButton.disabled = disabled;
+    }
+    if (this.objectTransformRefs.resetButton) {
+      this.objectTransformRefs.resetButton.disabled = disabled;
+    }
+    if (this.objectTransformRefs.jsonOutput) {
+      this.objectTransformRefs.jsonOutput.value = JSON.stringify(
+        { objectTransforms: this.getObjectTransformDrafts() },
+        null,
+        2
+      );
     }
   }
 

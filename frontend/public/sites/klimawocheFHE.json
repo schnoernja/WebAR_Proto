@@ -12,12 +12,10 @@
         "yawDeg": 0
       },
       "scene": {
-        "asset": "/assets/flowerpots_benches_gras.glb",
-        "usdzAsset": "/assets/flowerpots_benches_gras.usdz"
+        "asset": "/models/scene_a_environment_final.glb?v=scene-a-20260825"
       },
       "placement": {
-        "asset": "assets/flowerpots_benches_gras.glb",
-        "usdzAsset": "assets/flowerpots_benches_gras.usdz",
+        "asset": "/models/scene_a_environment_final.glb?v=scene-a-20260825",
         "target": {
           "lat": 50.985242,
           "lon": 11.043993
@@ -29,7 +27,8 @@
         },
         "transform": {
           "scaleFactor": 1,
-          "rotationDeg": 0
+          "rotationDeg": 0,
+          "preserveSourceScale": true
         },
         "maxDistanceMeters": 100
       },

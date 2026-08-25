@@ -220,6 +220,33 @@ Das Projekt ist dann unter http://localhost:8080 erreichbar.
 - Die Hoehe (`Y`) kommt weiterhin von der stabilen Hit-Test-Flaeche.
 - Nach erfolgreicher Geo-Platzierung greift derselbe Placement-Lock wie im freien Modus.
 
+### Einzelobjekt-Transformationen in Site-JSON
+
+Zusätzlich zu `placement.transform` für das gesamte Modell akzeptiert die Site-JSON eine Liste
+`placement.objectTransforms`. Jeder Eintrag bezieht sich auf genau einen im GLB benannten
+Knoten. Die Anwendung füllt `nodePath` beim Auswählen automatisch; dieser Pfad bleibt auch bei
+gleichnamigen Knoten eindeutig. `position` ist ein lokaler Versatz im Koordinatensystem des
+jeweiligen Modellknotens.
+
+```json
+"objectTransforms": [
+  {
+    "nodePath": "0/4",
+    "node": "Fountain",
+    "position": { "x": 0, "y": 0.2, "z": -0.5 },
+    "scaleFactor": 1.15,
+    "rotationDeg": 15
+  }
+]
+```
+
+Die Entwickleransicht bietet dafür unter „Geo Test-Anpassung“ eine Auswahl aller benannten
+Knoten. Die dort getesteten Werte wirken sofort auf die Vorschau und Geo-Instanzen. Der
+Übernehmen-Button hält sie in der zur Laufzeit geladenen Site-Konfiguration; für einen
+Neustart müssen dieselben Werte in die zugehörige `frontend/public/sites/*.json` übernommen
+werden. iOS Quick Look kann diese Laufzeit-Transformationen nicht übernehmen, weil es die
+separate USDZ-Datei öffnet.
+
 ## Einschraenkungen
 
 - Kein echter Geo-Anchor.

@@ -165,7 +165,8 @@ export class SceneManager {
     const gltf = await loader.loadAsync(candidate.url);
     const asset = this.normalizeAsset(gltf.scene, {
       label: candidate.label,
-      preciseGrounding: needsPreciseGrounding(candidate.url)
+      preciseGrounding: needsPreciseGrounding(candidate.url) || candidate.preserveSourceScale === true,
+      preserveSourceScale: candidate.preserveSourceScale === true
     });
     return {
       object: asset,
@@ -195,7 +196,7 @@ export class SceneManager {
     return resolveAppUrl(url);
   }
 
-  async createPlacementAssetFromUrl(url, label = null) {
+  async createPlacementAssetFromUrl(url, label = null, { preserveSourceScale = false } = {}) {
     const normalizedUrl = this.normalizeAssetUrl(url);
     if (!normalizedUrl) {
       throw new Error("Ungueltiger Modellpfad fuer das Geo-Placement.");
@@ -204,7 +205,8 @@ export class SceneManager {
     const loader = new GLTFLoader();
     const candidate = {
       url: normalizedUrl,
-      label: label || this.createAssetLabelFromUrl(normalizedUrl)
+      label: label || this.createAssetLabelFromUrl(normalizedUrl),
+      preserveSourceScale
     };
     return this.loadPlacementCandidate(loader, candidate);
   }
@@ -242,7 +244,7 @@ export class SceneManager {
     };
   }
 
-  normalizeAsset(assetRoot, { label = "Modell", preciseGrounding = false } = {}) {
+  normalizeAsset(assetRoot, { label = "Modell", preciseGrounding = false, preserveSourceScale = false } = {}) {
     const wrapper = new THREE.Group();
     wrapper.name = "placement-asset";
     wrapper.add(assetRoot);
@@ -258,7 +260,7 @@ export class SceneManager {
     const rawBox = new THREE.Box3().setFromObject(assetRoot, preciseGrounding);
     const rawSize = rawBox.getSize(new THREE.Vector3());
     const measuredHeight = Math.max(rawSize.y, 0.0001);
-    const uniformScale = APP_CONFIG.model.targetHeightMeters / measuredHeight;
+    const uniformScale = preserveSourceScale ? 1 : APP_CONFIG.model.targetHeightMeters / measuredHeight;
 
     assetRoot.scale.multiplyScalar(uniformScale);
     assetRoot.updateMatrixWorld(true);
