@@ -573,7 +573,6 @@ export class ARApp {
     this.syncScenarioSwitchControl();
 
     try {
-      this.resetPlacement();
       this.activeScenarioId = nextScenario.id;
       await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
       this.applySiteGeoTargetFromConfig({ force: true });
@@ -582,7 +581,9 @@ export class ARApp {
       this.applySiteLocalObjectsFromConfig({ force: true });
       this.applySiteObjectTransformsFromConfig({ force: true });
 
-      const assetReady = await this.ensurePlacementAssetForExperience(this.selectedExperienceMode);
+      const assetReady = await this.ensurePlacementAssetForExperience(this.selectedExperienceMode, {
+        preservePlacement: true
+      });
       if (!assetReady) {
         throw new Error("Szenario-Modell konnte nicht geladen werden.");
       }
@@ -595,7 +596,7 @@ export class ARApp {
       this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
       this.syncPresentationVisibility();
       this.ui.setMessage(`Szenario '${nextScenario.label}' aktiv.`);
-      this.ui.setHint("Das vorherige Placement wurde zurückgesetzt. Richte das Gerät neu aus, um das Szenario zu platzieren.");
+      this.ui.setHint("Die bestehende Platzierung wird für das neue Szenario weiterverwendet.");
       return true;
     } catch (error) {
       this.activeScenarioId = previousScenarioId;
@@ -1051,7 +1052,7 @@ export class ARApp {
     return assetInfo;
   }
 
-  async ensurePlacementAssetForExperience(experienceMode) {
+  async ensurePlacementAssetForExperience(experienceMode, { preservePlacement = false } = {}) {
     if (!this.placementController) {
       return false;
     }
@@ -1072,7 +1073,7 @@ export class ARApp {
           placementConfig.assetLabel,
           { preserveSourceScale: placementConfig.transform && placementConfig.transform.preserveSourceScale === true }
         );
-        this.placementController.setAsset(assetInfo.object, assetInfo.animations);
+        this.placementController.setAsset(assetInfo.object, assetInfo.animations, { preservePlacement });
         this.applySiteObjectTransformsFromConfig({ force: true });
         this.activePlacementAssetSource = placementConfig.assetUrl;
         this.activePlacementAssetUrl = assetInfo.sourceUrl;
@@ -1091,7 +1092,7 @@ export class ARApp {
 
     try {
       const defaultAssetInfo = await this.sceneManager.createPlacementAsset();
-      this.placementController.setAsset(defaultAssetInfo.object, defaultAssetInfo.animations);
+      this.placementController.setAsset(defaultAssetInfo.object, defaultAssetInfo.animations, { preservePlacement });
       this.applySiteObjectTransformsFromConfig({ force: true });
       this.activePlacementAssetSource = "default";
       this.activePlacementAssetUrl = defaultAssetInfo.sourceUrl;

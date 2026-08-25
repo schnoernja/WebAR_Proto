@@ -343,7 +343,18 @@ export class PlacementController {
     return reticle;
   }
 
-  setAsset(asset, animationClips = []) {
+  setAsset(asset, animationClips = [], { preservePlacement = false } = {}) {
+    const previousPlacement = preservePlacement && this.placed
+      ? {
+          objectPose: {
+            position: this.objectRoot.position.clone(),
+            quaternion: this.objectRoot.quaternion.clone()
+          },
+          geoPositions: this.geoInstancesRoot.children.map((slot) => slot.position.clone()),
+          isGeoPlacement: this.transformRoot.visible === false
+        }
+      : null;
+
     this.stopAssetMixer();
     this.clearGeoInstances();
 
@@ -359,7 +370,43 @@ export class PlacementController {
     this.assetMixer = this.createAnimationMixer(this.asset);
     this.applyObjectTransformsToAsset(this.asset);
     this.applyPlacementTransform();
-    this.showFallbackPreview();
+
+    if (!previousPlacement) {
+      this.showFallbackPreview();
+      return;
+    }
+
+    this.placed = true;
+    if (previousPlacement.isGeoPlacement) {
+      this.transformRoot.visible = false;
+      for (const position of previousPlacement.geoPositions) {
+        this.addGeoInstance(position);
+      }
+    } else {
+      this.transformRoot.visible = true;
+      applyPose(this.objectRoot, previousPlacement.objectPose);
+    }
+    this.objectRoot.visible = this.presentationVisible;
+    this.reticle.visible = false;
+  }
+
+  addGeoInstance(position) {
+    const slot = new THREE.Group();
+    slot.name = "geo-scenario-instance";
+    slot.position.copy(position);
+
+    const instance = this.asset ? this.asset.clone(true) : null;
+    if (instance) {
+      this.applyObjectTransformsToAsset(instance);
+      this.applyPlacementTransformToInstance(instance);
+      slot.add(instance);
+      const mixer = this.createAnimationMixer(instance);
+      if (mixer) {
+        this.geoInstanceMixers.push({ mixer, root: instance });
+      }
+    }
+
+    this.geoInstancesRoot.add(slot);
   }
 
   createAnimationMixer(root) {
@@ -886,22 +933,7 @@ export class PlacementController {
     void cameraState;
 
     for (const placement of placements) {
-      const slot = new THREE.Group();
-      slot.name = `geo-offset-${placement.id}`;
-      slot.position.copy(placement.worldPosition);
-
-      const instance = this.asset ? this.asset.clone(true) : null;
-      if (instance) {
-        this.applyObjectTransformsToAsset(instance);
-        this.applyPlacementTransformToInstance(instance);
-        slot.add(instance);
-        const mixer = this.createAnimationMixer(instance);
-        if (mixer) {
-          this.geoInstanceMixers.push({ mixer, root: instance });
-        }
-      }
-
-      this.geoInstancesRoot.add(slot);
+      this.addGeoInstance(placement.worldPosition);
     }
 
     this.objectRoot.visible = this.presentationVisible;
