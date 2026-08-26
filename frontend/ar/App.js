@@ -8,12 +8,12 @@ import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
 import { IOSSLAMTracker } from "./IOSSLAMTracker.js";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
-import { PlacementController, PlacementMode } from "./PlacementController.js?v=scene-b-editor-20260825";
-import { UIController } from "./UIController.js";
+import { PlacementController, PlacementMode } from "./PlacementController.js?v=scene-transform-20260826";
+import { UIController } from "./UIController.js?v=scene-transform-20260826";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
-import { SiteLoader } from "./geo/SiteLoader.js?v=scene-b-editor-20260825";
+import { SiteLoader } from "./geo/SiteLoader.js?v=scene-transform-20260826";
 import { SensorFusion } from "./geo/SensorFusion.js";
 import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=scene-b-editor-20260825";
 
