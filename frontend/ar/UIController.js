@@ -1405,6 +1405,7 @@ export class UIController {
     this.handleSurveyViewportResize = this.handleSurveyViewportResize.bind(this);
     this.lastSurveyViewportWidth = null;
     this.lastSurveyViewportHeight = null;
+    this.lastSurveyViewportTop = null;
 
     if (this.view && typeof this.view.addEventListener === "function") {
       this.view.addEventListener("resize", this.handleSurveyViewportResize);
@@ -1412,7 +1413,9 @@ export class UIController {
     }
     if (this.view && this.view.visualViewport && typeof this.view.visualViewport.addEventListener === "function") {
       this.view.visualViewport.addEventListener("resize", this.handleSurveyViewportResize);
+      this.view.visualViewport.addEventListener("scroll", this.handleSurveyViewportResize);
       this.cleanupCallbacks.push(() => this.view.visualViewport.removeEventListener("resize", this.handleSurveyViewportResize));
+      this.cleanupCallbacks.push(() => this.view.visualViewport.removeEventListener("scroll", this.handleSurveyViewportResize));
     }
 
     this.configureTextInputs();
@@ -1560,6 +1563,7 @@ export class UIController {
     this.bindGeoHeadingReferenceControl(onGeoHeadingReferenceToggle);
     this.bindInteractionSurface(this.uiContainer);
     this.bindInteractionSurface(this.hudRoot, { exclude: this.cardRefs.survey ? this.cardRefs.survey.root : null });
+    this.bindSurveyXRInteractionGuard();
     this.bindDeviceCoordinateCopy();
     this.bindGeoOffsetControls({
       onGeoOffsetToggle,
@@ -1873,6 +1877,20 @@ export class UIController {
     this.cleanupCallbacks.push(() => surface.removeEventListener("pointerup", handlePointerUp));
     this.cleanupCallbacks.push(() => surface.removeEventListener("pointercancel", handlePointerCancel));
     this.cleanupCallbacks.push(() => surface.removeEventListener("click", handleClick));
+  }
+
+  bindSurveyXRInteractionGuard() {
+    const surveyRoot = this.cardRefs.survey ? this.cardRefs.survey.root : null;
+    if (!surveyRoot) {
+      return;
+    }
+
+    const handleBeforeXRSelect = (event) => {
+      event.preventDefault();
+    };
+
+    surveyRoot.addEventListener("beforexrselect", handleBeforeXRSelect);
+    this.cleanupCallbacks.push(() => surveyRoot.removeEventListener("beforexrselect", handleBeforeXRSelect));
   }
 
   beginUIInteraction() {
@@ -2863,7 +2881,8 @@ export class UIController {
     const viewportTop = visualViewport && Number.isFinite(visualViewport.offsetTop)
       ? visualViewport.offsetTop
       : 0;
-    const topOffset = Math.max(Math.round(toolbarRect.bottom), Math.round(viewportTop));
+    this.lastSurveyViewportTop = viewportTop;
+    const topOffset = Math.max(toolbarRect.bottom, viewportTop);
     const centerX = Math.round(toolbarRect.left + (toolbarRect.width / 2));
     const centeredWidthLimit = Math.max(
       Math.min(centerX - sideGap, viewportWidth - centerX - sideGap) * 2,
@@ -2895,12 +2914,16 @@ export class UIController {
       : this.view && Number.isFinite(this.view.innerHeight)
         ? this.view.innerHeight
         : this.document.documentElement.clientHeight;
+    const viewportTop = visualViewport && Number.isFinite(visualViewport.offsetTop)
+      ? visualViewport.offsetTop
+      : 0;
 
     if (
       Number.isFinite(this.lastSurveyViewportWidth) &&
       Number.isFinite(this.lastSurveyViewportHeight) &&
       Math.abs(viewportWidth - this.lastSurveyViewportWidth) < 1 &&
-      Math.abs(viewportHeight - this.lastSurveyViewportHeight) < 1
+      Math.abs(viewportHeight - this.lastSurveyViewportHeight) < 1 &&
+      Math.abs(viewportTop - (this.lastSurveyViewportTop ?? 0)) < 1
     ) {
       return;
     }
