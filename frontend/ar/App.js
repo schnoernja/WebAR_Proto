@@ -5,7 +5,7 @@ import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=startup-grounding-20260825";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
-import { IOSSLAMTracker } from "./IOSSLAMTracker.js";
+import { IOSSLAMTracker } from "./IOSSLAMTracker.js?v=ios-grounding-20260826";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=scene-transform-20260826";
@@ -1639,6 +1639,14 @@ export class ARApp {
     if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
       this.captureGeoLocalReference(surfaceState, cameraState);
       this.maybePlaceGeoObject(surfaceState, cameraState);
+    } else if (
+      tracking &&
+      surfaceState.isStable &&
+      this.placementController.getMode() === PlacementMode.FREE &&
+      this.ui.isUserMode() &&
+      !this.placementController.isPlaced()
+    ) {
+      this.placeFreeObject("ios-auto");
     }
 
     this.ui.setPlacementState(this.placementController.isPlaced());
