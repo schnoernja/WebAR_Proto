@@ -90,6 +90,7 @@ function normalizeGeoCalibration(calibration) {
 
 function normalizePlacementTransform(transform) {
   const source = transform && typeof transform === "object" ? transform : null;
+  const position = source && source.position && typeof source.position === "object" ? source.position : {};
   const scaleSource =
     source && Number.isFinite(source.scaleFactor)
       ? source.scaleFactor
@@ -102,13 +103,19 @@ function normalizePlacementTransform(transform) {
       : source && Number.isFinite(source.rotation)
         ? source.rotation
         : 0;
-  const scaleFactor = clamp(scaleSource, 1, 3);
+  const scaleFactor = clamp(scaleSource, 0.1, 3);
   const normalizedRotationDeg = ((rotationSource % 360) + 360) % 360;
 
   return {
+    position: {
+      x: Number.isFinite(position.x) ? clamp(position.x, -20, 20) : 0,
+      y: Number.isFinite(position.y) ? clamp(position.y, -20, 20) : 0,
+      z: Number.isFinite(position.z) ? clamp(position.z, -20, 20) : 0
+    },
     scaleFactor,
     rotationDeg: normalizedRotationDeg,
-    rotationRad: THREE.MathUtils.degToRad(normalizedRotationDeg)
+    rotationRad: THREE.MathUtils.degToRad(normalizedRotationDeg),
+    preserveSourceScale: Boolean(source && source.preserveSourceScale === true)
   };
 }
 
@@ -541,8 +548,10 @@ export class PlacementController {
 
   getPlacementTransform() {
     return {
+      position: { ...this.placementTransform.position },
       scaleFactor: this.placementTransform.scaleFactor,
-      rotationDeg: this.placementTransform.rotationDeg
+      rotationDeg: this.placementTransform.rotationDeg,
+      preserveSourceScale: this.placementTransform.preserveSourceScale
     };
   }
 
@@ -677,6 +686,11 @@ export class PlacementController {
     }
 
     this.transformRoot.scale.setScalar(this.placementTransform.scaleFactor);
+    this.transformRoot.position.set(
+      this.placementTransform.position.x,
+      this.placementTransform.position.y,
+      this.placementTransform.position.z
+    );
     this.transformRoot.rotation.set(0, this.placementTransform.rotationRad, 0);
 
     for (const slot of this.geoInstancesRoot.children) {
@@ -695,6 +709,11 @@ export class PlacementController {
     }
 
     instance.scale.setScalar(this.placementTransform.scaleFactor);
+    instance.position.set(
+      this.placementTransform.position.x,
+      this.placementTransform.position.y,
+      this.placementTransform.position.z
+    );
     instance.rotation.set(0, this.placementTransform.rotationRad, 0);
   }
 

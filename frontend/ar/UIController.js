@@ -43,7 +43,7 @@ const USER_MODE_VISIBLE_CARDS = Object.freeze(["placement"]);
 const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze([]);
 
 const MAX_GEO_OFFSET_METERS = 20;
-const MIN_GEO_SCALE_FACTOR = 1;
+const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
 const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
@@ -280,7 +280,7 @@ const DE_TRANSLATIONS = Object.freeze({
       state: "Status",
       note: "Ablauf",
       geo: "Geolocation",
-      offset: "Geo Offset",
+      offset: "Geo Test-Anpassung",
       debug: "Geo Debug anzeigen"
     }
   },
@@ -471,20 +471,15 @@ const DE_TRANSLATIONS = Object.freeze({
   },
   offset: {
     title: "Geo Test-Anpassung",
-    description: "Offset, Skalierung und Rotation für Geo-Placement live testen. Werte werden zu den JSON-Vorgaben addiert bzw. überlagert.",
-    siteCalibrationToggle: "JSON-Offset aktivieren",
-    adoptAsSiteCalibration: "Test-Offset als JSON-Kalibrierung uebernehmen",
-    toggle: "Offset aktivieren",
-    eastLabel: "X (Ost/West)",
-    northLabel: "Y (Nord/Süd)",
-    scaleToggle: "Skalierung aktivieren",
+    description: "Das komplette geladene Szenenmodell verschieben, skalieren und rotieren. Alle Einzelobjekt-Transformationen bleiben erhalten und werden innerhalb dieser Gesamttransformation angewendet.",
+    xLabel: "X-Versatz",
+    yLabel: "Y-Versatz",
+    zLabel: "Z-Versatz",
     scaleLabel: "Skalierung",
-    rotationToggle: "Rotation aktivieren",
-    rotationLabel: "Rotation",
-    reset: "Tests reset",
-    unit: "m",
-    scaleUnit: "x",
-    rotationUnit: "deg"
+    rotationLabel: "Y-Rotation",
+    adopt: "Gesamtszenen-Transformation in JSON übernehmen",
+    reset: "Gesamtszene zurücksetzen",
+    jsonLabel: "JSON-Ausgabe für placement"
   },
   debug: {
     title: "Geo Debug",
@@ -543,7 +538,7 @@ const DE_TRANSLATIONS = Object.freeze({
       state: "Status auf- oder zuklappen",
       note: "Ablauf auf- oder zuklappen",
       geo: "Geolocation auf- oder zuklappen",
-      offset: "Geo Offset auf- oder zuklappen",
+      offset: "Geo Test-Anpassung auf- oder zuklappen",
       debug: "Geo Debug auf- oder zuklappen"
     },
     languageGroup: "Sprachauswahl"
@@ -590,7 +585,7 @@ const EN_TRANSLATIONS = Object.freeze({
       state: "Status",
       note: "Flow",
       geo: "Geolocation",
-      offset: "Geo offset",
+      offset: "Geo test adjustments",
       debug: "Show geo debug"
     }
   },
@@ -780,20 +775,15 @@ const EN_TRANSLATIONS = Object.freeze({
   },
   offset: {
     title: "Geo Test Adjustments",
-    description: "Live-test offset, scale, and rotation for geo placement. Values are added to or layered over JSON defaults.",
-    siteCalibrationToggle: "Enable JSON offset",
-    adoptAsSiteCalibration: "Apply test offset as JSON calibration",
-    toggle: "Enable offset",
-    eastLabel: "X (East/West)",
-    northLabel: "Y (North/South)",
-    scaleToggle: "Enable scale",
+    description: "Move, scale, and rotate the complete loaded scene model. All individual object transforms remain active inside this overall transform.",
+    xLabel: "X offset",
+    yLabel: "Y offset",
+    zLabel: "Z offset",
     scaleLabel: "Scale",
-    rotationToggle: "Enable rotation",
-    rotationLabel: "Rotation",
-    reset: "Reset tests",
-    unit: "m",
-    scaleUnit: "x",
-    rotationUnit: "deg"
+    rotationLabel: "Y rotation",
+    adopt: "Apply full-scene transform to JSON",
+    reset: "Reset full scene",
+    jsonLabel: "JSON output for placement"
   },
   debug: {
     title: "Geo Debug",
@@ -852,7 +842,7 @@ const EN_TRANSLATIONS = Object.freeze({
       state: "Toggle status card",
       note: "Toggle flow card",
       geo: "Toggle geolocation card",
-      offset: "Toggle geo offset card",
+      offset: "Toggle geo test adjustments card",
       debug: "Toggle geo debug card"
     },
     languageGroup: "Language selection"
@@ -1163,21 +1153,15 @@ export class UIController {
       help: this.document.getElementById("geo-help")
     };
     this.geoCopyTriggers = Array.from(this.document.querySelectorAll("[data-copy-device-coords='true']"));
-    this.geoOffsetRefs = {
-      siteCalibrationEnabled: this.document.getElementById("geo-site-calibration-enabled"),
-      enabled: this.document.getElementById("geo-offset-enabled"),
-      eastRange: this.document.getElementById("geo-offset-east-range"),
-      northRange: this.document.getElementById("geo-offset-north-range"),
-      eastValue: this.document.getElementById("geo-offset-east-value"),
-      northValue: this.document.getElementById("geo-offset-north-value"),
-      scaleEnabled: this.document.getElementById("geo-scale-enabled"),
-      scaleRange: this.document.getElementById("geo-scale-range"),
-      scaleValue: this.document.getElementById("geo-scale-value"),
-      rotationEnabled: this.document.getElementById("geo-rotation-enabled"),
-      rotationRange: this.document.getElementById("geo-rotation-range"),
-      rotationValue: this.document.getElementById("geo-rotation-value"),
-      adoptButton: this.document.getElementById("geo-offset-adopt-button"),
-      resetButton: this.document.getElementById("geo-offset-reset-button")
+    this.sceneTransformRefs = {
+      xRange: this.document.getElementById("scene-transform-x"),
+      yRange: this.document.getElementById("scene-transform-y"),
+      zRange: this.document.getElementById("scene-transform-z"),
+      scaleRange: this.document.getElementById("scene-transform-scale"),
+      rotationRange: this.document.getElementById("scene-transform-rotation"),
+      adoptButton: this.document.getElementById("scene-transform-adopt-button"),
+      resetButton: this.document.getElementById("scene-transform-reset-button"),
+      jsonOutput: this.document.getElementById("scene-transform-json")
     };
     this.objectTransformRefs = {
       select: this.document.getElementById("object-transform-select"),
@@ -1306,14 +1290,12 @@ export class UIController {
       geoTitle: this.document.querySelector("#card-geo .card-title-group h2"),
       offsetTitle: this.document.getElementById("offset-card-title"),
       offsetDescription: this.document.getElementById("geo-offset-description"),
-      siteCalibrationToggleLabel: this.document.getElementById("geo-site-calibration-toggle-label"),
-      offsetToggleLabel: this.document.getElementById("geo-offset-toggle-label"),
-      offsetEastLabel: this.document.getElementById("geo-offset-east-label"),
-      offsetNorthLabel: this.document.getElementById("geo-offset-north-label"),
-      scaleToggleLabel: this.document.getElementById("geo-scale-toggle-label"),
-      scaleLabel: this.document.getElementById("geo-scale-label"),
-      rotationToggleLabel: this.document.getElementById("geo-rotation-toggle-label"),
-      rotationLabel: this.document.getElementById("geo-rotation-label"),
+      sceneTransformXLabel: this.document.getElementById("scene-transform-x-label"),
+      sceneTransformYLabel: this.document.getElementById("scene-transform-y-label"),
+      sceneTransformZLabel: this.document.getElementById("scene-transform-z-label"),
+      sceneTransformScaleLabel: this.document.getElementById("scene-transform-scale-label"),
+      sceneTransformRotationLabel: this.document.getElementById("scene-transform-rotation-label"),
+      sceneTransformJsonLabel: this.document.getElementById("scene-transform-json-label"),
       debugTitle: this.document.querySelector("#card-debug .card-title-group h2"),
       debugTag: this.document.querySelector("#card-debug .panel-tag"),
       geoLabels: {
@@ -1372,15 +1354,11 @@ export class UIController {
       latitude: "",
       longitude: ""
     };
-    this.geoOffsetDraft = {
-      useSiteCalibration: true,
-      enabled: false,
-      eastMeters: 0,
-      northMeters: 0,
-      scaleEnabled: false,
+    this.sceneTransformDraft = {
+      position: { x: 0, y: 0, z: 0 },
       scaleFactor: 1,
-      rotationEnabled: false,
-      rotationDeg: 0
+      rotationDeg: 0,
+      preserveSourceScale: false
     };
     this.objectTransformTargets = [];
     this.objectTransformDrafts = [];
@@ -1427,7 +1405,7 @@ export class UIController {
     this.setExperienceMode(this.uiState.experienceMode);
     this.setPlacementMode(this.uiState.placementMode);
     this.renderGeoHeadingReferenceControl();
-    this.setGeoOffsetControlState(this.geoOffsetDraft);
+    this.setSceneTransformState(this.sceneTransformDraft);
     this.renderSystemStates();
     this.renderGeoSnapshot(this.lastGeoSnapshot);
     this.renderSensorSnapshot(this.lastSensorSnapshot);
@@ -1514,10 +1492,9 @@ export class UIController {
     onRequestGeolocation,
     onCalibrateHeading,
     onGeoHeadingReferenceToggle,
-    onGeoOffsetToggle,
-    onGeoOffsetChange,
-    onGeoOffsetAdopt,
-    onGeoOffsetReset,
+    onSceneTransformChange,
+    onSceneTransformAdopt,
+    onSceneTransformReset,
     onObjectTransformsChange,
     onObjectTransformsAdopt,
     onToggleScenario,
@@ -1565,12 +1542,7 @@ export class UIController {
     this.bindInteractionSurface(this.hudRoot, { exclude: this.cardRefs.survey ? this.cardRefs.survey.root : null });
     this.bindSurveyXRInteractionGuard();
     this.bindDeviceCoordinateCopy();
-    this.bindGeoOffsetControls({
-      onGeoOffsetToggle,
-      onGeoOffsetChange,
-      onGeoOffsetAdopt,
-      onGeoOffsetReset
-    });
+    this.bindSceneTransformControls({ onSceneTransformChange, onSceneTransformAdopt, onSceneTransformReset });
     this.bindObjectTransformControls({ onObjectTransformsChange, onObjectTransformsAdopt });
     this.bindTextInputActivity();
 
@@ -1986,384 +1958,114 @@ export class UIController {
     }
   }
 
-  bindGeoOffsetControls({ onGeoOffsetToggle, onGeoOffsetChange, onGeoOffsetAdopt, onGeoOffsetReset } = {}) {
-    const changeHandler = typeof onGeoOffsetChange === "function" ? onGeoOffsetChange : onGeoOffsetToggle;
-
-    if (this.geoOffsetRefs.enabled) {
-      const handleToggle = () => {
-        this.handleGeoOffsetToggle(changeHandler);
+  bindSceneTransformControls({ onSceneTransformChange, onSceneTransformAdopt, onSceneTransformReset } = {}) {
+    for (const input of [
+      this.sceneTransformRefs.xRange,
+      this.sceneTransformRefs.yRange,
+      this.sceneTransformRefs.zRange,
+      this.sceneTransformRefs.scaleRange,
+      this.sceneTransformRefs.rotationRange
+    ]) {
+      if (!input) {
+        continue;
+      }
+      const handleInput = () => {
+        this.updateSceneTransformDraftFromInputs();
+        this.renderSceneTransformControls();
+        if (typeof onSceneTransformChange === "function") {
+          onSceneTransformChange(this.getSceneTransformState());
+        }
       };
-      this.geoOffsetRefs.enabled.addEventListener("change", handleToggle);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.enabled.removeEventListener("change", handleToggle));
+      input.addEventListener("input", handleInput);
+      this.cleanupCallbacks.push(() => input.removeEventListener("input", handleInput));
     }
 
-    if (this.geoOffsetRefs.siteCalibrationEnabled) {
-      const handleSiteCalibrationToggle = () => {
-        this.handleGeoSiteCalibrationToggle(changeHandler);
-      };
-      this.geoOffsetRefs.siteCalibrationEnabled.addEventListener("change", handleSiteCalibrationToggle);
-      this.cleanupCallbacks.push(() =>
-        this.geoOffsetRefs.siteCalibrationEnabled.removeEventListener("change", handleSiteCalibrationToggle)
-      );
-    }
-
-    if (this.geoOffsetRefs.eastRange) {
-      const handleEastInput = () => {
-        this.handleGeoOffsetRangeInput(changeHandler);
-      };
-      this.geoOffsetRefs.eastRange.addEventListener("input", handleEastInput);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.eastRange.removeEventListener("input", handleEastInput));
-    }
-
-    if (this.geoOffsetRefs.northRange) {
-      const handleNorthInput = () => {
-        this.handleGeoOffsetRangeInput(changeHandler);
-      };
-      this.geoOffsetRefs.northRange.addEventListener("input", handleNorthInput);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.northRange.removeEventListener("input", handleNorthInput));
-    }
-
-    if (this.geoOffsetRefs.scaleEnabled) {
-      const handleScaleToggle = () => {
-        this.handleGeoScaleToggle(changeHandler);
-      };
-      this.geoOffsetRefs.scaleEnabled.addEventListener("change", handleScaleToggle);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.scaleEnabled.removeEventListener("change", handleScaleToggle));
-    }
-
-    if (this.geoOffsetRefs.scaleRange) {
-      const handleScaleInput = () => {
-        this.handleGeoScaleRangeInput(changeHandler);
-      };
-      this.geoOffsetRefs.scaleRange.addEventListener("input", handleScaleInput);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.scaleRange.removeEventListener("input", handleScaleInput));
-    }
-
-    if (this.geoOffsetRefs.rotationEnabled) {
-      const handleRotationToggle = () => {
-        this.handleGeoRotationToggle(changeHandler);
-      };
-      this.geoOffsetRefs.rotationEnabled.addEventListener("change", handleRotationToggle);
-      this.cleanupCallbacks.push(() =>
-        this.geoOffsetRefs.rotationEnabled.removeEventListener("change", handleRotationToggle)
-      );
-    }
-
-    if (this.geoOffsetRefs.rotationRange) {
-      const handleRotationInput = () => {
-        this.handleGeoRotationRangeInput(changeHandler);
-      };
-      this.geoOffsetRefs.rotationRange.addEventListener("input", handleRotationInput);
-      this.cleanupCallbacks.push(() =>
-        this.geoOffsetRefs.rotationRange.removeEventListener("input", handleRotationInput)
-      );
-    }
-
-    if (this.geoOffsetRefs.adoptButton) {
-      const handleAdopt = () => {
-        this.handleGeoOffsetAdopt(onGeoOffsetAdopt);
-      };
-      this.geoOffsetRefs.adoptButton.addEventListener("click", handleAdopt);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.adoptButton.removeEventListener("click", handleAdopt));
-    }
-
-    if (this.geoOffsetRefs.resetButton) {
+    if (this.sceneTransformRefs.resetButton) {
       const handleReset = () => {
-        this.handleGeoOffsetReset(onGeoOffsetReset);
+        const resetState = typeof onSceneTransformReset === "function" ? onSceneTransformReset() : null;
+        this.setSceneTransformState(resetState);
       };
-      this.geoOffsetRefs.resetButton.addEventListener("click", handleReset);
-      this.cleanupCallbacks.push(() => this.geoOffsetRefs.resetButton.removeEventListener("click", handleReset));
+      this.sceneTransformRefs.resetButton.addEventListener("click", handleReset);
+      this.cleanupCallbacks.push(() => this.sceneTransformRefs.resetButton.removeEventListener("click", handleReset));
+    }
+
+    if (this.sceneTransformRefs.adoptButton) {
+      const handleAdopt = () => {
+        if (typeof onSceneTransformAdopt === "function") {
+          onSceneTransformAdopt(this.getSceneTransformState());
+        }
+      };
+      this.sceneTransformRefs.adoptButton.addEventListener("click", handleAdopt);
+      this.cleanupCallbacks.push(() => this.sceneTransformRefs.adoptButton.removeEventListener("click", handleAdopt));
     }
   }
 
-  updateGeoOffsetDraftFromInputs() {
-    const eastMeters = clampGeoOffset(
-      this.geoOffsetRefs.eastRange ? Number.parseFloat(this.geoOffsetRefs.eastRange.value) : this.geoOffsetDraft.eastMeters
-    );
-    const northMeters = clampGeoOffset(
-      this.geoOffsetRefs.northRange
-        ? Number.parseFloat(this.geoOffsetRefs.northRange.value)
-        : this.geoOffsetDraft.northMeters
-    );
-    const scaleFactor = clampGeoScaleFactor(
-      this.geoOffsetRefs.scaleRange
-        ? Number.parseFloat(this.geoOffsetRefs.scaleRange.value)
-        : this.geoOffsetDraft.scaleFactor
-    );
-    const rotationDeg = normalizeRotationDeg(
-      this.geoOffsetRefs.rotationRange
-        ? Number.parseFloat(this.geoOffsetRefs.rotationRange.value)
-        : this.geoOffsetDraft.rotationDeg
-    );
-
-    this.geoOffsetDraft = {
-      ...this.geoOffsetDraft,
-      eastMeters,
-      northMeters,
-      scaleFactor,
-      rotationDeg
+  updateSceneTransformDraftFromInputs() {
+    const current = this.sceneTransformDraft;
+    this.sceneTransformDraft = {
+      position: {
+        x: this.sceneTransformRefs.xRange ? clampGeoOffset(Number.parseFloat(this.sceneTransformRefs.xRange.value)) : current.position.x,
+        y: this.sceneTransformRefs.yRange ? clampGeoOffset(Number.parseFloat(this.sceneTransformRefs.yRange.value)) : current.position.y,
+        z: this.sceneTransformRefs.zRange ? clampGeoOffset(Number.parseFloat(this.sceneTransformRefs.zRange.value)) : current.position.z
+      },
+      scaleFactor: this.sceneTransformRefs.scaleRange
+        ? clampGeoScaleFactor(Number.parseFloat(this.sceneTransformRefs.scaleRange.value))
+        : current.scaleFactor,
+      rotationDeg: this.sceneTransformRefs.rotationRange
+        ? normalizeRotationDeg(Number.parseFloat(this.sceneTransformRefs.rotationRange.value))
+        : current.rotationDeg,
+      preserveSourceScale: current.preserveSourceScale
     };
   }
 
-  handleGeoOffsetToggle(handler) {
-    const enabled = this.geoOffsetRefs.enabled ? Boolean(this.geoOffsetRefs.enabled.checked) : false;
-    this.geoOffsetDraft = {
-      ...this.geoOffsetDraft,
-      enabled
+  setSceneTransformState(transform = null) {
+    const source = transform && typeof transform === "object" ? transform : {};
+    const position = source.position && typeof source.position === "object" ? source.position : {};
+    this.sceneTransformDraft = {
+      position: {
+        x: clampGeoOffset(position.x),
+        y: clampGeoOffset(position.y),
+        z: clampGeoOffset(position.z)
+      },
+      scaleFactor: clampGeoScaleFactor(Number.isFinite(source.scaleFactor) ? source.scaleFactor : 1),
+      rotationDeg: normalizeRotationDeg(source.rotationDeg),
+      preserveSourceScale: source.preserveSourceScale === true
     };
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
+    this.renderSceneTransformControls();
   }
 
-  handleGeoSiteCalibrationToggle(handler) {
-    const useSiteCalibration = this.geoOffsetRefs.siteCalibrationEnabled
-      ? Boolean(this.geoOffsetRefs.siteCalibrationEnabled.checked)
-      : true;
-    this.geoOffsetDraft = {
-      ...this.geoOffsetDraft,
-      useSiteCalibration
-    };
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
-  }
-
-  handleGeoScaleToggle(handler) {
-    const scaleEnabled = this.geoOffsetRefs.scaleEnabled ? Boolean(this.geoOffsetRefs.scaleEnabled.checked) : false;
-    this.geoOffsetDraft = {
-      ...this.geoOffsetDraft,
-      scaleEnabled
-    };
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
-  }
-
-  handleGeoRotationToggle(handler) {
-    const rotationEnabled = this.geoOffsetRefs.rotationEnabled
-      ? Boolean(this.geoOffsetRefs.rotationEnabled.checked)
-      : false;
-    this.geoOffsetDraft = {
-      ...this.geoOffsetDraft,
-      rotationEnabled
-    };
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
-  }
-
-  handleGeoOffsetRangeInput(handler) {
-    this.updateGeoOffsetDraftFromInputs();
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
-  }
-
-  handleGeoScaleRangeInput(handler) {
-    this.updateGeoOffsetDraftFromInputs();
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
-  }
-
-  handleGeoRotationRangeInput(handler) {
-    this.updateGeoOffsetDraftFromInputs();
-    this.renderGeoOffsetControls();
-
-    if (typeof handler === "function") {
-      handler(this.getGeoOffsetControlState());
-    }
-  }
-
-  handleGeoOffsetReset(handler) {
-    const resetState =
-      typeof handler === "function"
-        ? handler() || {
-            useSiteCalibration: true,
-            enabled: false,
-            eastMeters: 0,
-            northMeters: 0,
-            scaleEnabled: false,
-            scaleFactor: 1,
-            rotationEnabled: false,
-            rotationDeg: 0
-          }
-        : {
-            useSiteCalibration: true,
-            enabled: false,
-            eastMeters: 0,
-            northMeters: 0,
-            scaleEnabled: false,
-            scaleFactor: 1,
-            rotationEnabled: false,
-            rotationDeg: 0
-          };
-    this.setGeoOffsetControlState(resetState);
-  }
-
-  handleGeoOffsetAdopt(handler) {
-    if (typeof handler !== "function") {
-      return;
-    }
-
-    const nextState = handler(this.getGeoOffsetControlState());
-    if (nextState && typeof nextState === "object") {
-      this.setGeoOffsetControlState(nextState);
-    }
-  }
-
-  setGeoOffsetControlState(state = {}) {
-    const nextState = {
-      useSiteCalibration:
-        typeof state.useSiteCalibration === "boolean"
-          ? state.useSiteCalibration
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.useSiteCalibration
-            : true,
-      enabled:
-        typeof state.enabled === "boolean"
-          ? state.enabled
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.enabled
-            : false,
-      eastMeters:
-        state.eastMeters != null
-          ? clampGeoOffset(Number.parseFloat(state.eastMeters))
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.eastMeters
-            : 0,
-      northMeters:
-        state.northMeters != null
-          ? clampGeoOffset(Number.parseFloat(state.northMeters))
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.northMeters
-            : 0,
-      scaleEnabled:
-        typeof state.scaleEnabled === "boolean"
-          ? state.scaleEnabled
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.scaleEnabled
-            : false,
-      scaleFactor:
-        state.scaleFactor != null
-          ? clampGeoScaleFactor(Number.parseFloat(state.scaleFactor))
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.scaleFactor
-            : 1,
-      rotationEnabled:
-        typeof state.rotationEnabled === "boolean"
-          ? state.rotationEnabled
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.rotationEnabled
-            : false,
-      rotationDeg:
-        state.rotationDeg != null
-          ? normalizeRotationDeg(Number.parseFloat(state.rotationDeg))
-          : this.geoOffsetDraft
-            ? this.geoOffsetDraft.rotationDeg
-            : 0
-    };
-
-    this.geoOffsetDraft = nextState;
-    this.renderGeoOffsetControls();
-  }
-
-  getGeoOffsetControlState() {
+  getSceneTransformState() {
     return {
-      useSiteCalibration: this.geoOffsetDraft.useSiteCalibration !== false,
-      enabled: Boolean(this.geoOffsetDraft.enabled),
-      eastMeters: clampGeoOffset(this.geoOffsetDraft.eastMeters),
-      northMeters: clampGeoOffset(this.geoOffsetDraft.northMeters),
-      scaleEnabled: Boolean(this.geoOffsetDraft.scaleEnabled),
-      scaleFactor: clampGeoScaleFactor(this.geoOffsetDraft.scaleFactor),
-      rotationEnabled: Boolean(this.geoOffsetDraft.rotationEnabled),
-      rotationDeg: normalizeRotationDeg(this.geoOffsetDraft.rotationDeg)
+      position: { ...this.sceneTransformDraft.position },
+      scaleFactor: this.sceneTransformDraft.scaleFactor,
+      rotationDeg: this.sceneTransformDraft.rotationDeg,
+      ...(this.sceneTransformDraft.preserveSourceScale ? { preserveSourceScale: true } : {})
     };
   }
 
-  formatGeoOffsetValue(value) {
-    const unit = this.getText().offset.unit || "m";
-    return `${clampGeoOffset(value).toFixed(1)} ${unit}`;
-  }
-
-  formatGeoScaleValue(value) {
-    const unit = this.getText().offset.scaleUnit || "x";
-    return `${unit}${clampGeoScaleFactor(value).toFixed(2)}`;
-  }
-
-  formatGeoRotationValue(value) {
-    const unit = this.getText().offset.rotationUnit || "deg";
-    return `${Math.round(normalizeRotationDeg(value))} ${unit}`;
-  }
-
-  renderGeoOffsetControls() {
-    const disabled = !this.geoOffsetDraft.enabled;
-    const scaleDisabled = !this.geoOffsetDraft.scaleEnabled;
-    const rotationDisabled = !this.geoOffsetDraft.rotationEnabled;
-
-    if (this.geoOffsetRefs.siteCalibrationEnabled) {
-      this.geoOffsetRefs.siteCalibrationEnabled.checked = this.geoOffsetDraft.useSiteCalibration !== false;
+  renderSceneTransformControls() {
+    const values = this.sceneTransformDraft;
+    const fields = [
+      [this.sceneTransformRefs.xRange, values.position.x, 2],
+      [this.sceneTransformRefs.yRange, values.position.y, 2],
+      [this.sceneTransformRefs.zRange, values.position.z, 2],
+      [this.sceneTransformRefs.scaleRange, values.scaleFactor, 2],
+      [this.sceneTransformRefs.rotationRange, values.rotationDeg, 0]
+    ];
+    for (const [input, value, precision] of fields) {
+      if (input) {
+        input.value = Number(value).toFixed(precision);
+      }
     }
-
-    if (this.geoOffsetRefs.enabled) {
-      this.geoOffsetRefs.enabled.checked = this.geoOffsetDraft.enabled;
-    }
-
-    if (this.geoOffsetRefs.eastRange) {
-      this.geoOffsetRefs.eastRange.value = this.geoOffsetDraft.eastMeters.toFixed(1);
-      this.geoOffsetRefs.eastRange.disabled = disabled;
-    }
-
-    if (this.geoOffsetRefs.northRange) {
-      this.geoOffsetRefs.northRange.value = this.geoOffsetDraft.northMeters.toFixed(1);
-      this.geoOffsetRefs.northRange.disabled = disabled;
-    }
-
-    if (this.geoOffsetRefs.scaleEnabled) {
-      this.geoOffsetRefs.scaleEnabled.checked = this.geoOffsetDraft.scaleEnabled;
-    }
-
-    if (this.geoOffsetRefs.scaleRange) {
-      this.geoOffsetRefs.scaleRange.value = this.geoOffsetDraft.scaleFactor.toFixed(2);
-      this.geoOffsetRefs.scaleRange.disabled = scaleDisabled;
-    }
-
-    if (this.geoOffsetRefs.rotationEnabled) {
-      this.geoOffsetRefs.rotationEnabled.checked = this.geoOffsetDraft.rotationEnabled;
-    }
-
-    if (this.geoOffsetRefs.rotationRange) {
-      this.geoOffsetRefs.rotationRange.value = `${Math.round(this.geoOffsetDraft.rotationDeg)}`;
-      this.geoOffsetRefs.rotationRange.disabled = rotationDisabled;
-    }
-
-    if (this.geoOffsetRefs.eastValue) {
-      this.geoOffsetRefs.eastValue.textContent = this.formatGeoOffsetValue(this.geoOffsetDraft.eastMeters);
-    }
-
-    if (this.geoOffsetRefs.northValue) {
-      this.geoOffsetRefs.northValue.textContent = this.formatGeoOffsetValue(this.geoOffsetDraft.northMeters);
-    }
-
-    if (this.geoOffsetRefs.scaleValue) {
-      this.geoOffsetRefs.scaleValue.textContent = this.formatGeoScaleValue(this.geoOffsetDraft.scaleFactor);
-    }
-
-    if (this.geoOffsetRefs.rotationValue) {
-      this.geoOffsetRefs.rotationValue.textContent = this.formatGeoRotationValue(this.geoOffsetDraft.rotationDeg);
+    if (this.sceneTransformRefs.jsonOutput) {
+      this.sceneTransformRefs.jsonOutput.value = JSON.stringify(
+        {
+          transform: this.getSceneTransformState(),
+          objectTransforms: this.getObjectTransformDrafts()
+        },
+        null,
+        2
+      );
     }
   }
 
@@ -2560,6 +2262,7 @@ export class UIController {
         2
       );
     }
+    this.renderSceneTransformControls();
   }
 
   setMenuOpen(open) {
@@ -3125,16 +2828,14 @@ export class UIController {
     this.setElementText(this.staticRefs.geoTitle, text.geo.title);
     this.setElementText(this.staticRefs.offsetTitle, text.offset.title);
     this.setElementText(this.staticRefs.offsetDescription, text.offset.description);
-    this.setElementText(this.staticRefs.siteCalibrationToggleLabel, text.offset.siteCalibrationToggle);
-    this.setElementText(this.staticRefs.offsetToggleLabel, text.offset.toggle);
-    this.setElementText(this.staticRefs.offsetEastLabel, text.offset.eastLabel);
-    this.setElementText(this.staticRefs.offsetNorthLabel, text.offset.northLabel);
-    this.setElementText(this.staticRefs.scaleToggleLabel, text.offset.scaleToggle);
-    this.setElementText(this.staticRefs.scaleLabel, text.offset.scaleLabel);
-    this.setElementText(this.staticRefs.rotationToggleLabel, text.offset.rotationToggle);
-    this.setElementText(this.staticRefs.rotationLabel, text.offset.rotationLabel);
-    this.setElementText(this.geoOffsetRefs.adoptButton, text.offset.adoptAsSiteCalibration);
-    this.setElementText(this.geoOffsetRefs.resetButton, text.offset.reset);
+    this.setElementText(this.staticRefs.sceneTransformXLabel, text.offset.xLabel);
+    this.setElementText(this.staticRefs.sceneTransformYLabel, text.offset.yLabel);
+    this.setElementText(this.staticRefs.sceneTransformZLabel, text.offset.zLabel);
+    this.setElementText(this.staticRefs.sceneTransformScaleLabel, text.offset.scaleLabel);
+    this.setElementText(this.staticRefs.sceneTransformRotationLabel, text.offset.rotationLabel);
+    this.setElementText(this.staticRefs.sceneTransformJsonLabel, text.offset.jsonLabel);
+    this.setElementText(this.sceneTransformRefs.adoptButton, text.offset.adopt);
+    this.setElementText(this.sceneTransformRefs.resetButton, text.offset.reset);
     this.setElementText(this.activateGeoButton, text.geo.buttons.location);
     this.setElementText(this.calibrateHeadingButton, text.geo.buttons.calibrate);
     this.setElementText(this.staticRefs.geoLabels.status, text.geo.labels.status);
@@ -3209,7 +2910,7 @@ export class UIController {
     this.updateUserPlacementPopup(text);
     this.renderGeoTargetFeedback();
     this.renderAssetLabel();
-    this.renderGeoOffsetControls();
+    this.renderSceneTransformControls();
     this.renderGeoSnapshot(this.lastGeoSnapshot);
     this.renderSensorSnapshot(this.lastSensorSnapshot);
   }

@@ -176,7 +176,7 @@
                 </label>
                 <label class="menu-option">
                   <input type="checkbox" data-card-visibility-toggle="offset" checked />
-                  <span>Geo Offset</span>
+                  <span>Geo Test-Anpassung</span>
                 </label>
               </div>
             </section>
@@ -731,7 +731,7 @@
             <section id="card-offset" class="panel card-panel offset-panel" data-card="offset">
               <div class="card-header">
                 <div class="card-title-group">
-                  <h2 id="offset-card-title">Geo Offset</h2>
+                  <h2 id="offset-card-title">Geo Test-Anpassung</h2>
                 </div>
                 <div class="card-header-actions">
                   <button
@@ -741,7 +741,7 @@
                     data-card-toggle="offset"
                     aria-expanded="false"
                     aria-controls="card-offset-content"
-                    aria-label="Geo Offset auf- oder zuklappen"
+                    aria-label="Geo Test-Anpassung auf- oder zuklappen"
                   >
                     <span data-card-toggle-icon="offset">+</span>
                   </button>
@@ -749,104 +749,25 @@
               </div>
 
               <div id="card-offset-content" class="card-content" data-card-content="offset" hidden>
-                <p id="geo-offset-description" class="hint-text">
-                  Test-Offset für Geo-Placement. Werte werden zur Site-Kalibrierung addiert.
-                </p>
-
-                <label class="offset-toggle-row" for="geo-site-calibration-enabled">
-                  <span id="geo-site-calibration-toggle-label" class="field-label">JSON-Offset aktivieren</span>
-                  <input id="geo-site-calibration-enabled" class="offset-toggle-input" type="checkbox" checked />
-                </label>
-
-                <label class="offset-toggle-row" for="geo-offset-enabled">
-                  <span id="geo-offset-toggle-label" class="field-label">Offset aktivieren</span>
-                  <input id="geo-offset-enabled" class="offset-toggle-input" type="checkbox" />
-                </label>
-
-                <div class="offset-slider-block">
-                  <div class="offset-slider-head">
-                    <span id="geo-offset-east-label" class="field-label">X (Ost/West)</span>
-                    <strong id="geo-offset-east-value" class="offset-slider-value">0.0 m</strong>
+                <div class="object-transform-editor scene-transform-editor">
+                  <p id="geo-offset-description" class="hint-text">
+                    Das komplette geladene Szenenmodell verschieben, skalieren und rotieren. Alle Einzelobjekt-Transformationen bleiben erhalten und werden innerhalb dieser Gesamttransformation angewendet.
+                  </p>
+                  <div class="object-transform-grid">
+                    <label class="offset-slider-block"><span id="scene-transform-x-label" class="field-label">X-Versatz</span><input id="scene-transform-x" class="offset-range-input" type="range" min="-20" max="20" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span id="scene-transform-y-label" class="field-label">Y-Versatz</span><input id="scene-transform-y" class="offset-range-input" type="range" min="-20" max="20" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span id="scene-transform-z-label" class="field-label">Z-Versatz</span><input id="scene-transform-z" class="offset-range-input" type="range" min="-20" max="20" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span id="scene-transform-scale-label" class="field-label">Skalierung</span><input id="scene-transform-scale" class="offset-range-input" type="range" min="0.1" max="3" step="0.01" value="1" /></label>
+                    <label class="offset-slider-block"><span id="scene-transform-rotation-label" class="field-label">Y-Rotation</span><input id="scene-transform-rotation" class="offset-range-input" type="range" min="0" max="360" step="1" value="0" /></label>
                   </div>
-                  <input
-                    id="geo-offset-east-range"
-                    class="offset-range-input"
-                    type="range"
-                    min="-20"
-                    max="20"
-                    step="0.1"
-                    value="0"
-                  />
-                </div>
-
-                <div class="offset-slider-block">
-                  <div class="offset-slider-head">
-                    <span id="geo-offset-north-label" class="field-label">Y (Nord/Süd)</span>
-                    <strong id="geo-offset-north-value" class="offset-slider-value">0.0 m</strong>
+                  <div class="coord-actions">
+                    <button id="scene-transform-adopt-button" class="button" type="button">Gesamtszenen-Transformation in JSON übernehmen</button>
+                    <button id="scene-transform-reset-button" class="button button-ghost" type="button">Gesamtszene zurücksetzen</button>
                   </div>
-                  <input
-                    id="geo-offset-north-range"
-                    class="offset-range-input"
-                    type="range"
-                    min="-20"
-                    max="20"
-                    step="0.1"
-                    value="0"
-                  />
-                </div>
-
-                <label class="offset-toggle-row" for="geo-scale-enabled">
-                  <span id="geo-scale-toggle-label" class="field-label">Skalierung aktivieren</span>
-                  <input id="geo-scale-enabled" class="offset-toggle-input" type="checkbox" />
-                </label>
-
-                <div class="offset-slider-block">
-                  <div class="offset-slider-head">
-                    <span id="geo-scale-label" class="field-label">Skalierung</span>
-                    <strong id="geo-scale-value" class="offset-slider-value">x1.00</strong>
-                  </div>
-                  <input
-                    id="geo-scale-range"
-                    class="offset-range-input"
-                    type="range"
-                    min="1"
-                    max="3"
-                    step="0.01"
-                    value="1"
-                  />
-                </div>
-
-                <label class="offset-toggle-row" for="geo-rotation-enabled">
-                  <span id="geo-rotation-toggle-label" class="field-label">Rotation aktivieren</span>
-                  <input id="geo-rotation-enabled" class="offset-toggle-input" type="checkbox" />
-                </label>
-
-                <div class="offset-slider-block">
-                  <div class="offset-slider-head">
-                    <span id="geo-rotation-label" class="field-label">Rotation</span>
-                    <strong id="geo-rotation-value" class="offset-slider-value">0 deg</strong>
-                  </div>
-                  <input
-                    id="geo-rotation-range"
-                    class="offset-range-input"
-                    type="range"
-                    min="0"
-                    max="360"
-                    step="1"
-                    value="0"
-                  />
-                </div>
-
-                <div class="coord-actions">
-                  <button id="geo-offset-adopt-button" class="button" type="button">
-                    Test-Offset als JSON-Kalibrierung übernehmen
-                  </button>
-                </div>
-
-                <div class="coord-actions">
-                  <button id="geo-offset-reset-button" class="button button-ghost" type="button">
-                    Tests reset
-                  </button>
+                  <label class="field-group">
+                    <span id="scene-transform-json-label" class="field-label">JSON-Ausgabe für placement</span>
+                    <textarea id="scene-transform-json" class="field-input object-transform-json" rows="8" readonly></textarea>
+                  </label>
                 </div>
 
                 <div class="object-transform-editor">

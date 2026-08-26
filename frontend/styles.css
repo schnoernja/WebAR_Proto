@@ -1516,6 +1516,11 @@ body.ar-active .offset-slider-block {
   padding-top: 14px;
 }
 
+.scene-transform-editor {
+  border-top: 0;
+  padding-top: 0;
+}
+
 body.ar-active .object-transform-editor {
   border-color: rgba(244, 241, 231, 0.16);
 }

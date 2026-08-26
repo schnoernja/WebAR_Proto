@@ -37,7 +37,7 @@ const MIN_GEO_SITE_TOLERANCE_METERS = 3;
 const MAX_GEO_SITE_TOLERANCE_METERS = 100;
 const DEFAULT_GEO_SITE_TOLERANCE_METERS = 100;
 const GEO_OFFSET_LIMIT_METERS = 20;
-const MIN_GEO_SCALE_FACTOR = 1;
+const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
 const SLAM_STABILIZER_CONFIG = Object.freeze({
@@ -217,48 +217,13 @@ function normalizeRotationDeg(value) {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
-function normalizeGeoCalibration(calibration) {
-  if (!calibration || typeof calibration !== "object") {
-    return {
-      eastMeters: 0,
-      northMeters: 0,
-      yawDeg: 0
-    };
-  }
-
-  return {
-    eastMeters: Number.isFinite(calibration.eastMeters) ? calibration.eastMeters : 0,
-    northMeters: Number.isFinite(calibration.northMeters) ? calibration.northMeters : 0,
-    yawDeg: Number.isFinite(calibration.yawDeg) ? calibration.yawDeg : 0
-  };
-}
-
-function mergeGeoCalibration(baseCalibration, offsetState) {
-  const useSiteCalibration = !offsetState || offsetState.useSiteCalibration !== false;
-  const effectiveBaseCalibration =
-    useSiteCalibration && baseCalibration && typeof baseCalibration === "object"
-      ? baseCalibration
-      : null;
-  const base = normalizeGeoCalibration(effectiveBaseCalibration);
-  const hasBaseCalibration = Boolean(effectiveBaseCalibration);
-  const hasOffset = Boolean(offsetState && offsetState.enabled);
-
-  if (!hasBaseCalibration && !hasOffset) {
-    return null;
-  }
-
-  return {
-    eastMeters: base.eastMeters + (hasOffset ? clampGeoOffsetMeters(offsetState.eastMeters) : 0),
-    northMeters: base.northMeters + (hasOffset ? clampGeoOffsetMeters(offsetState.northMeters) : 0),
-    yawDeg: base.yawDeg
-  };
-}
-
 function normalizePlacementTransform(transform) {
   if (!transform || typeof transform !== "object") {
     return {
+      position: { x: 0, y: 0, z: 0 },
       scaleFactor: 1,
-      rotationDeg: 0
+      rotationDeg: 0,
+      preserveSourceScale: false
     };
   }
 
@@ -266,26 +231,17 @@ function normalizePlacementTransform(transform) {
     Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : transform.scale;
   const rotationSource =
     Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : transform.rotation;
+  const position = transform.position && typeof transform.position === "object" ? transform.position : {};
 
   return {
-    scaleFactor: clampGeoScaleFactor(scaleSource),
-    rotationDeg: normalizeRotationDeg(rotationSource)
-  };
-}
-
-function mergePlacementTransform(baseTransform, uiState) {
-  const base = normalizePlacementTransform(baseTransform);
-  const hasBaseTransform = Boolean(baseTransform && typeof baseTransform === "object");
-  const hasScaleOverride = Boolean(uiState && uiState.scaleEnabled);
-  const hasRotationOverride = Boolean(uiState && uiState.rotationEnabled);
-
-  if (!hasBaseTransform && !hasScaleOverride && !hasRotationOverride) {
-    return null;
-  }
-
-  return {
-    scaleFactor: hasScaleOverride ? clampGeoScaleFactor(uiState.scaleFactor) : base.scaleFactor,
-    rotationDeg: hasRotationOverride ? normalizeRotationDeg(uiState.rotationDeg) : base.rotationDeg
+    position: {
+      x: clampGeoOffsetMeters(position.x),
+      y: clampGeoOffsetMeters(position.y),
+      z: clampGeoOffsetMeters(position.z)
+    },
+    scaleFactor: clampGeoScaleFactor(Number.isFinite(scaleSource) ? scaleSource : 1),
+    rotationDeg: normalizeRotationDeg(rotationSource),
+    preserveSourceScale: transform.preserveSourceScale === true
   };
 }
 
@@ -370,15 +326,11 @@ export class ARApp {
     this.iosSlamActive = false;
     this.activePlacementAssetSource = null;
     this.activePlacementAssetUrl = null;
-    this.geoOffsetUiState = {
-      useSiteCalibration: true,
-      enabled: false,
-      eastMeters: 0,
-      northMeters: 0,
-      scaleEnabled: false,
+    this.sceneTransformUiState = {
+      position: { x: 0, y: 0, z: 0 },
       scaleFactor: 1,
-      rotationEnabled: false,
-      rotationDeg: 0
+      rotationDeg: 0,
+      preserveSourceScale: false
     };
     this.objectTransformUiState = [];
 
@@ -394,6 +346,7 @@ export class ARApp {
     this.placementController = new PlacementController({
       scene: this.sceneManager.getScene()
     });
+    this.syncSceneTransformStateFromConfig();
 
     const assetInfo = await this.prepareInitialPlacementAsset();
     this.ui.setExperienceMode(this.selectedExperienceMode);
@@ -432,17 +385,16 @@ export class ARApp {
       onRequestGeolocation: () => this.requestGeoLocation(),
       onCalibrateHeading: () => this.calibrateGeoHeading(),
       onGeoHeadingReferenceToggle: (enabled) => this.applyGeoHeadingReferenceMode(enabled),
-      onGeoOffsetToggle: (state) => this.applyGeoOffsetState(state),
-      onGeoOffsetChange: (state) => this.applyGeoOffsetState(state),
-      onGeoOffsetAdopt: (state) => this.adoptGeoOffsetAsSiteCalibration(state),
-      onGeoOffsetReset: () => this.resetGeoOffsetState(),
+      onSceneTransformChange: (transform) => this.applySceneTransformState(transform),
+      onSceneTransformAdopt: (transform) => this.adoptSceneTransformAsSiteConfig(transform),
+      onSceneTransformReset: () => this.resetSceneTransformState(),
       onObjectTransformsChange: (transforms) => this.applyObjectTransformsState(transforms),
       onObjectTransformsAdopt: (transforms) => this.adoptObjectTransformsAsSiteConfig(transforms),
       onToggleScenario: () => this.switchToNextScenario(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
-    this.ui.setGeoOffsetControlState(this.geoOffsetUiState);
+    this.ui.setSceneTransformState(this.sceneTransformUiState);
     this.syncObjectTransformEditor();
 
     const capability = await this.arLauncher.detectCapabilities();
@@ -575,6 +527,7 @@ export class ARApp {
     try {
       this.activeScenarioId = nextScenario.id;
       await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
+      this.syncSceneTransformStateFromConfig();
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
@@ -601,6 +554,7 @@ export class ARApp {
     } catch (error) {
       this.activeScenarioId = previousScenarioId;
       await this.geoSceneManager.loadSite(this.getActiveSiteConfig(), { loadSceneAsset: false });
+      this.syncSceneTransformStateFromConfig();
       this.applySiteGeoTargetFromConfig({ force: true });
       this.applySiteGeoCalibrationFromConfig({ force: true });
       this.applySitePlacementTransformFromConfig({ force: true });
@@ -800,9 +754,8 @@ export class ARApp {
 
     const placementConfig = this.getSiteGeoPlacementConfig();
     const baseCalibration = placementConfig ? placementConfig.calibration : null;
-    const effectiveCalibration = mergeGeoCalibration(baseCalibration, this.geoOffsetUiState);
-    this.placementController.setGeoCalibration(effectiveCalibration);
-    return Boolean(effectiveCalibration);
+    this.placementController.setGeoCalibration(baseCalibration);
+    return Boolean(baseCalibration);
   }
 
   applySitePlacementTransformFromConfig({ force = false } = {}) {
@@ -815,11 +768,8 @@ export class ARApp {
       return false;
     }
 
-    const placementConfig = this.getSiteGeoPlacementConfig();
-    const baseTransform = placementConfig ? placementConfig.transform : null;
-    const effectiveTransform = mergePlacementTransform(baseTransform, this.geoOffsetUiState);
-    this.placementController.setPlacementTransform(effectiveTransform);
-    return Boolean(effectiveTransform);
+    this.placementController.setPlacementTransform(this.sceneTransformUiState);
+    return true;
   }
 
   applySiteObjectTransformsFromConfig({ force = false } = {}) {
@@ -873,116 +823,49 @@ export class ARApp {
     );
   }
 
-  applyGeoOffsetState(state = {}) {
-    const nextState = {
-      useSiteCalibration:
-        typeof state.useSiteCalibration === "boolean"
-          ? state.useSiteCalibration
-          : this.geoOffsetUiState.useSiteCalibration,
-      enabled:
-        typeof state.enabled === "boolean"
-          ? state.enabled
-          : this.geoOffsetUiState.enabled,
-      eastMeters:
-        state.eastMeters != null
-          ? clampGeoOffsetMeters(Number.parseFloat(state.eastMeters))
-          : this.geoOffsetUiState.eastMeters,
-      northMeters:
-        state.northMeters != null
-          ? clampGeoOffsetMeters(Number.parseFloat(state.northMeters))
-          : this.geoOffsetUiState.northMeters,
-      scaleEnabled:
-        typeof state.scaleEnabled === "boolean"
-          ? state.scaleEnabled
-          : this.geoOffsetUiState.scaleEnabled,
-      scaleFactor:
-        state.scaleFactor != null
-          ? clampGeoScaleFactor(Number.parseFloat(state.scaleFactor))
-          : this.geoOffsetUiState.scaleFactor,
-      rotationEnabled:
-        typeof state.rotationEnabled === "boolean"
-          ? state.rotationEnabled
-          : this.geoOffsetUiState.rotationEnabled,
-      rotationDeg:
-        state.rotationDeg != null
-          ? normalizeRotationDeg(Number.parseFloat(state.rotationDeg))
-          : this.geoOffsetUiState.rotationDeg
-    };
-
-    this.geoOffsetUiState = nextState;
-    this.ui.setGeoOffsetControlState(nextState);
-    this.syncGeoAdjustmentsAfterOffsetChange();
-    return { ...nextState };
-  }
-
-  resetGeoOffsetState() {
-    return this.applyGeoOffsetState({
-      useSiteCalibration: true,
-      enabled: false,
-      eastMeters: 0,
-      northMeters: 0,
-      scaleEnabled: false,
-      scaleFactor: 1,
-      rotationEnabled: false,
-      rotationDeg: 0
-    });
-  }
-
-  adoptGeoOffsetAsSiteCalibration(offsetState = null) {
-    if (!this.siteConfig) {
-      this.ui.setMessage("Keine Site geladen. JSON-Kalibrierung kann nicht uebernommen werden.");
-      return null;
+  syncSceneTransformStateFromConfig() {
+    const placementConfig = this.getSiteGeoPlacementConfig();
+    this.sceneTransformUiState = normalizePlacementTransform(placementConfig ? placementConfig.transform : null);
+    if (this.ui) {
+      this.ui.setSceneTransformState(this.sceneTransformUiState);
     }
+    return this.sceneTransformUiState;
+  }
 
-    const state = offsetState && typeof offsetState === "object" ? offsetState : this.geoOffsetUiState;
-    if (!state.enabled) {
-      this.ui.setMessage("Aktiviere zuerst den Test-Offset, um ihn als JSON-Kalibrierung zu uebernehmen.");
+  applySceneTransformState(transform) {
+    this.sceneTransformUiState = normalizePlacementTransform(transform);
+    if (this.placementController) {
+      this.placementController.setPlacementTransform(this.sceneTransformUiState);
+    }
+    this.ui.setSceneTransformState(this.sceneTransformUiState);
+    return this.sceneTransformUiState;
+  }
+
+  resetSceneTransformState() {
+    return this.applySceneTransformState(null);
+  }
+
+  adoptSceneTransformAsSiteConfig(transform) {
+    if (!this.siteConfig) {
+      this.ui.setMessage("Keine Site geladen. Die Gesamtszenen-Transformation kann nicht in die JSON-Konfiguration übernommen werden.");
       return null;
     }
 
     const placementConfigOwner = this.getActivePlacementConfigOwner();
-    const sitePlacement =
-      placementConfigOwner && placementConfigOwner.placement && typeof placementConfigOwner.placement === "object"
-        ? placementConfigOwner.placement
-        : {};
     if (!placementConfigOwner.placement || typeof placementConfigOwner.placement !== "object") {
-      placementConfigOwner.placement = sitePlacement;
+      placementConfigOwner.placement = {};
     }
 
-    const baseCalibration = normalizeGeoCalibration(sitePlacement.calibration);
-    const adoptedCalibration = {
-      eastMeters: baseCalibration.eastMeters + clampGeoOffsetMeters(state.eastMeters),
-      northMeters: baseCalibration.northMeters + clampGeoOffsetMeters(state.northMeters),
-      yawDeg: baseCalibration.yawDeg
+    const adoptedTransform = this.applySceneTransformState(transform);
+    placementConfigOwner.placement.transform = {
+      position: { ...adoptedTransform.position },
+      scaleFactor: adoptedTransform.scaleFactor,
+      rotationDeg: adoptedTransform.rotationDeg,
+      ...(adoptedTransform.preserveSourceScale ? { preserveSourceScale: true } : {})
     };
-    placementConfigOwner.placement.calibration = adoptedCalibration;
-
-    const nextState = this.applyGeoOffsetState({
-      ...this.geoOffsetUiState,
-      useSiteCalibration: true,
-      enabled: false,
-      eastMeters: 0,
-      northMeters: 0
-    });
-
-    this.ui.setMessage(
-      `JSON-Kalibrierung uebernommen: E ${adoptedCalibration.eastMeters.toFixed(2)} m, N ${adoptedCalibration.northMeters.toFixed(2)} m.`
-    );
-    this.ui.setHint("Druecke 'Neu platzieren', um mit der uebernommenen JSON-Kalibrierung zu testen.");
-    return nextState;
-  }
-
-  syncGeoAdjustmentsAfterOffsetChange() {
-    if (!this.placementController) {
-      return;
-    }
-
-    if (!this.isGeoPlacementModeSelected()) {
-      return;
-    }
-
-    this.applySiteGeoCalibrationFromConfig({ force: true });
-    this.applySitePlacementTransformFromConfig({ force: true });
+    this.ui.setMessage("Gesamtszenen-Transformation in die JSON-Konfiguration übernommen.");
+    this.ui.setHint("Die Werte gelten sofort in dieser Sitzung. Für eine dauerhafte Änderung kopiere sie in die Site-JSON.");
+    return adoptedTransform;
   }
 
   getGeoSiteToleranceMeters() {

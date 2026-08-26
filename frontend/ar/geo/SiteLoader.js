@@ -157,8 +157,14 @@ function normalizePlacementTransform(transform) {
 
   const scaleSource = Number.isFinite(transform.scaleFactor) ? transform.scaleFactor : transform.scale;
   const rotationSource = Number.isFinite(transform.rotationDeg) ? transform.rotationDeg : transform.rotation;
+  const position = transform.position && typeof transform.position === "object" ? transform.position : {};
 
   return {
+    position: {
+      x: Number.isFinite(position.x) ? position.x : 0,
+      y: Number.isFinite(position.y) ? position.y : 0,
+      z: Number.isFinite(position.z) ? position.z : 0
+    },
     scaleFactor: Number.isFinite(scaleSource) ? scaleSource : 1,
     rotationDeg: Number.isFinite(rotationSource) ? rotationSource : 0,
     preserveSourceScale: transform.preserveSourceScale === true
