@@ -409,6 +409,7 @@ export class SceneManager {
   }
 
   resetFallbackView() {
+    this.camera.matrixAutoUpdate = true;
     this.camera.position.set(
       APP_CONFIG.fallback.cameraPosition.x,
       APP_CONFIG.fallback.cameraPosition.y,
@@ -424,6 +425,9 @@ export class SceneManager {
       );
       this.controls.update();
     }
+
+    this.camera.updateMatrix();
+    this.camera.updateMatrixWorld(true);
   }
 
   render() {
