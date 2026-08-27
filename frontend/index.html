@@ -7,7 +7,7 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
   />
   <title>EPARtwin WebAR</title>
-  <link rel="stylesheet" href="./styles.css?v=scene-transform-20260826" />
+  <link rel="stylesheet" href="./styles.css?v=info-cards-20260827" />
   <script type="importmap">
     {
       "imports": {
@@ -149,6 +149,9 @@
                 <button id="user-menu-reset-button" class="button user-menu-reset-button" type="button" hidden>
                   Objekt neu platzieren
                 </button>
+                <button id="user-menu-help-button" class="button user-menu-help-button" type="button">
+                  Hilfe
+                </button>
                 <button id="user-menu-survey-button" class="button user-menu-survey-button" type="button">
                   An Umfrage teilnehmen
                 </button>
@@ -256,6 +259,64 @@
           </div>
 
           <div id="hud-body" class="hud-body">
+            <section id="info-card-1" class="panel card-panel info-panel" data-info-card="1">
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="info-card-1-title">Info 1/2</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="close-info-card-1-button"
+                    class="card-close-button"
+                    type="button"
+                    aria-label="Info 1 von 2 schließen"
+                  >
+                    X
+                  </button>
+                </div>
+              </div>
+              <div class="card-content info-card-content">
+                <p id="info-card-1-text" class="info-card-text">
+                  Schwenken Sie mit der Kamera über das Gelände, bis das Fadenkreuz vor Ihren Füßen ist und grün aufleuchtet.
+                </p>
+                <img
+                  id="info-card-1-image"
+                  class="info-card-image"
+                  src="assets/tutorial/ar-flaeche-finden.gif"
+                  alt="Das Smartphone wird zum Boden geschwenkt, bis das Fadenkreuz grün aufleuchtet."
+                />
+              </div>
+            </section>
+
+            <section id="info-card-2" class="panel card-panel info-panel" data-info-card="2" hidden>
+              <div class="card-header">
+                <div class="card-title-group">
+                  <h2 id="info-card-2-title">Info 2/2</h2>
+                </div>
+                <div class="card-header-actions">
+                  <button
+                    id="close-info-card-2-button"
+                    class="card-close-button"
+                    type="button"
+                    aria-label="Info 2 von 2 schließen"
+                  >
+                    X
+                  </button>
+                </div>
+              </div>
+              <div class="card-content info-card-content">
+                <p id="info-card-2-text" class="info-card-text">
+                  Sehen Sie sich in der Szene um. Wechseln Sie die Szene. Teilen Sie mit uns Ihre Erfahrung mit der EPARtwin WebAR in der Umfrage.
+                </p>
+                <img
+                  id="info-card-2-image"
+                  class="info-card-image"
+                  src="assets/tutorial/ar-szenario-und-umfrage.gif"
+                  alt="Die Szene wird gewechselt und anschließend die Umfrage geöffnet."
+                />
+              </div>
+            </section>
+
             <section id="card-welcome" class="panel card-panel welcome-panel" data-card="welcome">
               <div class="card-header">
                 <div class="card-title-group">
@@ -890,6 +951,6 @@
     </div>
   </noscript>
 
-    <script type="module" src="./webxr.js?v=ios-paths-20260827-2"></script>
+    <script type="module" src="./webxr.js?v=info-cards-20260827"></script>
 </body>
 </html>

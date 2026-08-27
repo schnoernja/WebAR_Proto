@@ -255,6 +255,7 @@ const DE_TRANSLATIONS = Object.freeze({
     userPlacementCopy: "",
     userResetPlacement: "Objekt neu platzieren",
     userToolbarReset: "Objekt neu platzieren",
+    userHelpAction: "Hilfe",
     userSurveyAction: "An Umfrage teilnehmen",
     userStopAr: "AR beenden",
     developerCopy: "Entwickleransicht und Debug-Kacheln separat einblenden.",
@@ -336,6 +337,14 @@ const DE_TRANSLATIONS = Object.freeze({
       "4. Handy auf den Boden richten, bis oben rechts 'Objekt platziert: Ja' angezeigt wird.",
       "5. Dann umgucken."
     ]
+  },
+  info: {
+    firstTitle: "Info 1/2",
+    firstText: "Schwenken Sie mit der Kamera über das Gelände, bis das Fadenkreuz vor Ihren Füßen ist und grün aufleuchtet.",
+    firstImageAlt: "Das Smartphone wird zum Boden geschwenkt, bis das Fadenkreuz grün aufleuchtet.",
+    secondTitle: "Info 2/2",
+    secondText: "Sehen Sie sich in der Szene um. Wechseln Sie die Szene. Teilen Sie mit uns Ihre Erfahrung mit der EPARtwin WebAR in der Umfrage.",
+    secondImageAlt: "Die Szene wird gewechselt und anschließend die Umfrage geöffnet."
   },
   survey: {
     title: "Umfrage",
@@ -525,6 +534,8 @@ const DE_TRANSLATIONS = Object.freeze({
     closeButtons: {
       welcome: "Begrüßung schließen",
       help: "Hilfskachel schließen",
+      infoFirst: "Info 1 von 2 schließen",
+      infoSecond: "Info 2 von 2 schließen",
       survey: "Umfrage schließen",
       settings: "Einstellungen schließen"
     },
@@ -560,6 +571,7 @@ const EN_TRANSLATIONS = Object.freeze({
     userPlacementCopy: "",
     userResetPlacement: "Reposition object",
     userToolbarReset: "Reposition object",
+    userHelpAction: "Help",
     userSurveyAction: "Take survey",
     userStopAr: "Stop AR",
     developerCopy: "Show or hide developer views and debug cards separately.",
@@ -640,6 +652,14 @@ const EN_TRANSLATIONS = Object.freeze({
       "4. Point the phone at the floor until the top-right status shows 'Object placed: Yes'.",
       "5. Then look around."
     ]
+  },
+  info: {
+    firstTitle: "Info 1/2",
+    firstText: "Pan the camera across the area until the reticle is in front of your feet and lights up green.",
+    firstImageAlt: "The smartphone is tilted toward the ground until the reticle lights up green.",
+    secondTitle: "Info 2/2",
+    secondText: "Look around the scene. Switch the scene. Share your experience with the EPARtwin WebAR in the survey.",
+    secondImageAlt: "The scene is switched and the survey is then opened."
   },
   survey: {
     title: "Survey",
@@ -829,6 +849,8 @@ const EN_TRANSLATIONS = Object.freeze({
     closeButtons: {
       welcome: "Close welcome card",
       help: "Close help card",
+      infoFirst: "Close info 1 of 2",
+      infoSecond: "Close info 2 of 2",
       survey: "Close survey card",
       settings: "Close settings card"
     },
@@ -1096,6 +1118,7 @@ export class UIController {
     this.openSettingsCardButton = this.document.getElementById("open-settings-card-button");
     this.userMenuActions = this.document.getElementById("user-menu-actions");
     this.userMenuResetButton = this.document.getElementById("user-menu-reset-button");
+    this.userMenuHelpButton = this.document.getElementById("user-menu-help-button");
     this.userMenuSurveyButton = this.document.getElementById("user-menu-survey-button");
     this.menuTabButtons = Array.from(this.document.querySelectorAll("[data-menu-tab]"));
     this.menuTabPanels = Array.from(this.document.querySelectorAll("[data-menu-panel]"));
@@ -1118,6 +1141,8 @@ export class UIController {
     this.calibrateHeadingButton = this.document.getElementById("calibrate-heading-button");
     this.closeWelcomeButton = this.document.getElementById("close-welcome-button");
     this.closeHelpButton = this.document.getElementById("close-help-button");
+    this.closeInfoCardOneButton = this.document.getElementById("close-info-card-1-button");
+    this.closeInfoCardTwoButton = this.document.getElementById("close-info-card-2-button");
     this.closeSurveyButton = this.document.getElementById("close-survey-button");
     this.closeSettingsButton = this.document.getElementById("close-settings-button");
     this.userToolbarActions = this.document.getElementById("user-ar-toolbar-actions");
@@ -1266,6 +1291,14 @@ export class UIController {
       welcomeList: this.document.getElementById("welcome-card-list"),
       helpTitle: this.document.querySelector("#card-help .card-title-group h2"),
       helpCopy: this.document.querySelector("#card-help .help-copy"),
+      infoFirstRoot: this.document.getElementById("info-card-1"),
+      infoFirstTitle: this.document.getElementById("info-card-1-title"),
+      infoFirstText: this.document.getElementById("info-card-1-text"),
+      infoFirstImage: this.document.getElementById("info-card-1-image"),
+      infoSecondRoot: this.document.getElementById("info-card-2"),
+      infoSecondTitle: this.document.getElementById("info-card-2-title"),
+      infoSecondText: this.document.getElementById("info-card-2-text"),
+      infoSecondImage: this.document.getElementById("info-card-2-image"),
       surveyTitle: this.document.getElementById("survey-card-title"),
       surveyPlaceholderTitle: this.document.getElementById("survey-placeholder-title"),
       surveyPlaceholderText: this.document.getElementById("survey-placeholder-text"),
@@ -1341,6 +1374,10 @@ export class UIController {
       cardVisibility: { ...DEFAULT_CARD_VISIBILITY },
       cardCollapsed: { ...DEFAULT_CARD_COLLAPSED },
       language: "de"
+    };
+    this.infoSequenceState = {
+      active: true,
+      step: 1
     };
 
     this.rawUiText = {
@@ -1515,6 +1552,8 @@ export class UIController {
     this.bindButton(this.calibrateHeadingButton, onCalibrateHeading);
     this.bindButton(this.closeWelcomeButton, () => this.closeCard("welcome"));
     this.bindButton(this.closeHelpButton, () => this.closeCard("help"));
+    this.bindButton(this.closeInfoCardOneButton, () => this.advanceInfoSequence());
+    this.bindButton(this.closeInfoCardTwoButton, () => this.completeInfoSequence());
     this.bindButton(this.closeSurveyButton, () => this.closeCard("survey"));
     this.bindButton(this.closeSettingsButton, () => this.closeCard("settings"));
     this.bindButton(this.userMenuResetButton, () => {
@@ -1523,6 +1562,7 @@ export class UIController {
       }
       this.closeMenu();
     });
+    this.bindButton(this.userMenuHelpButton, () => this.startInfoSequence());
     this.bindButton(this.userMenuSurveyButton, () => this.toggleMenuCard("survey"));
     this.bindButton(this.userToolbarResetButton, onResetPlacement);
     this.bindButton(this.userToolbarStopButton, onStopAR);
@@ -2480,6 +2520,7 @@ export class UIController {
     this.applyAllCardStates();
     this.updateMiniSummaryLayout();
     this.updateUserModeActions();
+    this.applyInfoSequenceState();
     this.renderModeSpecificCopy();
     this.renderExperienceModeUI();
     this.renderHelpCopy();
@@ -2645,6 +2686,49 @@ export class UIController {
     });
   }
 
+  startInfoSequence() {
+    if (this.infoSequenceState.active) {
+      return;
+    }
+
+    this.infoSequenceState.active = true;
+    this.infoSequenceState.step = 1;
+    this.applyInfoSequenceState();
+    this.closeMenu();
+  }
+
+  advanceInfoSequence() {
+    if (!this.infoSequenceState.active || this.infoSequenceState.step !== 1) {
+      return;
+    }
+
+    this.infoSequenceState.step = 2;
+    this.applyInfoSequenceState();
+  }
+
+  completeInfoSequence() {
+    if (!this.infoSequenceState.active || this.infoSequenceState.step !== 2) {
+      return;
+    }
+
+    this.infoSequenceState.active = false;
+    this.infoSequenceState.step = 0;
+    this.applyInfoSequenceState();
+  }
+
+  applyInfoSequenceState() {
+    const showForUser = this.isUserMode() && this.infoSequenceState.active;
+    if (this.staticRefs.infoFirstRoot) {
+      this.staticRefs.infoFirstRoot.hidden = !(showForUser && this.infoSequenceState.step === 1);
+    }
+    if (this.staticRefs.infoSecondRoot) {
+      this.staticRefs.infoSecondRoot.hidden = !(showForUser && this.infoSequenceState.step === 2);
+    }
+    if (this.userMenuHelpButton) {
+      this.userMenuHelpButton.disabled = this.infoSequenceState.active;
+    }
+  }
+
   openCard(cardKey) {
     this.setCardVisibility(cardKey, true);
     this.setCardCollapsed(cardKey, false);
@@ -2762,6 +2846,7 @@ export class UIController {
     this.setElementText(this.openSurveyCardButton, text.menu.openSurvey);
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
     this.setElementText(this.userMenuResetButton, text.menu.userResetPlacement);
+    this.setElementText(this.userMenuHelpButton, text.menu.userHelpAction);
     this.setElementText(this.userMenuSurveyButton, text.menu.userSurveyAction);
     this.setElementText(this.userToolbarResetButton, text.menu.userToolbarReset);
     this.setElementText(this.userToolbarStopButton, text.menu.userStopAr);
@@ -2794,6 +2879,17 @@ export class UIController {
 
     this.setElementText(this.staticRefs.helpTitle, text.help.title);
     this.renderHelpCopy();
+
+    this.setElementText(this.staticRefs.infoFirstTitle, text.info.firstTitle);
+    this.setElementText(this.staticRefs.infoFirstText, text.info.firstText);
+    this.setElementText(this.staticRefs.infoSecondTitle, text.info.secondTitle);
+    this.setElementText(this.staticRefs.infoSecondText, text.info.secondText);
+    if (this.staticRefs.infoFirstImage) {
+      this.staticRefs.infoFirstImage.setAttribute("alt", this.toDisplayText(text.info.firstImageAlt));
+    }
+    if (this.staticRefs.infoSecondImage) {
+      this.staticRefs.infoSecondImage.setAttribute("alt", this.toDisplayText(text.info.secondImageAlt));
+    }
 
     this.setElementText(this.staticRefs.surveyTitle, text.survey.title);
     this.setElementText(this.staticRefs.surveyPlaceholderTitle, text.survey.placeholderTitle);
@@ -2893,6 +2989,12 @@ export class UIController {
     }
     if (this.closeHelpButton) {
       this.closeHelpButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.help));
+    }
+    if (this.closeInfoCardOneButton) {
+      this.closeInfoCardOneButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.infoFirst));
+    }
+    if (this.closeInfoCardTwoButton) {
+      this.closeInfoCardTwoButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.infoSecond));
     }
     if (this.closeSurveyButton) {
       this.closeSurveyButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.survey));

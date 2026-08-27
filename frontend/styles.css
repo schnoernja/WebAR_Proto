@@ -619,6 +619,7 @@ body[data-ui-mode="user"] .hud-logo {
 
 .user-toolbar-button,
 .user-menu-reset-button,
+.user-menu-help-button,
 .user-menu-survey-button {
   width: 100%;
 }
@@ -658,6 +659,49 @@ body[data-ui-mode="user"].ar-active .user-menu-survey-button:hover:not(:disabled
 body[data-ui-mode="user"].ar-active .user-menu-survey-button:focus-visible:not(:disabled) {
   border-color: transparent;
   background: #4ca667;
+}
+
+.info-panel {
+  max-height: min(72vh, 700px);
+}
+
+.info-panel .card-header {
+  padding-right: 44px;
+}
+
+.info-panel .card-header-actions {
+  padding-right: 32px;
+}
+
+.info-panel .card-close-button {
+  right: 8px;
+}
+
+.info-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.info-card-text {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.96rem;
+  line-height: 1.5;
+}
+
+.info-card-image {
+  display: block;
+  width: min(100%, 360px);
+  height: auto;
+  align-self: center;
+  border: 1px solid rgba(19, 35, 38, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+body[data-ui-mode="developer"] .info-panel {
+  display: none;
 }
 
 .mini-pill {
@@ -1240,6 +1284,7 @@ body[data-ui-mode="user"].ar-active .status-message,
 body[data-ui-mode="user"].ar-active .hint-text,
 body[data-ui-mode="user"].ar-active .user-placement-popup-title,
 body[data-ui-mode="user"].ar-active .user-placement-popup-text,
+body[data-ui-mode="user"].ar-active .info-card-text,
 body[data-ui-mode="user"].ar-active .help-copy p,
 body[data-ui-mode="user"].ar-active .card-list,
 body[data-ui-mode="user"].ar-active .field-label,
@@ -1682,6 +1727,10 @@ body.ar-active .state-item {
 
   .card-panel {
     max-height: min(35vh, 280px);
+  }
+
+  .info-panel {
+    max-height: min(72vh, 700px);
   }
 
   .hero-panel {

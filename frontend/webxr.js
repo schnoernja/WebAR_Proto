@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=ios-paths-20260827-2";
+import { ARApp } from "./ar/App.js?v=info-cards-20260827";
 
 const app = new ARApp();
 

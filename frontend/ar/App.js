@@ -9,7 +9,7 @@ import { IOSSLAMTracker } from "./IOSSLAMTracker.js?v=ios-paths-20260827-2";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=scene-transform-20260826";
-import { UIController } from "./UIController.js?v=scene-transform-20260826";
+import { UIController } from "./UIController.js?v=info-cards-20260827";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
