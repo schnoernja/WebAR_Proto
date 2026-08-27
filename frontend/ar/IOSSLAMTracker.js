@@ -95,15 +95,12 @@ export class IOSSLAMTracker {
 
     // Boden-Ebene: Normalenvektor nach oben (0, 1, 0), Abstand 1.35m unter der Startkamera
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), ESTIMATED_CAMERA_HEIGHT_METERS);
-    this.tempPlaneQuaternion = new THREE.Quaternion();
-    this.tempPlanePosition = new THREE.Vector3();
     this.tempCameraDirection = new THREE.Vector3();
     this.raycaster = new THREE.Raycaster();
     this.intersectionPoint = new THREE.Vector3();
 
     this.lastHitPose = null;
     this.lastCameraPose = null;
-    this.groundHeight = -ESTIMATED_CAMERA_HEIGHT_METERS;
   }
 
   async start({ videoElement } = {}) {
@@ -272,26 +269,18 @@ export class IOSSLAMTracker {
         };
       }
 
-      // 4. Bodenebene (Plane) oder Boden-Raycast berechnen
+      // 4. Den Blickstrahl mit der geschätzten Bodenebene schneiden.
+      // AlvaAR.findPlane() liefert eine beliebige dominante Ebene aus den
+      // aktuellen Feature-Punkten. Der Aufruf ist RANSAC-basiert, teuer und
+      // kann pro Frame zwischen Wand, Tisch und Boden wechseln. Das machte
+      // die Bodenpose unstetig und verhinderte die nachgelagerte Stabilisierung.
       let hitPose = null;
       let planeDetected = false;
 
-      // Option A: Prüfe explizite Plane Estimation aus AlvaAR
-      const rawPlane = typeof this.alva.findPlane === "function" ? this.alva.findPlane() : null;
-      if (rawPlane && rawPlane.length >= 16) {
-        this.applyPose(rawPlane, this.tempPlaneQuaternion, this.tempPlanePosition);
-        hitPose = {
-          position: this.tempPlanePosition.clone(),
-          quaternion: new THREE.Quaternion() // Flach auf dem Boden
-        };
-        this.groundHeight = this.tempPlanePosition.y;
-        planeDetected = true;
-      } else if (camera) {
-        // Option B: Raycast vom Kamera-Ursprung auf die Bodenebene
+      if (camera) {
         camera.getWorldDirection(this.tempCameraDirection);
         this.raycaster.set(camera.position, this.tempCameraDirection);
 
-        // Schneide mit der Bodenebene
         const intersect = this.raycaster.ray.intersectPlane(this.groundPlane, this.intersectionPoint);
         const distanceToCam = intersect ? intersect.distanceTo(camera.position) : 0;
 
@@ -301,18 +290,6 @@ export class IOSSLAMTracker {
             quaternion: new THREE.Quaternion()
           };
           planeDetected = true;
-        } else {
-          // Fallback: Plaziere stabil vor der Kamera auf Bodenhöhe
-          const forwardGround = new THREE.Vector3(this.tempCameraDirection.x, 0, this.tempCameraDirection.z).normalize();
-          if (forwardGround.lengthSq() > 0.01) {
-            const targetPos = camera.position.clone().addScaledVector(forwardGround, 1.85);
-            targetPos.y = this.groundHeight;
-            hitPose = {
-              position: targetPos,
-              quaternion: new THREE.Quaternion()
-            };
-            planeDetected = true;
-          }
         }
       }
 

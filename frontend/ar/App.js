@@ -1639,6 +1639,14 @@ export class ARApp {
     if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
       this.captureGeoLocalReference(surfaceState, cameraState);
       this.maybePlaceGeoObject(surfaceState, cameraState);
+    } else if (
+      tracking &&
+      surfaceState.isStable &&
+      this.placementController.getMode() === PlacementMode.FREE &&
+      this.ui.isUserMode() &&
+      !this.placementController.isPlaced()
+    ) {
+      this.placeFreeObject("ios-auto");
     }
 
     this.ui.setPlacementState(this.placementController.isPlaced());

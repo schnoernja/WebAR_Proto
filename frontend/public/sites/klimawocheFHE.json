@@ -82,7 +82,12 @@
           "yawDeg": 0
         },
         "transform": {
-          "scaleFactor": 1,
+          "position": {
+            "x": 0,
+            "y": -1.86,
+            "z": 1.32
+          },
+          "scaleFactor": 1.32,
           "rotationDeg": 0,
           "preserveSourceScale": true
         },
