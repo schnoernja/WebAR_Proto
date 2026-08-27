@@ -5,7 +5,7 @@ import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=startup-grounding-20260825";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
-import { IOSSLAMTracker } from "./IOSSLAMTracker.js";
+import { IOSSLAMTracker } from "./IOSSLAMTracker.js?v=ios-world-anchor-20260827";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=scene-transform-20260826";

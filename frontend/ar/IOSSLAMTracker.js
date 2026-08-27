@@ -12,9 +12,56 @@ const DEFAULT_CAMERA_CONFIG = Object.freeze({
   audio: false
 });
 
-// Optimierte Arbeitsauflösung für flüssige Wasm-SLAM-Verarbeitung (30-60 FPS auf iPhones)
-const TARGET_PROCESSING_WIDTH = 480;
+// Begrenzte Arbeitsauflösung für flüssige Wasm-SLAM-Verarbeitung auf iPhones.
+const MAX_PROCESSING_DIMENSION = 640;
 const ESTIMATED_CAMERA_HEIGHT_METERS = 1.35; // Typische Smartphone-Haltehöhe über dem Boden
+
+function getCoverCrop(sourceWidth, sourceHeight, targetAspect) {
+  const sourceAspect = sourceWidth / Math.max(sourceHeight, 1);
+
+  if (sourceAspect > targetAspect) {
+    const width = sourceHeight * targetAspect;
+    return {
+      x: (sourceWidth - width) * 0.5,
+      y: 0,
+      width,
+      height: sourceHeight
+    };
+  }
+
+  const height = sourceWidth / Math.max(targetAspect, 0.0001);
+  return {
+    x: 0,
+    y: (sourceHeight - height) * 0.5,
+    width: sourceWidth,
+    height
+  };
+}
+
+function getProcessingSize(aspect) {
+  const normalizedAspect = Math.max(aspect, 0.0001);
+  const width = normalizedAspect >= 1
+    ? MAX_PROCESSING_DIMENSION
+    : Math.round(MAX_PROCESSING_DIMENSION * normalizedAspect);
+  const height = normalizedAspect >= 1
+    ? Math.round(MAX_PROCESSING_DIMENSION / normalizedAspect)
+    : MAX_PROCESSING_DIMENSION;
+
+  return {
+    width: Math.max(2, width - (width % 2)),
+    height: Math.max(2, height - (height % 2))
+  };
+}
+
+function getAlvaFov(verticalFovDeg, aspect) {
+  if (aspect >= 1) {
+    return verticalFovDeg;
+  }
+
+  const verticalFovRad = THREE.MathUtils.degToRad(verticalFovDeg);
+  const horizontalFovRad = 2 * Math.atan(Math.tan(verticalFovRad * 0.5) * aspect);
+  return THREE.MathUtils.radToDeg(horizontalFovRad);
+}
 
 function toErrorMessage(error) {
   if (error instanceof Error && error.message) {
@@ -44,6 +91,7 @@ export class IOSSLAMTracker {
 
     this.processingWidth = 480;
     this.processingHeight = 640;
+    this.videoCrop = null;
 
     // Boden-Ebene: Normalenvektor nach oben (0, 1, 0), Abstand 1.35m unter der Startkamera
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), ESTIMATED_CAMERA_HEIGHT_METERS);
@@ -113,18 +161,18 @@ export class IOSSLAMTracker {
       throw new Error(`Kamerazugriff fehlgeschlagen: ${toErrorMessage(camError)}`);
     }
 
-    // 3. Verarbeitungs-Canvas einrichten mit korrekter Aspect Ratio
+    // 3. SLAM verarbeitet denselben mittigen Cover-Ausschnitt, der hinter dem WebGL-Canvas sichtbar ist.
     const videoW = this.videoElement.videoWidth || 1280;
     const videoH = this.videoElement.videoHeight || 720;
-    const aspectRatio = videoW / Math.max(videoH, 1);
+    const renderContainer = this.sceneManager ? this.sceneManager.container : null;
+    const renderWidth = renderContainer?.clientWidth || window.innerWidth || videoW;
+    const renderHeight = renderContainer?.clientHeight || window.innerHeight || videoH;
+    const renderAspect = renderWidth / Math.max(renderHeight, 1);
+    const processingSize = getProcessingSize(renderAspect);
 
-    this.processingWidth = TARGET_PROCESSING_WIDTH;
-    this.processingHeight = Math.round(TARGET_PROCESSING_WIDTH / aspectRatio);
-
-    // Auf gerade Pixelmaße runden
-    if (this.processingHeight % 2 !== 0) {
-      this.processingHeight += 1;
-    }
+    this.processingWidth = processingSize.width;
+    this.processingHeight = processingSize.height;
+    this.videoCrop = getCoverCrop(videoW, videoH, renderAspect);
 
     this.canvas.width = this.processingWidth;
     this.canvas.height = this.processingHeight;
@@ -132,12 +180,17 @@ export class IOSSLAMTracker {
 
     // 4. AlvaAR Wasm initialisieren
     try {
-      this.alva = await AlvaAR.Initialize(this.processingWidth, this.processingHeight);
+      const renderCamera = this.sceneManager?.getCamera?.();
+      const cameraFov = Number.isFinite(renderCamera?.fov) ? renderCamera.fov : 45;
+      const alvaFov = getAlvaFov(cameraFov, renderAspect);
+      this.alva = await AlvaAR.Initialize(this.processingWidth, this.processingHeight, alvaFov);
       this.applyPose = AlvaARConnectorTHREE.Initialize(THREE);
       console.info("[IOSSLAMTracker] AlvaAR Wasm SLAM initialisiert.", {
         width: this.processingWidth,
         height: this.processingHeight,
-        aspectRatio: aspectRatio.toFixed(3)
+        aspectRatio: renderAspect.toFixed(3),
+        cameraFov,
+        alvaFov
       });
     } catch (alvaError) {
       this.stop();
@@ -166,7 +219,27 @@ export class IOSSLAMTracker {
     }
 
     // 1. Frame auf Canvas zeichnen & Pixeldaten extrahieren
-    this.ctx.drawImage(this.videoElement, 0, 0, this.processingWidth, this.processingHeight);
+    const crop = this.videoCrop;
+    if (!crop) {
+      return {
+        tracking: false,
+        surfaceDetected: false,
+        isStable: false,
+        pose: null,
+        cameraPose: null
+      };
+    }
+    this.ctx.drawImage(
+      this.videoElement,
+      crop.x,
+      crop.y,
+      crop.width,
+      crop.height,
+      0,
+      0,
+      this.processingWidth,
+      this.processingHeight
+    );
     const frame = this.ctx.getImageData(0, 0, this.processingWidth, this.processingHeight);
 
     // 2. Pose berechnen (mit IMU falls vorhanden)
@@ -331,6 +404,7 @@ export class IOSSLAMTracker {
     }
     this.alva = null;
     this.imu = null;
+    this.videoCrop = null;
     this.lastHitPose = null;
     this.lastCameraPose = null;
   }
