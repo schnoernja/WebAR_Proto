@@ -15,7 +15,6 @@ Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 IPhone Support sicherstellen --> Kamera etc wird abgefragt aber Objekt wird noch nicht korrekt auf Boden platziert
 stabilisierte AlvaAR-Kalibrierung wäre genauer, ist aber eine Erweiterung des Tracking-Verhaltens und sollte auf echten iPhones mit Boden, Tisch, Wand und Treppen getestet werden
 
-
 Problem Efeu/Gebäudebegrünung: SEHR viele Reticles bei so großer Fläche wenn als 3D-Modell. Plane mit Textur sähe doof aus weil realistische Efeu-Textur mit "semi"-realistischen Objekten
 --> vllt findet man "realistischere" Objekte bzw Texturen für die Objekte; WIP
 
@@ -24,10 +23,11 @@ Klimawerte irgendwie einbauen?? Aber das ist bis zur Klimawoche so irrelevant ei
 dargestellt wird und in den Szenen die Thermometer/Farbe oder sonstiges ebenfalls einbauen inkl Veränderung
 --> Knackpunkt: Man muss genau wissen, WO und an welchen Objekten final die WebAR benutzt werden Knackpunkt
 
-
 UI bei Umfrage immer noch etwas inkonsistent
 
 evt neue/bessere Modelle
 
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
 
+
+Sicherungsordner archive/ios-alva-20260904

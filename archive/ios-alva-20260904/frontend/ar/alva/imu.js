@@ -173,6 +173,11 @@ class IMU
 
         const handleDeviceOrientation = ( event ) =>
         {
+            if( !Number.isFinite( event.alpha ) || !Number.isFinite( event.beta ) || !Number.isFinite( event.gamma ) )
+            {
+                return;
+            }
+
             // axis orientation assumes device is placed on ground, screen upward
             const x = event.beta * deg2rad;    // X-axis (β) vertical tilt
             const y = event.gamma * deg2rad;   // Y-axis (γ) horizontal tilt
@@ -188,13 +193,33 @@ class IMU
 
         const handleDeviceMotion = ( event ) =>
         {
-            const gx = event.rotationRate.beta * deg2rad;   // X-axis (β) deg to rad: rad/s
-            const gy = event.rotationRate.gamma * deg2rad;  // Y-axis (γ) deg to rad: rad/s
-            const gz = event.rotationRate.alpha * deg2rad;  // Z-axis (α) deg to rad: rad/s
+            const rotationRate = event.rotationRate;
+            const acceleration = event.acceleration;
+            if( !rotationRate || !acceleration )
+            {
+                return;
+            }
 
-            const ax = event.acceleration.x; // (m/s^2)
-            const ay = event.acceleration.y; // (m/s^2)
-            const az = event.acceleration.z; // (m/s^2)
+            const values = [
+                rotationRate.beta,
+                rotationRate.gamma,
+                rotationRate.alpha,
+                acceleration.x,
+                acceleration.y,
+                acceleration.z
+            ];
+            if( values.some( value => !Number.isFinite( value ) ) )
+            {
+                return;
+            }
+
+            const gx = rotationRate.beta * deg2rad;   // X-axis (β) deg to rad: rad/s
+            const gy = rotationRate.gamma * deg2rad;  // Y-axis (γ) deg to rad: rad/s
+            const gz = rotationRate.alpha * deg2rad;  // Z-axis (α) deg to rad: rad/s
+
+            const ax = acceleration.x; // (m/s^2)
+            const ay = acceleration.y; // (m/s^2)
+            const az = acceleration.z; // (m/s^2)
 
             const timestamp = Date.now();
 
@@ -219,14 +244,26 @@ class IMU
             }
         }
 
-        window.addEventListener( 'devicemotion', handleDeviceMotion.bind( this ), false );
-        window.addEventListener( 'deviceorientation', handleDeviceOrientation.bind( this ), false );
-        window.addEventListener( 'orientationchange', handleScreenOrientation.bind( this ), false );
+        this.handleDeviceMotion = handleDeviceMotion;
+        this.handleDeviceOrientation = handleDeviceOrientation;
+        this.handleScreenOrientation = handleScreenOrientation;
+
+        window.addEventListener( 'devicemotion', this.handleDeviceMotion, false );
+        window.addEventListener( 'deviceorientation', this.handleDeviceOrientation, false );
+        window.addEventListener( 'orientationchange', this.handleScreenOrientation, false );
     }
 
     clear()
     {
         this.motion.length = 0;
+    }
+
+    dispose()
+    {
+        window.removeEventListener( 'devicemotion', this.handleDeviceMotion, false );
+        window.removeEventListener( 'deviceorientation', this.handleDeviceOrientation, false );
+        window.removeEventListener( 'orientationchange', this.handleScreenOrientation, false );
+        this.clear();
     }
 }
 

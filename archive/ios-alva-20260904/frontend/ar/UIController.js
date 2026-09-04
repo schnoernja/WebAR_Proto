@@ -288,17 +288,17 @@ const DE_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Objektplatzierung",
-    intro: "Wähle zwischen freier Platzierung mit stabilisiertem Reticle und Geo-Platzierung mit Standort und Kompass.",
+    intro: "Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung. iPhone-QR-Sites nutzen Kamera, Standort und Kompass direkt im Browser.",
     userIntro: "Tippe auf 'AR starten'.",
     userGuideTitle: "Objektplatzierung",
     userGuideSearch:
       "Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.",
     userGuideDetected: "Flaeche erkannt. Bitte halte das Geraet kurz ruhig, bis das Objekt platziert wird.",
-    userGuideSensor: "Standort und Kompass werden bestimmt. Halte das Gerät ruhig und richte es auf den Boden.",
+    userGuideSensor: "Standort und Kompass werden bestimmt. Halte das iPhone ruhig und richte es auf den Boden.",
     modeLabel: "Hauptmodus",
     modeOptions: {
-      xr: "AR",
-      geoSensor: "Geo"
+      xr: "AR (WebXR)",
+      geoSensor: "Geo (WebXR)"
     },
     buttons: {
       startXR: "AR starten",
@@ -316,8 +316,8 @@ const DE_TRANSLATIONS = Object.freeze({
     headline: "Herzlich Willkommen bei der EPARtwin WebAR Experience!",
     subheading: "Anforderungen",
     items: [
-      "Ein unterstütztes mobiles Gerät",
-      "Kamerafreigabe für den AR- und Geo-Modus",
+      "Ein mobiles Gerät mit WebXR-Unterstützung",
+      "Kamerafreigabe für den AR- und Geo-Modus (WebXR)",
       "Standortfreigabe für Geo-Placement",
       "Eine erkennbare Boden- oder Tischfläche für stabiles Placement"
     ]
@@ -328,7 +328,7 @@ const DE_TRANSLATIONS = Object.freeze({
       "1. Starte AR oder Geo über die Aktionskachel oben.",
       "2. Bewege das Gerät langsam, bis eine stabile Fläche erkannt wird.",
       "3. Im freien Modus setzt du das Objekt direkt auf die stabile Fläche.",
-      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den lokalen AR-Raum übertragen und auf der stabilen Bodenfläche verankert."
+      "4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum übertragen und auf der stabilen Bodenfläche verankert."
     ],
     userSteps: [
       "1. Zum Starten der WebAR-Anwendung mit dem Rücken zum QR-Code stehen.",
@@ -403,7 +403,7 @@ const DE_TRANSLATIONS = Object.freeze({
   state: {
     title: "Status",
     labels: {
-      support: "AR-Unterstützung",
+      support: "WebXR",
       session: "Modus aktiv",
       tracking: "Tracking",
       surface: "Fläche",
@@ -604,16 +604,16 @@ const EN_TRANSLATIONS = Object.freeze({
   placement: {
     eyebrow: "EPARtwin WebAR",
     title: "Object Placement",
-    intro: "Choose between free placement with the stabilized reticle and geo placement with location and compass.",
+    intro: "Choose between free WebXR placement with the stabilized reticle and geo placement. iPhone QR sites use the camera, location, and compass directly in the browser.",
     userIntro: "Tap 'Start AR'.",
     userGuideTitle: "Object placement",
     userGuideSearch: "Please point the device at the floor and move it slowly until a surface is detected.",
     userGuideDetected: "Surface detected. Please hold the device still briefly until the object is placed.",
-    userGuideSensor: "Location and compass are being determined. Hold the device still and point it at the ground.",
+    userGuideSensor: "Location and compass are being determined. Hold the iPhone still and point it at the scene.",
     modeLabel: "Main mode",
     modeOptions: {
-      xr: "AR",
-      geoSensor: "Geo"
+      xr: "AR (WebXR)",
+      geoSensor: "Geo (WebXR)"
     },
     buttons: {
       startXR: "Start AR",
@@ -631,8 +631,8 @@ const EN_TRANSLATIONS = Object.freeze({
     headline: "Welcome to the EPARtwin WebAR Experience!",
     subheading: "Requirements",
     items: [
-      "A supported mobile device",
-      "Camera permission for AR and Geo mode",
+      "A mobile device with WebXR support",
+      "Camera permission for AR and Geo mode (WebXR)",
       "Location permission for geo placement",
       "A visible floor or table surface for stable placement"
     ]
@@ -643,7 +643,7 @@ const EN_TRANSLATIONS = Object.freeze({
       "1. Start AR or Geo from the action card above.",
       "2. Move the device slowly until a stable surface is detected.",
       "3. In free mode you place the object directly on the stable surface.",
-      "4. In coordinate mode the target latitude and longitude are mapped into local AR space and anchored on the stable ground surface."
+      "4. In coordinate mode the target latitude and longitude are mapped into WebXR space and anchored on the stable ground surface."
     ],
     userSteps: [
       "1. Start the WebAR experience while standing with your back to the QR code.",
@@ -718,7 +718,7 @@ const EN_TRANSLATIONS = Object.freeze({
   state: {
     title: "Status",
     labels: {
-      support: "AR support",
+      support: "WebXR",
       session: "Mode active",
       tracking: "Tracking",
       surface: "Surface",

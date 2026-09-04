@@ -1,67 +1,82 @@
-# iOS-AR-Fallback
+# Browserbasierter AR-Pfad für iPhone und iPad
 
-## Startarchitektur
+## Auswahl und Nutzerablauf
 
-`ArCapabilityDetector` prüft beim Initialisieren zuerst echten WebXR-Support mit
-`navigator.xr.isSessionSupported("immersive-ar")`. WebXR hat immer Prioritaet.
-Für iPhone/iPad wird zusätzlich der iPadOS-Desktop-User-Agent erkannt. Öffnet
-ein Nutzer eine gültige QR-Site (`?site=...`), startet `AR starten` den
-Browser-Sensorpfad anstelle von Quick Look.
+`ArCapabilityDetector` prüft zuerst
+`navigator.xr.isSessionSupported("immersive-ar")`. Wird diese Fähigkeit angeboten,
+bleibt der bestehende Android-/WebXR-Pfad unverändert aktiv. Nur wenn sie fehlt,
+prüft die Anwendung ergänzend iOS/iPadOS, HTTPS, Geräteorientierung, WebAssembly
+SIMD, WebGL und Kamerazugriff. Auf einem passenden Gerät wird automatisch
+`IOSWebSLAMPlacementBackend` gewählt.
 
-Die Startwege sind:
+Beide Pfade verwenden dieselbe URL, denselben Startbutton, dieselben
+Statuskomponenten, dasselbe Reticle, dieselbe Platzierungsaktion sowie dieselben
+Reset- und Ende-Funktionen. Technische Backend-Namen erscheinen nicht in der
+Benutzeroberfläche.
 
-- WebXR: Der bestehende `ARApp`-/`ARSessionManager`-Flow wird aufgerufen (Android/Desktop).
-- iPhone/iPad (In-Browser SLAM): `IOSSLAMTracker` startet über WebAssembly (AlvaAR) und IMU ein 6-DoF-Kamera-Tracking mit optischer Bodenflächenerkennung (Hit-Testing) direkt im Browser. Das Kachel-HUD, Menüs und Umfrage-Links bleiben vollständig erhalten.
-- iPhone/iPad mit Geo-Global-Site: Falls explizit der sensorbasierte Geo-Modus gewählt wird, berechnet `SensorFusion` die Kamerapose relativ zum Site-Ursprung.
-- iOS Quick Look Fallback: `IOSQuickLookLauncher` kann bei Bedarf weiterhin ein USDZ-Modell in Quick Look öffnen.
-- Kein bekannter Modus: Die bestehende Statusanzeige zeigt eine Fehlermeldung.
+## Engine und Selbst-Hosting
 
-Die Anfragen für Kamera, Standort und Orientierung werden im selben Klick
-gestartet, damit die auf iOS erforderliche Nutzeraktivierung erhalten bleibt.
+Der iOS-Pfad verwendet die unveränderte **8th Wall Distributed Engine Binary
+1.0.0** mit World Tracking:
 
-## Asset-Zuordnung
+- `vendor/8thwall/xr.js`
+- `vendor/8thwall/xr-slam.js`
+- `vendor/8thwall/LICENSE`
 
-Site-Modelle verwenden `usdzAsset` direkt neben `asset` in der jeweiligen
-Site-JSON. Die Standardmodelle werden in `ar/config.js` ueber
-`primaryQuickLookUrl` und `fallbackQuickLookUrl` zugeordnet. Auf iOS wird die
-Erreichbarkeit der relevanten USDZ-Dateien per `HEAD` vorab geprueft. Eine
-fehlende Datei fuehrt beim Start zu einer klaren UI-Meldung und beeinflusst
-WebXR nicht.
+Bezugsquelle: offizielles npm-Paket
+[`@8thwall/engine-binary@1.0.0`](https://www.npmjs.com/package/@8thwall/engine-binary).
+SHA-256 des bezogenen npm-Archivs:
+`31E916D871A1B9046BBE055A79BC173AA6244D120116A1337D3ADA7EF96112FF`.
 
-Vorhanden und als USDZ-Archiv validiert:
+Nur Entry-Point, SLAM-Chunk und Lizenz werden ausgeliefert. Face Effects,
+Semantikmodelle, VPS, Maps und Hand Tracking sind nicht eingebunden. Das Script
+wird ausschließlich für den automatisch ausgewählten iOS-Pfad dynamisch geladen.
 
-- `frontend/assets/fountain_benches_trees.usdz` (ca. 169,2 MiB)
-- `frontend/assets/flowerpots_benches_gras.usdz` (ca. 40,5 MiB)
-- `frontend/assets/EFH.usdz` (ca. 3,0 MiB)
+Die Binary steht unter dem beigefügten XR Engine License Agreement. Die Dateien
+bleiben unverändert; die Copyright- und Lizenzhinweise sind am Anfang der Binary
+enthalten. In der Hilfe verlinkt „Rechtliche Hinweise“ sichtbar auf
+`vendor/8thwall/LICENSE` und nennt Urheber, Lizenz sowie Gewährleistungsausschluss.
 
-Noch fehlende, weiterhin referenzierte Dateien:
+## Technische Integration
 
-- `frontend/models/tree.usdz`
-- `frontend/models/fountain.usdz`
-- `frontend/assets/platz-a/scene.usdz`
+Das Backend verwendet `XR8.XrController` mit aktiviertem World Tracking und
+absoluter Meter-Skalierung. Der bestehende Three.js-Canvas und Render-Loop treiben
+die Engine über `XR8.runPreRender()` und `XR8.runPostRender()` an. Deshalb entstehen
+weder eine zweite Three.js-Szene noch ein zweiter Render-Loop.
 
-Die USDZ-Dateien muessen in Massstab, Ausrichtung und sichtbarem Inhalt ihren
-jeweiligen GLB-Dateien entsprechen. Der nginx-Container liefert `.usdz` als
-`model/vnd.usdz+zip` aus.
+Die Kamerapose und Projektionsmatrix kommen aus dem Engine-Ergebnis. Ein
+Bildschirm-Hit-Test im unteren mittleren Kamerabereich bevorzugt
+`DETECTED_SURFACE`, danach `ESTIMATED_SURFACE` und zuletzt `FEATURE_POINT`. Die
+Ergebnisse laufen durch den vorhandenen `PoseStabilizer` und anschließend durch
+den unveränderten `PlacementController`. Das Modell behält damit Normalisierung,
+Bodenkontakt, Transformationen, Animationen und fachliche Geo-Local-Regeln.
 
-`fountain_benches_trees.usdz` sollte wegen seiner Groesse auf mehreren
-iPhone-/iPad-Generationen getestet und nach Moeglichkeit durch Mesh- und
-Texturoptimierung verkleinert werden. Die Archivstruktur selbst ist gueltig.
+Eine semantische Bodenklassifizierung wird nicht behauptet. Die Platzierung nutzt
+World Tracking, den dokumentierten 8th-Wall-Hit-Test und die Bestätigung durch den
+Nutzer.
 
-## Technische Grenzen gegenüber WebXR
+## Bestehender Geo-Global-Pfad
 
-- Der Browser-Sensorpfad liefert keine ARKit-/WebXR-Flächenerkennung, keinen
-  Hit-Test und keine Bodenverankerung. Die Szene folgt nur GPS und
-  Geräteorientierung; ihre Lage kann daher driften.
-- Szenariowechsel, Three.js-Szenensteuerung, Kameraansicht sowie das bestehende
-  UI bleiben im Browser verfügbar.
-- Die Sensorfreigaben benötigen HTTPS und können vom Nutzer abgelehnt werden.
-- Quick Look bleibt für Seiten ohne QR-Site separat bestehen; dabei gelten
-  weiterhin dessen Einschränkungen für UI und Szenensteuerung.
+Der getrennte Geo-Global-Modus bleibt aus Kompatibilitätsgründen unverändert. Er
+nutzt weiterhin `SensorFusion`, Standort und Kompass, da eine Umstellung seine
+fachliche Bedeutung und den bestehenden Android-Ablauf verändern würde.
 
-## Referenzen
+## Manuelle Vergleichscheckliste
 
-- [Apple: Previewing a Model with AR Quick Look](https://developer.apple.com/documentation/ARKit/previewing-a-model-with-ar-quick-look)
-- [Apple WWDC25: What's new for the spatial web](https://developer.apple.com/videos/play/wwdc2025/237/)
-- [Apple WWDC21: AR Quick Look, meet Object Capture](https://developer.apple.com/videos/play/wwdc2021/10078/)
-- [IANA: Media Types](https://www.iana.org/assignments/media-types/media-types.xhtml)
+Auf einem unterstützten Android-Gerät und einem realen iPhone jeweils prüfen:
+
+- dieselbe URL, Startansicht und derselbe Startbutton;
+- Kamera-, Standort- und gegebenenfalls Kompassberechtigungen;
+- identische Initialisierungs- und Scananweisungen;
+- Erscheinen, Position und Stabilität des Reticles;
+- Platzierung durch Tippen beziehungsweise „Objekt setzen“;
+- Bodenkontakt, Maßstab, Rotation, Modelle und Animationen;
+- Stabilität beim Umrunden und Drift nach etwa 5–10 Metern;
+- Trackingverlust und Wiederherstellung;
+- Zurücksetzen, erneutes Platzieren, Beenden und erneutes Starten;
+- Tab-Wechsel sowie Rückkehr in die AR-Ansicht;
+- helle, dunkle, strukturreiche und strukturarme Böden;
+- sichtbare oder funktionale Abweichungen zwischen beiden Geräten.
+
+Reale Trackingstabilität, Drift und Bodenqualität können ohne physisches iPhone
+nicht abschließend automatisiert beurteilt werden.

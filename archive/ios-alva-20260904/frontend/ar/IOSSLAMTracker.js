@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { AlvaAR } from "./alva/alva_ar.js";
 import { AlvaARConnectorTHREE } from "./alva/alva_ar_three.js";
-import { IMU } from "./alva/imu.js";
+import { IMU } from "./alva/imu.js?v=iphone-tracking-20260904";
 
 const DEFAULT_CAMERA_CONFIG = Object.freeze({
   video: {
@@ -14,6 +14,11 @@ const DEFAULT_CAMERA_CONFIG = Object.freeze({
 
 // Begrenzte Arbeitsauflösung für flüssige Wasm-SLAM-Verarbeitung auf iPhones.
 const MAX_PROCESSING_DIMENSION = 640;
+const MIN_GROUND_HIT_DISTANCE_METERS = 1.0;
+const MAX_GROUND_HIT_DISTANCE_METERS = 5.0;
+const TRACKING_GRACE_FRAMES = 6;
+const MAX_CAMERA_TRANSLATION_PER_FRAME = 0.5;
+const MAX_CAMERA_ROTATION_PER_FRAME_RAD = Math.PI / 3;
 const ESTIMATED_CAMERA_HEIGHT_METERS = 1.35; // Typische Smartphone-Haltehöhe über dem Boden
 
 function getCoverCrop(sourceWidth, sourceHeight, targetAspect) {
@@ -96,6 +101,8 @@ export class IOSSLAMTracker {
     // Boden-Ebene: Normalenvektor nach oben (0, 1, 0), Abstand 1.35m unter der Startkamera
     this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), ESTIMATED_CAMERA_HEIGHT_METERS);
     this.tempCameraDirection = new THREE.Vector3();
+    this.candidateCameraPosition = new THREE.Vector3();
+    this.candidateCameraQuaternion = new THREE.Quaternion();
     this.raycaster = new THREE.Raycaster();
     this.intersectionPoint = new THREE.Vector3();
 
@@ -251,7 +258,19 @@ export class IOSSLAMTracker {
       }
     }
 
-    if (rawPose) {
+    let poseAccepted = Boolean(rawPose);
+    if (rawPose && camera) {
+      this.applyPose(rawPose, this.candidateCameraQuaternion, this.candidateCameraPosition);
+      if (this.lastCameraPose) {
+        const translationJump = this.candidateCameraPosition.distanceTo(this.lastCameraPose.position);
+        const rotationJump = this.candidateCameraQuaternion.angleTo(this.lastCameraPose.quaternion);
+        poseAccepted =
+          translationJump <= MAX_CAMERA_TRANSLATION_PER_FRAME &&
+          rotationJump <= MAX_CAMERA_ROTATION_PER_FRAME_RAD;
+      }
+    }
+
+    if (rawPose && poseAccepted) {
       this.consecutiveTrackedFrames += 1;
       this.lostFrames = 0;
       this.tracking = true;
@@ -259,7 +278,8 @@ export class IOSSLAMTracker {
       // 3. Three.js Kamera aktualisieren
       if (camera) {
         camera.matrixAutoUpdate = false;
-        this.applyPose(rawPose, camera.quaternion, camera.position);
+        camera.quaternion.copy(this.candidateCameraQuaternion);
+        camera.position.copy(this.candidateCameraPosition);
         camera.updateMatrix();
         camera.updateMatrixWorld(true);
 
@@ -284,7 +304,11 @@ export class IOSSLAMTracker {
         const intersect = this.raycaster.ray.intersectPlane(this.groundPlane, this.intersectionPoint);
         const distanceToCam = intersect ? intersect.distanceTo(camera.position) : 0;
 
-        if (intersect && distanceToCam >= 0.5 && distanceToCam <= 12.0) {
+        if (
+          intersect &&
+          distanceToCam >= MIN_GROUND_HIT_DISTANCE_METERS &&
+          distanceToCam <= MAX_GROUND_HIT_DISTANCE_METERS
+        ) {
           hitPose = {
             position: this.intersectionPoint.clone(),
             quaternion: new THREE.Quaternion()
@@ -308,7 +332,7 @@ export class IOSSLAMTracker {
 
     // Tracking für diesen Frame kurz verloren -> Grace Frames nutzen, um Flackern zu verhindern
     this.lostFrames += 1;
-    if (this.lostFrames <= 6 && this.lastHitPose) {
+    if (this.lostFrames <= TRACKING_GRACE_FRAMES && this.lastHitPose) {
       return {
         tracking: true,
         surfaceDetected: true,
@@ -318,17 +342,17 @@ export class IOSSLAMTracker {
       };
     }
 
-    if (this.lostFrames > 10) {
-      this.tracking = false;
-      this.consecutiveTrackedFrames = 0;
-    }
+    const trackingLost = this.tracking;
+    this.tracking = false;
+    this.consecutiveTrackedFrames = 0;
 
     return {
-      tracking: this.tracking,
+      tracking: false,
+      trackingLost,
       surfaceDetected: false,
       isStable: false,
       pose: null,
-      cameraPose: this.lastCameraPose
+      cameraPose: null
     };
   }
 
@@ -347,6 +371,7 @@ export class IOSSLAMTracker {
     this.consecutiveTrackedFrames = 0;
     this.lostFrames = 0;
     this.lastHitPose = null;
+    this.lastCameraPose = null;
   }
 
   stop() {
@@ -380,6 +405,9 @@ export class IOSSLAMTracker {
       }
     }
     this.alva = null;
+    if (this.imu && typeof this.imu.dispose === "function") {
+      this.imu.dispose();
+    }
     this.imu = null;
     this.videoCrop = null;
     this.lastHitPose = null;

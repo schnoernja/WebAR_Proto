@@ -624,25 +624,6 @@ body[data-ui-mode="user"] .hud-logo {
   width: 100%;
 }
 
-.legal-notice {
-  margin-top: 14px;
-  color: var(--ink-soft);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.legal-notice summary {
-  cursor: pointer;
-}
-
-.legal-notice a {
-  color: inherit;
-}
-
-body.ar-active .legal-notice {
-  color: rgba(244, 241, 231, 0.76);
-}
-
 .user-ar-toolbar-actions .user-toolbar-button {
   flex: 1 1 0;
   width: auto;

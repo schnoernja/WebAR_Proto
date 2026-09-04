@@ -1,6 +1,7 @@
 export const ARLaunchMode = Object.freeze({
   WEBXR: "webxr",
-  IOS_WEB_TRACKING: "ios-web-tracking",
+  IOS_SLAM: "ios-slam",
+  IOS_QUICK_LOOK: "ios-quick-look",
   UNSUPPORTED: "unsupported"
 });
 
@@ -17,30 +18,9 @@ function isSafariBrowser(navigatorRef) {
   return /Safari/i.test(userAgent) && !/(CriOS|FxiOS|EdgiOS|OPiOS|Chrome|Chromium)/i.test(userAgent);
 }
 
-function supportsWasmSimd(windowRef) {
-  if (!windowRef.WebAssembly || typeof windowRef.WebAssembly.validate !== "function") {
-    return false;
-  }
-  const simdProbe = new Uint8Array([
-    0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123,
-    3, 2, 1, 0, 10, 8, 1, 6, 0, 65, 0, 253, 15, 11
-  ]);
-  return windowRef.WebAssembly.validate(simdProbe);
-}
-
-function supportsWebTracking(windowRef, navigatorRef, documentRef) {
-  const canvas = documentRef.createElement("canvas");
-  const hasWebGL = Boolean(
-    canvas.getContext("webgl2") || canvas.getContext("webgl") || canvas.getContext("experimental-webgl")
-  );
-  return Boolean(
-    windowRef.isSecureContext &&
-    supportsWasmSimd(windowRef) &&
-    windowRef.DeviceOrientationEvent &&
-    navigatorRef.mediaDevices &&
-    typeof navigatorRef.mediaDevices.getUserMedia === "function" &&
-    hasWebGL
-  );
+function supportsQuickLook(documentRef) {
+  const link = documentRef.createElement("a");
+  return Boolean(link.relList && typeof link.relList.supports === "function" && link.relList.supports("ar"));
 }
 
 export class ArCapabilityDetector {
@@ -60,8 +40,7 @@ export class ArCapabilityDetector {
   async detect() {
     const isIOS = isIOSDevice(this.navigator);
     const isSafari = isSafariBrowser(this.navigator);
-    const iosWebTrackingSupported =
-      isIOS && supportsWebTracking(this.window, this.navigator, this.document);
+    const quickLookSupported = isIOS && supportsQuickLook(this.document);
     let webXRSupported = false;
     let webXRError = null;
 
@@ -78,21 +57,24 @@ export class ArCapabilityDetector {
     }
 
     let mode = ARLaunchMode.UNSUPPORTED;
-    let message = "AR wird auf diesem Gerät oder Browser nicht unterstützt.";
+    let message = "Dieses Geraet unterstuetzt keinen bekannten AR-Modus.";
 
     if (webXRSupported) {
       mode = ARLaunchMode.WEBXR;
-      message = "AR ist verfügbar.";
-    } else if (iosWebTrackingSupported) {
-      mode = ARLaunchMode.IOS_WEB_TRACKING;
-      message = "AR ist verfügbar.";
+      message = "WebXR immersive-ar ist verfuegbar.";
+    } else if (isIOS) {
+      mode = ARLaunchMode.IOS_SLAM;
+      message = "iPhone erkannt: In-Browser AR mit Boden-SLAM ist verfuegbar.";
+    } else if (quickLookSupported) {
+      mode = ARLaunchMode.IOS_QUICK_LOOK;
+      message = "WebXR nicht verfuegbar, iOS erkannt: Quick-Look-Fallback ist verfuegbar.";
     }
 
     this.lastResult = {
       mode,
       message,
       webXRSupported,
-      iosWebTrackingSupported,
+      quickLookSupported,
       isIOS,
       isSafari,
       webXRError

@@ -206,14 +206,6 @@
               <button id="open-help-card-button" class="button" type="button">
                 Hilfskachel öffnen
               </button>
-              <details class="legal-notice">
-                <summary>Rechtliche Hinweise</summary>
-                <p>
-                  XR Engine © 2026 Niantic Spatial, Inc. Die Software ist unter dem
-                  <a href="./vendor/8thwall/LICENSE" target="_blank" rel="noopener">XR Engine License Agreement</a>
-                  lizenziert und wird ohne Gewährleistung bereitgestellt.
-                </p>
-              </details>
             </section>
 
             <section class="menu-tab-panel" data-menu-panel="survey" role="tabpanel" hidden>
@@ -359,8 +351,8 @@
                 </p>
                 <p id="welcome-card-subheading" class="card-subheading">Anforderungen</p>
                 <ul id="welcome-card-list" class="card-list welcome-list">
-                  <li>Ein unterstütztes mobiles Gerät</li>
-                  <li>Kamerafreigabe für den AR- und Geo-Modus</li>
+                  <li>Ein mobiles Gerät mit WebXR-Unterstützung</li>
+                  <li>Kamerafreigabe für den AR- und Geo-Modus (WebXR)</li>
                   <li>Standortfreigabe für Geo-Placement</li>
                   <li>Eine erkennbare Boden- oder Tischfläche für stabiles Placement</li>
                 </ul>
@@ -390,19 +382,19 @@
 
               <div id="card-placement-content" class="card-content" data-card-content="placement">
                 <p class="panel-intro">
-                  Wähle zwischen freier Platzierung mit stabilisiertem Reticle und Geo-Platzierung mit Standort und Kompass.
+                  Wähle zwischen freier WebXR-Platzierung mit stabilisiertem Reticle und Geo-Platzierung im selben WebXR-Flow mit Standort, IMU und Kompass.
                 </p>
                 <div class="coord-grid">
                   <label class="field field-full startup-developer-only">
                     <span class="field-label">Hauptmodus</span>
                     <select id="experience-mode-select" class="field-input">
-                      <option value="xr">AR</option>
-                      <option value="geo-sensor">Geo</option>
+                      <option value="xr">AR (WebXR)</option>
+                      <option value="geo-sensor">Geo (WebXR)</option>
                     </select>
                   </label>
                 </div>
                 <p id="status-message" class="status-message">
-                  AR-Unterstützung wird geprüft.
+                  Browser und WebXR-Support werden geprüft.
                 </p>
 
                 <div class="button-row">
@@ -458,7 +450,7 @@
                   <p>1. Starte AR oder Geo über die Aktionskachel oben.</p>
                   <p>2. Bewege das Gerät langsam, bis eine stabile Fläche erkannt wird.</p>
                   <p>3. Im freien Modus setzt du das Objekt direkt auf die stabile Fläche.</p>
-                  <p>4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den lokalen AR-Raum übertragen und auf der stabilen Bodenfläche verankert.</p>
+                  <p>4. Im Koordinatenmodus wird das Ziel aus Latitude und Longitude in den WebXR-Raum übertragen und auf der stabilen Bodenfläche verankert.</p>
                 </div>
               </div>
             </section>
@@ -668,7 +660,7 @@
               <div id="card-state-content" class="card-content" data-card-content="state" hidden>
                 <div class="state-grid">
                   <article class="state-item" data-state="support" data-status="idle">
-                    <span class="state-label">AR-Unterstützung</span>
+                    <span class="state-label">WebXR</span>
                     <strong id="state-support" class="state-value">Prüfung</strong>
                   </article>
                   <article class="state-item" data-state="session" data-status="idle">
@@ -955,10 +947,10 @@
 
   <noscript>
     <div class="noscript-banner">
-      Diese Anwendung benötigt JavaScript für die AR-Darstellung.
+      Diese Anwendung benötigt JavaScript für Three.js und WebXR.
     </div>
   </noscript>
 
-    <script type="module" src="./webxr.js?v=8thwall-ios-20260904"></script>
+    <script type="module" src="./webxr.js?v=iphone-tracking-20260904"></script>
 </body>
 </html>

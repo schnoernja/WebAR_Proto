@@ -4,7 +4,8 @@ import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=ios-paths-20260827-2";
 import { ARSessionManager } from "./ARSessionManager.js";
-import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=8thwall-20260904";
+import { IOSQuickLookLauncher } from "./IOSQuickLookLauncher.js";
+import { IOSSLAMTracker } from "./IOSSLAMTracker.js?v=iphone-tracking-20260904";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=iphone-tracking-20260904";
@@ -39,7 +40,7 @@ const GEO_OFFSET_LIMIT_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
-const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({
+const SLAM_STABILIZER_CONFIG = Object.freeze({
   positionSmoothing: 16,
   rotationSmoothing: 14,
   positionDeadbandMeters: 0.004,
@@ -299,12 +300,13 @@ export class ARApp {
     this.arCapabilityDetector = new ArCapabilityDetector({
       sessionMode: APP_CONFIG.ar.sessionMode
     });
-    this.iosPlacementBackend = new IOSWebSLAMPlacementBackend({
-      sceneManager: this.sceneManager,
-      threeRef: THREE
+    this.iosQuickLookLauncher = new IOSQuickLookLauncher();
+    this.iosSlamTracker = new IOSSLAMTracker({
+      sceneManager: this.sceneManager
     });
     this.arLauncher = new ArLauncher({
-      capabilityDetector: this.arCapabilityDetector
+      capabilityDetector: this.arCapabilityDetector,
+      iosQuickLookLauncher: this.iosQuickLookLauncher
     });
     this.placementController = null;
     this.arSessionManager = null;
@@ -335,12 +337,10 @@ export class ARApp {
     this.handleFrame = this.handleFrame.bind(this);
     this.handleSessionEnded = this.handleSessionEnded.bind(this);
     this.handleSelect = this.handleSelect.bind(this);
-    this.handleCanvasPlacement = this.handleCanvasPlacement.bind(this);
   }
 
   async init() {
     await this.sceneManager.initialize();
-    this.sceneManager.getCanvasElement().addEventListener("pointerup", this.handleCanvasPlacement);
     await this.loadSiteConfiguration();
 
     this.placementController = new PlacementController({
@@ -398,12 +398,28 @@ export class ARApp {
     this.syncObjectTransformEditor();
 
     const capability = await this.arLauncher.detectCapabilities();
-    const arAvailable = capability.mode !== ARLaunchMode.UNSUPPORTED;
-    const supportMessage = capability.message;
+    if (capability.mode === ARLaunchMode.IOS_QUICK_LOOK && !this.siteConfig) {
+      await Promise.all(
+        this.getIOSQuickLookAssetCandidates().map((url) => this.iosQuickLookLauncher.checkAsset(url))
+      );
+    }
+    const arAvailable = capability.mode !== ARLaunchMode.UNSUPPORTED || capability.isIOS;
+    const supportMessage =
+      capability.mode === ARLaunchMode.IOS_SLAM
+        ? "iPhone erkannt: In-Browser AR mit Boden-Tracking ist verfügbar."
+        : capability.isIOS && capability.mode !== ARLaunchMode.WEBXR && this.siteConfig
+          ? "iPhone-Browser-AR ist für diese QR-Site verfügbar."
+          : capability.message;
     this.ui.setSupportState(arAvailable, supportMessage);
     this.ui.setSessionState(
       false,
-      arAvailable ? "AR kann gestartet werden." : supportMessage
+      capability.mode === ARLaunchMode.WEBXR
+        ? "AR kann gestartet werden."
+        : capability.mode === ARLaunchMode.IOS_SLAM
+          ? "iPhone-AR mit Boden-Tracking kann gestartet werden."
+          : capability.isIOS && capability.mode !== ARLaunchMode.WEBXR && this.siteConfig
+            ? "iPhone-Browser-AR kann gestartet werden."
+            : supportMessage
     );
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
@@ -413,7 +429,7 @@ export class ARApp {
 
     if (this.siteConfig && !this.ui.isUserMode()) {
       this.ui.setMessage(`Site '${this.siteConfig.id}' geladen.`);
-      this.ui.setHint("QR-Site geladen. AR mit Geo-Local ist vorausgewählt.");
+      this.ui.setHint("QR-Site geladen. AR (WebXR) mit Geo-Local ist vorausgewaehlt.");
     }
 
     this.sceneManager.setAnimationLoop(this.handleFrame);
@@ -1011,26 +1027,44 @@ export class ARApp {
       return this.startIOSBrowserSensorFallback();
     }
 
+    const quickLookAssetUrl = this.getIOSQuickLookAssetUrl();
     const result = await this.arLauncher.launch({
       startWebXR: () => this.startSelectedWebXRExperience(),
-      startIOSWebTracking: () => this.startIOSWebTrackingExperience()
+      startIOSSLAM: () => this.startIOSSLAMExperience(),
+      quickLookAssetUrl
     });
 
-    if (result.mode === ARLaunchMode.WEBXR || result.mode === ARLaunchMode.IOS_WEB_TRACKING) {
+    if (result.mode === ARLaunchMode.WEBXR || result.mode === ARLaunchMode.IOS_SLAM) {
       return result.started;
     }
 
-    this.ui.setSessionState(false, "AR wird auf diesem Gerät oder Browser nicht unterstützt.");
+    if (result.mode === ARLaunchMode.IOS_QUICK_LOOK) {
+      if (!result.started) {
+        this.ui.setSessionState(false, "iOS-Fallback nicht moeglich: USDZ-Datei fehlt.");
+        this.ui.setHint(
+          quickLookAssetUrl
+            ? `iOS AR benoetigt eine USDZ-Datei fuer dieses Modell: ${quickLookAssetUrl}`
+            : "iOS AR benoetigt eine USDZ-Datei fuer dieses Modell."
+        );
+        return false;
+      }
+
+      this.ui.setSessionState(false, "AR Quick Look Link wurde geoeffnet.");
+      this.ui.setHint("Das Modell wird in Apples AR Quick Look angezeigt.");
+      return true;
+    }
+
+    this.ui.setSessionState(false, "Dieses Geraet unterstuetzt keinen bekannten AR-Modus.");
     this.ui.setHint("Fallback-3D-Ansicht bleibt aktiv.");
     return false;
   }
 
-  async startIOSWebTrackingExperience() {
+  async startIOSSLAMExperience() {
     if (this.iosSlamActive || this.geoSensorActive || (this.arSessionManager && this.arSessionManager.isActive())) {
       return false;
     }
 
-    this.ui.setMessage("AR wird initialisiert...");
+    this.ui.setMessage("Starte iPhone-AR mit Boden-Tracking...");
     const xrAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
     if (!xrAssetReady) {
       this.ui.setSessionState(false, "AR konnte nicht gestartet werden: 3D-Modell fehlt.");
@@ -1040,14 +1074,14 @@ export class ARApp {
     this.sceneManager.setSLAMMode(true);
     this.placementController.enterARMode();
     this.placementController.setTrackingVisible(false);
-    this.poseStabilizer.setConfig(IOS_TRACKING_STABILIZER_CONFIG);
+    this.poseStabilizer.setConfig(SLAM_STABILIZER_CONFIG);
 
     try {
-      await this.iosPlacementBackend.start({
+      await this.iosSlamTracker.start({
         videoElement: this.sceneManager.cameraVideo
       });
       this.iosSlamActive = true;
-      this.ui.setSessionState(true, "AR aktiv. Bewege das Gerät langsam über den Boden.");
+      this.ui.setSessionState(true, "iPhone-AR aktiv. Bewege das Gerät über den Boden.");
       this.ui.setHint("Sobald eine Bodenfläche erkannt wird, erscheint das Reticle.");
       this.ui.setTrackingState(false);
       this.ui.setSurfaceState(false, false);
@@ -1055,31 +1089,31 @@ export class ARApp {
       this.syncCanvasPointerState();
       return true;
     } catch (error) {
-      console.error("Browser-AR start failed:", error);
-      this.iosPlacementBackend.stop();
+      console.error("iOS SLAM start failed:", error);
+      this.iosSlamTracker.stop();
       this.placementController.exitARMode();
       this.sceneManager.setSLAMMode(false);
       this.sceneManager.resetFallbackView();
       this.iosSlamActive = false;
       this.ui.setSessionState(false, error instanceof Error ? error.message : "AR konnte nicht gestartet werden.");
-      this.ui.setHint("Prüfe die Kamera-Berechtigung in den Browser-Einstellungen.");
+      this.ui.setHint("Prüfe Kamera- und Sensor-Berechtigungen in den Safari-Einstellungen.");
       return false;
     }
   }
 
-  async stopIOSWebTrackingExperience() {
+  async stopIOSSLAMExperience() {
     if (!this.iosSlamActive) {
       return true;
     }
 
-    this.iosPlacementBackend.stop();
+    this.iosSlamTracker.stop();
     this.placementController.exitARMode();
     this.poseStabilizer.reset();
     this.sceneManager.setSLAMMode(false);
     this.sceneManager.resetFallbackView();
     this.iosSlamActive = false;
 
-    this.ui.setSessionState(false, "AR wurde beendet.");
+    this.ui.setSessionState(false, "iPhone-AR wurde beendet.");
     this.ui.setHint("Fallback-3D-Ansicht aktiv.");
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
@@ -1096,7 +1130,7 @@ export class ARApp {
 
     const activeSiteConfig = this.getActiveSiteConfig();
     if (!activeSiteConfig || !activeSiteConfig.origin) {
-      this.ui.setSessionState(false, "Geo-AR benötigt eine Site mit Ursprungskoordinaten.");
+      this.ui.setSessionState(false, "iPhone-Browser-AR benötigt eine Site mit Ursprungskoordinaten.");
       this.ui.setHint("Öffne die Anwendung über den QR-Link mit einem gültigen ?site=... Parameter.");
       return false;
     }
@@ -1140,10 +1174,10 @@ export class ARApp {
       this.syncPresentationVisibility();
       if (!sensorStarted) {
         const sensorSnapshot = this.sensorFusion.getSnapshot();
-        this.ui.setSessionState(false, sensorSnapshot.message || "Geo-AR konnte nicht gestartet werden.");
-        this.ui.setHint("Geo-AR benötigt Standort- sowie Kompass-/Bewegungsfreigabe.");
+        this.ui.setSessionState(false, sensorSnapshot.message || "iPhone-Browser-AR konnte nicht gestartet werden.");
+        this.ui.setHint("iPhone-Browser-AR benötigt Standort- sowie Kompass-/Bewegungsfreigabe.");
       } else if (!siteSceneReady) {
-        this.ui.setSessionState(false, "Geo-AR konnte die Site-Szene nicht laden.");
+        this.ui.setSessionState(false, "iPhone-Browser-AR konnte die Site-Szene nicht laden.");
         this.ui.setHint("Prüfe den Modellpfad in der Site-JSON und starte danach erneut.");
       }
       this.ui.setTrackingState(false);
@@ -1155,7 +1189,7 @@ export class ARApp {
 
     this.geoSensorActive = true;
     this.syncPresentationVisibility();
-    this.ui.setSessionState(true, `Geo-AR aktiv. Site '${this.siteConfig.id}' geladen.`);
+    this.ui.setSessionState(true, `iPhone-Browser-AR aktiv. Site '${this.siteConfig.id}' geladen.`);
     this.ui.setTrackingState(false);
     this.ui.setSurfaceState(false, false);
     this.ui.setPlacementState(false);
@@ -1223,7 +1257,7 @@ export class ARApp {
 
   async stopActiveExperience() {
     if (this.iosSlamActive) {
-      return this.stopIOSWebTrackingExperience();
+      return this.stopIOSSLAMExperience();
     }
 
     if (this.geoSensorActive) {
@@ -1321,7 +1355,7 @@ export class ARApp {
     }
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
-      this.ui.setMessage("AR läuft bereits. Beende zuerst den AR-Modus.");
+      this.ui.setMessage("WebXR laeuft bereits. Beende zuerst den AR-Modus.");
       return false;
     }
 
@@ -1359,7 +1393,7 @@ export class ARApp {
     const activeSiteConfig = this.getActiveSiteConfig();
     if (!activeSiteConfig || !activeSiteConfig.origin) {
       this.ui.setSessionState(false, "Geo-Modus benoetigt in der Site-JSON eine origin-Koordinate.");
-      this.ui.setHint("Für QR-basiertes Placement nutze AR mit Geo-Local.");
+      this.ui.setHint("Fuer QR-basiertes Placement nutze AR (WebXR) mit Geo-Local.");
       await this.stopAR();
       return false;
     }
@@ -1420,7 +1454,7 @@ export class ARApp {
 
   async startAR({ allowGeoGlobal = false } = {}) {
     if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL && !allowGeoGlobal) {
-      this.ui.setMessage("Geo-Global-Modus nutzt den Geo-Flow. Wähle 'Geo' und starte diesen Modus.");
+      this.ui.setMessage("Geo-Global-Modus nutzt den Geo-WebXR-Flow. Waehle 'Geo (WebXR)' und starte diesen Modus.");
       return false;
     }
 
@@ -1572,36 +1606,30 @@ export class ARApp {
       this.syncDebugPanels(surfaceState, cameraState);
       this.updateInteractionHint(surfaceState, tracking, cameraState);
     } else if (this.iosSlamActive) {
-      this.updateIOSWebTrackingFrame(timeMs, deltaSeconds);
+      this.updateIOSSLAMFrame(deltaSeconds);
     } else if (this.geoSensorActive) {
       this.updateGeoSensorFrame(deltaSeconds);
     }
 
     this.sceneManager.render();
-    if (this.iosSlamActive) {
-      this.iosPlacementBackend.finishFrame();
-    }
   }
 
-  updateIOSWebTrackingFrame(timeMs, deltaSeconds) {
+  updateIOSSLAMFrame(deltaSeconds) {
     if (this.isTextInputActive) {
       return;
     }
 
-    const slamResult = this.iosPlacementBackend.update(timeMs, this.sceneManager.getCamera());
-    if (slamResult.error) {
-      const message = toMessage(slamResult.error, "AR wurde wegen eines technischen Fehlers beendet.");
-      void this.stopIOSWebTrackingExperience();
-      this.ui.setSessionState(false, message);
-      this.ui.setHint("Prüfe die Browser-Berechtigungen und starte AR erneut.");
-      return;
-    }
+    const slamResult = this.iosSlamTracker.update(deltaSeconds, this.sceneManager.getCamera());
     const tracking = slamResult.tracking;
     this.placementController.setTrackingVisible(tracking);
     this.ui.setTrackingState(tracking);
 
     if (slamResult.trackingLost) {
       this.poseStabilizer.reset();
+      if (this.placementController.isPlaced()) {
+        this.placementController.resetPlacement();
+        this.ui.setPlacementState(false);
+      }
     }
 
     let surfaceState = null;
@@ -1621,6 +1649,14 @@ export class ARApp {
     if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
       this.captureGeoLocalReference(surfaceState, cameraState);
       this.maybePlaceGeoObject(surfaceState, cameraState);
+    } else if (
+      tracking &&
+      surfaceState.isStable &&
+      this.placementController.getMode() === PlacementMode.FREE &&
+      this.ui.isUserMode() &&
+      !this.placementController.isPlaced()
+    ) {
+      this.placeFreeObject("ios-auto");
     }
 
     this.ui.setPlacementState(this.placementController.isPlaced());
@@ -1658,13 +1694,6 @@ export class ARApp {
     if (this.placementController.getMode() === PlacementMode.GEO) {
       this.placeGeoObject("xr");
     }
-  }
-
-  handleCanvasPlacement(event) {
-    if (!this.iosSlamActive || event.isPrimary === false || event.button !== 0) {
-      return;
-    }
-    this.handleSelect();
   }
 
   applyPlacementMode(mode) {
@@ -1737,7 +1766,7 @@ export class ARApp {
     }
 
     if (normalizedMode === ExperienceMode.GEO_SENSOR && !this.siteConfig) {
-      this.ui.setMessage("Geo ist ohne Site-QR-Konfiguration nicht verfügbar.");
+      this.ui.setMessage("Geo (WebXR) ist ohne Site-QR-Konfiguration nicht verfuegbar.");
       return false;
     }
 
@@ -1769,15 +1798,15 @@ export class ARApp {
     }
 
     if (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR) {
-      this.ui.setHint("Geo ausgewählt. Beim Start werden AR, Standort und Kompass gemeinsam aktiviert.");
+      this.ui.setHint("Geo (WebXR) ausgewaehlt. Beim Start werden WebXR, Standort und IMU/Kompass gemeinsam aktiviert.");
     } else if (this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL) {
       this.ui.setHint(
         this.geoHeadingReferenceEnabled
-          ? "AR ausgewählt. Geo-Local nutzt QR-Offsets mit optionalem Kompassbezug für echte Ost/Nord-Platzierung."
-          : "AR ausgewählt. Geo-Local nutzt QR-Offsets mit stabilisierter Flächenerkennung."
+          ? "AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit optionalem Kompassbezug fuer echte Ost/Nord-Platzierung."
+          : "AR (WebXR) ausgewaehlt. Geo-Local nutzt QR-Offsets mit Hit-Test + Stabilizer."
       );
     } else {
-      this.ui.setHint("AR ausgewählt. Freie Platzierung bleibt unverändert.");
+      this.ui.setHint("AR (WebXR) ausgewaehlt. Freie Platzierung bleibt unveraendert.");
     }
 
     return true;
@@ -1870,9 +1899,6 @@ export class ARApp {
     }
 
     this.ui.setPlacementState(true);
-    if (isSLAMSession) {
-      this.iosPlacementBackend.setPlaced(true);
-    }
     this.ui.setMessage("Objekt stabil auf der erkannten Flaeche platziert.");
     this.ui.setHint("Placement-Lock aktiv. Neu platzieren nur per Reset.");
     return true;
@@ -1908,7 +1934,7 @@ export class ARApp {
 
     const cameraState = this.lastCameraState;
     if (!cameraState) {
-      this.ui.setMessage("Tracking pausiert. Halte das Gerät ruhig, bis die Position wieder erfasst wird.");
+      this.ui.setMessage("Tracking pausiert. Halte das Geraet ruhig, bis WebXR wieder Viewer-Pose liefert.");
       return false;
     }
 
@@ -1953,9 +1979,6 @@ export class ARApp {
 
     const objectCount = Array.isArray(computation.placements) ? computation.placements.length : 1;
     this.ui.setPlacementState(true);
-    if (isSLAMSession) {
-      this.iosPlacementBackend.setPlaced(true);
-    }
     this.ui.setMessage(`Geo-Local Placement aktiv: ${objectCount} Objekt(e) relativ zum QR-Ursprung gesetzt.`);
     this.ui.setHint("Placement-Lock aktiv. Offsets bleiben stabil, bis du resettest.");
     return true;
@@ -1980,9 +2003,6 @@ export class ARApp {
 
     const objectCount = Array.isArray(computation.placements) ? computation.placements.length : 1;
     this.ui.setPlacementState(true);
-    if (this.iosSlamActive) {
-      this.iosPlacementBackend.setPlaced(true);
-    }
     this.ui.setMessage(`Geo-Local Placement aktiv: ${objectCount} Objekt(e) relativ zum QR-Ursprung gesetzt.`);
     this.ui.setHint("Placement-Lock aktiv. Offsets bleiben stabil, bis du resettest.");
   }
@@ -2117,7 +2137,7 @@ export class ARApp {
     }
 
     if (!tracking) {
-      this.ui.setHint("Tracking pausiert. Halte das Gerät ruhig, bis die Position wieder erfasst wird.");
+      this.ui.setHint("Tracking pausiert. Halte das Geraet ruhig, bis WebXR wieder Viewer-Pose liefert.");
       return;
     }
 
@@ -2189,8 +2209,8 @@ export class ARApp {
     if (this.arSessionManager) {
       this.arSessionManager.clearOriginPose();
     }
-    if (this.iosSlamActive && this.iosPlacementBackend) {
-      this.iosPlacementBackend.reset();
+    if (this.iosSlamActive && this.iosSlamTracker) {
+      this.iosSlamTracker.reset();
     }
     this.placementController.clearGeoOrigin();
     this.placementController.clearGeoReferenceDirection();
@@ -2240,8 +2260,6 @@ export class ARApp {
     this.poseStabilizer.reset();
     this.geoLocationService.stop();
     this.headingService.dispose();
-    this.iosPlacementBackend.dispose();
-    this.sceneManager.getCanvasElement().removeEventListener("pointerup", this.handleCanvasPlacement);
 
     if (this.placementController) {
       this.placementController.dispose();
