@@ -40,14 +40,15 @@ const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
 const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({
-  positionSmoothing: 16,
-  rotationSmoothing: 14,
+  positionSmoothing: 8,
+  rotationSmoothing: 8,
   positionDeadbandMeters: 0.004,
   rotationDeadbandRad: 0.03,
-  stabilityWindowSize: 10,
-  stableFramesRequired: 8,
-  maxPositionDeviationMeters: 0.035,
-  maxRotationDeviationRad: 0.1
+  stabilityWindowSize: 12,
+  stableFramesRequired: 15,
+  maxPositionDeviationMeters: 0.06,
+  maxRotationDeviationRad: 0.2,
+  stabilityUsesSmoothedPose: true
 });
 
 function normalizeExperienceMode(mode) {
@@ -1618,9 +1619,13 @@ export class ARApp {
     const cameraState = slamResult.cameraPose ? buildCameraStateFromPose(slamResult.cameraPose) : null;
     this.lastCameraState = cameraState;
 
-    if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
-      this.captureGeoLocalReference(surfaceState, cameraState);
-      this.maybePlaceGeoObject(surfaceState, cameraState);
+    if (tracking && surfaceState.isStable && !this.placementController.isPlaced()) {
+      if (this.placementController.getMode() === PlacementMode.FREE) {
+        this.placeFreeObject("ios-auto");
+      } else if (this.placementController.getMode() === PlacementMode.GEO) {
+        this.captureGeoLocalReference(surfaceState, cameraState);
+        this.maybePlaceGeoObject(surfaceState, cameraState);
+      }
     }
 
     this.ui.setPlacementState(this.placementController.isPlaced());

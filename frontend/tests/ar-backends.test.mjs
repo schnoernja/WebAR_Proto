@@ -294,3 +294,13 @@ test("gemeinsame Oberfläche enthält genau einen neutralen AR-Start", async () 
   assert.match(html, /href="\.\/vendor\/8thwall\/LICENSE"/);
   assert.match(html, /© 2026 Niantic Spatial, Inc\./);
 });
+
+test("iOS platziert nach geglätteter stabiler Bodenpose automatisch", async () => {
+  const appSource = await readFile(new URL("../ar/App.js", import.meta.url), "utf8");
+  const stabilizerSource = await readFile(new URL("../ar/PoseStabilizer.js", import.meta.url), "utf8");
+
+  assert.match(appSource, /stabilityUsesSmoothedPose:\s*true/);
+  assert.match(appSource, /surfaceState\.isStable\s*&&\s*!this\.placementController\.isPlaced\(\)/);
+  assert.match(appSource, /this\.placeFreeObject\("ios-auto"\)/);
+  assert.match(stabilizerSource, /this\.config\.stabilityUsesSmoothedPose/);
+});

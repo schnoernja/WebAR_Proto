@@ -49,8 +49,12 @@ export class PoseStabilizer {
     }
 
     this.missedFrames = 0;
-    this.pushSample(rawPose);
     this.updateSmoothedPose(rawPose, deltaSeconds);
+    this.pushSample(
+      this.config.stabilityUsesSmoothedPose && this.smoothedPose
+        ? this.smoothedPose
+        : rawPose
+    );
 
     const metrics = this.computeStabilityMetrics();
     const windowStable =

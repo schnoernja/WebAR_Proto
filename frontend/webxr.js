@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=8thwall-ios-20260904";
+import { ARApp } from "./ar/App.js?v=ios-auto-placement-fix-20260904";
 
 const app = new ARApp();
 
