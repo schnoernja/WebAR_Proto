@@ -194,10 +194,19 @@ test("iOS-Backend nutzt genau einen extern gesteuerten Render-Loop und räumt sa
   const frame = backend.update(1000, camera);
   assert.equal(frame.tracking, true);
   assert.equal(frame.surfaceDetected, true);
+  assert.equal(frame.isStable, false);
   assert.equal(frame.hitType, "DETECTED_SURFACE");
   backend.finishFrame();
   assert.equal(calls.pre, 1);
   assert.equal(calls.post, 1);
+
+  let stableFrame = null;
+  for (let timeMs = 1100; timeMs <= 2200; timeMs += 100) {
+    stableFrame = backend.update(timeMs, camera);
+    backend.finishFrame();
+  }
+  assert.equal(stableFrame.surfaceDetected, true);
+  assert.equal(stableFrame.isStable, true);
 
   backend.setPlaced(true);
   assert.equal(backend.state, PlacementBackendState.PLACED);
@@ -302,5 +311,6 @@ test("iOS platziert nach geglätteter stabiler Bodenpose automatisch", async () 
   assert.match(appSource, /stabilityUsesSmoothedPose:\s*true/);
   assert.match(appSource, /surfaceState\.isStable\s*&&\s*!this\.placementController\.isPlaced\(\)/);
   assert.match(appSource, /this\.placeFreeObject\("ios-auto"\)/);
+  assert.match(appSource, /slamResult\.isStable/);
   assert.match(stabilizerSource, /this\.config\.stabilityUsesSmoothedPose/);
 });

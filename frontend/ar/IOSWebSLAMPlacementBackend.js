@@ -15,6 +15,8 @@ const PIPELINE_MODULE_NAME = "epartwin-ios-world-tracking";
 const CAMERA_START_HEIGHT_METERS = 1.6;
 const HIT_TEST_X = 0.5;
 const HIT_TEST_Y = 0.62;
+const SURFACE_DWELL_MS = 1200;
+const SURFACE_HIT_GRACE_MS = 300;
 const HIT_TYPE_PRIORITY = Object.freeze({
   DETECTED_SURFACE: 3,
   ESTIMATED_SURFACE: 2,
@@ -67,6 +69,8 @@ export class IOSWebSLAMPlacementBackend {
     this.preRenderPending = false;
     this.latestReality = null;
     this.lastTracking = false;
+    this.surfaceHitStartedAtMs = null;
+    this.lastSurfaceHitAtMs = null;
     this.placed = false;
     this.state = PlacementBackendState.IDLE;
     this.error = null;
@@ -208,6 +212,7 @@ export class IOSWebSLAMPlacementBackend {
     this.error = null;
     this.latestReality = null;
     this.lastTracking = false;
+    this.resetSurfaceReadiness();
     this.placed = false;
     const xr8 = await this.prepare();
 
@@ -290,6 +295,7 @@ export class IOSWebSLAMPlacementBackend {
     this.lastTracking = tracking;
 
     if (!tracking) {
+      this.resetSurfaceReadiness();
       this.setState(
         trackingLost ? PlacementBackendState.TRACKING_LOST : PlacementBackendState.SCANNING
       );
@@ -322,6 +328,7 @@ export class IOSWebSLAMPlacementBackend {
             : new this.THREE.Quaternion()
         }
       : null;
+    const isStable = this.updateSurfaceReadiness(timeMs, Boolean(pose));
 
     this.setState(
       this.placed
@@ -334,7 +341,7 @@ export class IOSWebSLAMPlacementBackend {
       tracking: true,
       trackingLost: false,
       surfaceDetected: Boolean(pose),
-      isStable: false,
+      isStable,
       pose,
       cameraPose: {
         position: camera.position.clone(),
@@ -369,6 +376,7 @@ export class IOSWebSLAMPlacementBackend {
   reset() {
     this.latestReality = null;
     this.lastTracking = false;
+    this.resetSurfaceReadiness();
     this.placed = false;
     if (this.active && this.xr8 && this.xr8.XrController) {
       this.xr8.XrController.recenter();
@@ -390,6 +398,7 @@ export class IOSWebSLAMPlacementBackend {
     this.preRenderPending = false;
     this.latestReality = null;
     this.lastTracking = false;
+    this.resetSurfaceReadiness();
     this.placed = false;
     this.pipelineModule = null;
     this.error = null;
@@ -402,6 +411,37 @@ export class IOSWebSLAMPlacementBackend {
 
   isTracking() {
     return this.lastTracking;
+  }
+
+  updateSurfaceReadiness(timeMs, hasHit) {
+    if (!Number.isFinite(timeMs)) {
+      return false;
+    }
+
+    if (hasHit) {
+      const previousHitAtMs = this.lastSurfaceHitAtMs;
+      if (
+        this.surfaceHitStartedAtMs === null ||
+        (previousHitAtMs !== null && timeMs - previousHitAtMs > SURFACE_HIT_GRACE_MS)
+      ) {
+        this.surfaceHitStartedAtMs = timeMs;
+      }
+      this.lastSurfaceHitAtMs = timeMs;
+      return timeMs - this.surfaceHitStartedAtMs >= SURFACE_DWELL_MS;
+    }
+
+    if (
+      this.lastSurfaceHitAtMs === null ||
+      timeMs - this.lastSurfaceHitAtMs > SURFACE_HIT_GRACE_MS
+    ) {
+      this.resetSurfaceReadiness();
+    }
+    return false;
+  }
+
+  resetSurfaceReadiness() {
+    this.surfaceHitStartedAtMs = null;
+    this.lastSurfaceHitAtMs = null;
   }
 
   setPlaced(placed) {

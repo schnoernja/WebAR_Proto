@@ -28,6 +28,10 @@ UI bei Umfrage immer noch etwas inkonsistent
 evt neue/bessere Modelle
 
 Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
+--> Wird zu Evasys gewechselt, Herr Finster teilt Link wenn fertig
 
 
 Sicherungsordner archive/ios-alva-20260904
+
+wenn alles auf Server:
+Noch eine Frage zum Hosting der AR-Anwendung: Ist es korrekt, was ich in Erinnerung hatte, dass die Anwendung im Self-Hosting betrieben wird? Könntest du mir noch ein paar Infos dazu geben, wie die Ortungs-/ Kamera-/ Bewegungsdaten, Gerätedaten und Metadaten allgemein verarbeitet und gespeichert werden? Dazu gehört auch der Speicherort, also welcher Server in welchem Land. Ich muss das unserer Datenschutz-Stelle mitteilen.
