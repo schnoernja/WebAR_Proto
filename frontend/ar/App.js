@@ -325,6 +325,8 @@ export class ARApp {
     this.iosSlamActive = false;
     this.activePlacementAssetSource = null;
     this.activePlacementAssetUrl = null;
+    this.placementAssetLoadPending = false;
+    this.placementAssetLoadPromise = null;
     this.sceneTransformUiState = {
       position: { x: 0, y: 0, z: 0 },
       scaleFactor: 1,
@@ -349,7 +351,7 @@ export class ARApp {
     });
     this.syncSceneTransformStateFromConfig();
 
-    const assetInfo = await this.prepareInitialPlacementAsset();
+    this.prepareLazyPlacementAsset();
     this.ui.setExperienceMode(this.selectedExperienceMode);
     this.ui.setPlacementMode(this.selectedPlacementMode);
     this.ui.setGeoHeadingReferenceEnabled(this.geoHeadingReferenceEnabled);
@@ -362,11 +364,7 @@ export class ARApp {
     this.ui.bindGeoLocationService(this.geoLocationService);
     this.ui.bindSensorFusion(this.sensorFusion);
 
-    if (assetInfo.usedPlaceholder) {
-      this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
-    } else {
-      this.ui.setHint("Fallback-3D-Ansicht aktiv. Im freien Modus platzierst du per Reticle, im Geo-Local-Modus per QR-basiertem lokalen Offset.");
-    }
+    this.ui.setHint("Fallback-3D-Ansicht aktiv. Das 3D-Modell wird beim AR-Start geladen.");
 
     this.arSessionManager = new ARSessionManager({
       renderer: this.sceneManager.getRenderer(),
@@ -492,7 +490,7 @@ export class ARApp {
         label: scenario.label
       })),
       activeId: this.activeScenarioId,
-      pending: this.scenarioSwitchPending
+      pending: this.scenarioSwitchPending || this.placementAssetLoadPending
     });
   }
 
@@ -593,13 +591,6 @@ export class ARApp {
           ? activeSiteConfig.scene.asset
           : null;
     const assetUrl = normalizeSiteAssetUrl(preferredAssetUrl);
-    const preferredQuickLookAssetUrl =
-      sitePlacement && typeof sitePlacement.usdzAsset === "string" && sitePlacement.usdzAsset.trim()
-        ? sitePlacement.usdzAsset.trim()
-        : activeSiteConfig.scene && typeof activeSiteConfig.scene.usdzAsset === "string"
-          ? activeSiteConfig.scene.usdzAsset
-          : null;
-    const quickLookAssetUrl = normalizeSiteAssetUrl(preferredQuickLookAssetUrl);
     const toleranceMeters = clampSiteToleranceMeters(
       sitePlacement && Number.isFinite(sitePlacement.maxDistanceMeters)
         ? sitePlacement.maxDistanceMeters
@@ -609,7 +600,6 @@ export class ARApp {
     return {
       targetCoord,
       assetUrl,
-      quickLookAssetUrl,
       assetLabel: toAssetLabel(assetUrl),
       calibration:
         sitePlacement && sitePlacement.calibration && typeof sitePlacement.calibration === "object"
@@ -882,45 +872,47 @@ export class ARApp {
     return !Number.isFinite(accuracyMeters) || accuracyMeters <= MAX_GEO_ORIGIN_ACCURACY_METERS;
   }
 
-  async prepareInitialPlacementAsset() {
-    if (!this.placementController) {
-      return null;
-    }
-
+  prepareLazyPlacementAsset() {
     const placementConfig = this.getSiteGeoPlacementConfig();
     const shouldUseSiteAsset =
       Boolean(placementConfig && placementConfig.assetUrl) &&
       (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected());
+    const assetLabel = shouldUseSiteAsset
+      ? placementConfig.assetLabel
+      : toAssetLabel(APP_CONFIG.model.primaryUrl);
 
-    if (shouldUseSiteAsset) {
-      try {
-        const assetInfo = await this.sceneManager.createPlacementAssetFromUrl(
-          placementConfig.assetUrl,
-          placementConfig.assetLabel,
-          { preserveSourceScale: placementConfig.transform && placementConfig.transform.preserveSourceScale === true }
-        );
-        this.placementController.setAsset(assetInfo.object, assetInfo.animations);
-        this.applySiteObjectTransformsFromConfig({ force: true });
-        this.ui.setAssetLabel(assetInfo.label);
-        this.activePlacementAssetSource = placementConfig.assetUrl;
-        this.activePlacementAssetUrl = assetInfo.sourceUrl;
-        return assetInfo;
-      } catch (error) {
-        this.ui.setMessage(`Geo-Modell konnte nicht geladen werden: ${toMessage(error)}`);
-        this.ui.setHint("Pruefe den Modellpfad in der Site-JSON (placement.asset).");
-      }
-    }
-
-    const assetInfo = await this.sceneManager.createPlacementAsset();
-    this.placementController.setAsset(assetInfo.object, assetInfo.animations);
-    this.applySiteObjectTransformsFromConfig({ force: true });
-    this.ui.setAssetLabel(assetInfo.label);
-    this.activePlacementAssetSource = "default";
-    this.activePlacementAssetUrl = assetInfo.sourceUrl;
-    return assetInfo;
+    this.activePlacementAssetSource = null;
+    this.activePlacementAssetUrl = null;
+    this.ui.setAssetLabel(assetLabel);
+    return assetLabel;
   }
 
   async ensurePlacementAssetForExperience(experienceMode, { preservePlacement = false } = {}) {
+    if (!this.placementController) {
+      return false;
+    }
+
+    if (this.placementAssetLoadPromise) {
+      return this.placementAssetLoadPromise;
+    }
+
+    this.placementAssetLoadPending = true;
+    this.syncScenarioSwitchControl();
+    const loadPromise = this.loadPlacementAssetForExperience(experienceMode, { preservePlacement });
+    this.placementAssetLoadPromise = loadPromise;
+
+    try {
+      return await loadPromise;
+    } finally {
+      if (this.placementAssetLoadPromise === loadPromise) {
+        this.placementAssetLoadPromise = null;
+        this.placementAssetLoadPending = false;
+        this.syncScenarioSwitchControl();
+      }
+    }
+  }
+
+  async loadPlacementAssetForExperience(experienceMode, { preservePlacement = false } = {}) {
     if (!this.placementController) {
       return false;
     }
@@ -936,6 +928,7 @@ export class ARApp {
       }
 
       try {
+        this.ui.setMessage("3D-Modell wird geladen...");
         const assetInfo = await this.sceneManager.createPlacementAssetFromUrl(
           placementConfig.assetUrl,
           placementConfig.assetLabel,
@@ -959,45 +952,21 @@ export class ARApp {
     }
 
     try {
+      this.ui.setMessage("3D-Modell wird geladen...");
       const defaultAssetInfo = await this.sceneManager.createPlacementAsset();
       this.placementController.setAsset(defaultAssetInfo.object, defaultAssetInfo.animations, { preservePlacement });
       this.applySiteObjectTransformsFromConfig({ force: true });
       this.activePlacementAssetSource = "default";
       this.activePlacementAssetUrl = defaultAssetInfo.sourceUrl;
       this.ui.setAssetLabel(defaultAssetInfo.label);
+      if (defaultAssetInfo.usedPlaceholder) {
+        this.ui.setHint("tree.glb konnte nicht geladen werden. Platzhalter aktiv.");
+      }
       return true;
     } catch (error) {
       this.ui.setMessage(`Standard-Modell konnte nicht geladen werden: ${toMessage(error)}`);
       return false;
     }
-  }
-
-  getIOSQuickLookAssetCandidates() {
-    const placementConfig = this.getSiteGeoPlacementConfig();
-    return [
-      resolveAppUrl(APP_CONFIG.model.primaryQuickLookUrl),
-      resolveAppUrl(APP_CONFIG.model.fallbackQuickLookUrl),
-      placementConfig ? placementConfig.quickLookAssetUrl : null
-    ].filter((url, index, urls) => Boolean(url) && urls.indexOf(url) === index);
-  }
-
-  getIOSQuickLookAssetUrl() {
-    const placementConfig = this.getSiteGeoPlacementConfig();
-    const shouldUseSiteAsset =
-      Boolean(placementConfig && placementConfig.assetUrl) &&
-      (this.selectedExperienceMode === ExperienceMode.GEO_SENSOR || this.isGeoPlacementModeSelected());
-
-    if (shouldUseSiteAsset) {
-      return placementConfig.quickLookAssetUrl;
-    }
-
-    const activeAssetUrl = normalizeSiteAssetUrl(this.activePlacementAssetUrl);
-    const fallbackAssetUrl = normalizeSiteAssetUrl(APP_CONFIG.model.fallbackUrl);
-    return resolveAppUrl(
-      activeAssetUrl === fallbackAssetUrl
-        ? APP_CONFIG.model.fallbackQuickLookUrl
-        : APP_CONFIG.model.primaryQuickLookUrl
-    );
   }
 
   async startSelectedExperience() {
@@ -1865,6 +1834,11 @@ export class ARApp {
       return false;
     }
 
+    if (this.placementAssetLoadPending) {
+      this.ui.setMessage("3D-Modell wird geladen...");
+      return false;
+    }
+
     if (this.isTextInputActive) {
       return false;
     }
@@ -1900,6 +1874,11 @@ export class ARApp {
     const isXRSession = Boolean(this.arSessionManager && this.arSessionManager.isActive());
     const isSLAMSession = Boolean(this.iosSlamActive);
     if (!isXRSession && !isSLAMSession) {
+      return false;
+    }
+
+    if (this.placementAssetLoadPending) {
+      this.ui.setMessage("3D-Modell wird geladen...");
       return false;
     }
 
@@ -1980,7 +1959,12 @@ export class ARApp {
   }
 
   maybePlaceGeoObject(surfaceState, cameraState) {
-    if (this.isTextInputActive || !surfaceState.isStable || this.placementController.isPlaced()) {
+    if (
+      this.placementAssetLoadPending ||
+      this.isTextInputActive ||
+      !surfaceState.isStable ||
+      this.placementController.isPlaced()
+    ) {
       return;
     }
 

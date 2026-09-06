@@ -68,11 +68,7 @@ function normalizeScene(scene) {
   }
 
   return {
-    asset: resolveAppUrl(scene.asset.trim()),
-    usdzAsset:
-      typeof scene.usdzAsset === "string" && scene.usdzAsset.trim()
-        ? resolveAppUrl(scene.usdzAsset.trim())
-        : null
+    asset: resolveAppUrl(scene.asset.trim())
   };
 }
 
@@ -246,10 +242,6 @@ function normalizePlacement(placement) {
     typeof placement.asset === "string" && placement.asset.trim()
       ? placement.asset.trim()
       : null;
-  const usdzAsset =
-    typeof placement.usdzAsset === "string" && placement.usdzAsset.trim()
-      ? placement.usdzAsset.trim()
-      : null;
   const target = normalizePlacementTarget(placement.target);
   const calibration = normalizePlacementCalibration(placement.calibration);
   const transform = normalizePlacementTransform(placement.transform);
@@ -259,13 +251,12 @@ function normalizePlacement(placement) {
     ? placement.maxDistanceMeters
     : null;
 
-  if (!asset && !usdzAsset && !target && !calibration && !transform && objectTransforms.length === 0 && maxDistanceMeters === null) {
+  if (!asset && !target && !calibration && !transform && objectTransforms.length === 0 && maxDistanceMeters === null) {
     return null;
   }
 
   return {
     asset: resolveAppUrl(asset),
-    usdzAsset: resolveAppUrl(usdzAsset),
     target,
     calibration,
     transform,

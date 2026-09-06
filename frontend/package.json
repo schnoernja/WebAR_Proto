@@ -3,6 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "node ../scripts/serve-static.mjs --root . --port 5173",
+    "build": "node ../scripts/build-frontend.mjs",
+    "preview": "node ../scripts/serve-static.mjs --root ../dist --port 4173",
+    "check:dist": "node ../scripts/verify-dist.mjs",
     "test": "node --test --test-isolation=none tests/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

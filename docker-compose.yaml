@@ -1,8 +1,10 @@
 services:
   webar_proto:
+    image: epartwin-webar:production
     build:
       context: .
       dockerfile: Dockerfile.webar
+      target: runtime
     ports:
       - "8080:80" # 8080 ist der Port auf dem Host, 80 ist der Port im Container
     restart: unless-stopped

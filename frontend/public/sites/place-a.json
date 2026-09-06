@@ -8,12 +8,10 @@
     "yawDeg": 0
   },
   "scene": {
-    "asset": "/assets/fountain_benches_trees.glb",
-    "usdzAsset": "/assets/fountain_benches_trees.usdz"
+    "asset": "/assets/fountain_benches_trees.glb"
   },
   "placement": {
     "asset": "assets/fountain_benches_trees.glb",
-    "usdzAsset": "assets/fountain_benches_trees.usdz",
     "target": {
       "lat": 50.984751,
       "lon": 11.044106

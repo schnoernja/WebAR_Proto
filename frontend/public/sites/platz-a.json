@@ -8,12 +8,10 @@
     "yawDeg": 35
   },
   "scene": {
-    "asset": "/assets/platz-a/scene.glb",
-    "usdzAsset": "/assets/platz-a/scene.usdz"
+    "asset": "/assets/platz-a/scene.glb"
   },
   "placement": {
     "asset": "assets/platz-a/scene.glb",
-    "usdzAsset": "assets/platz-a/scene.usdz",
     "target": {
       "lat": 50.984,
       "lon": 11.029

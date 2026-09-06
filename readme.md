@@ -6,22 +6,66 @@ https://webar.duckdns.org/
 ## Entwicklung & Selbst-Hosting
 
 ### Voraussetzungen
-- Installiere Docker und Docker Compose.
+- Node.js 20 oder neuer für lokale Entwicklung und Produktions-Build.
+- Docker und Docker Compose für den bestehenden Container-Stack.
 
-### Projekt lokal starten
-
-Oeffne ein Terminal im Projektordner und fuehre aus:
+### Frontend lokal entwickeln
 
 ```powershell
-# Container bauen und starten/neustarten
-docker compose up -d
+cd frontend
+npm run dev
 ```
 
-Das Projekt ist dann unter http://localhost:8080 erreichbar.
+Das Frontend ist anschließend unter http://127.0.0.1:5173 erreichbar. Dieser schnelle
+Entwicklungsweg benötigt keinen Docker-Image-Rebuild.
+
+### Produktions-Build
+
+```powershell
+cd frontend
+npm run build
+npm run check:dist
+npm run preview
+```
+
+`npm run build` erzeugt `dist/` bei jedem Lauf vollständig neu. Der Build übernimmt nur
+die explizit freigegebenen Laufzeitdateien und die von den Site-Konfigurationen referenzierten
+Assets. `dist/` ist ein nicht versioniertes Build-Artefakt und darf nicht manuell bearbeitet
+werden. `npm run preview` stellt den Build unter http://127.0.0.1:4173 bereit.
+
+Die GitHub-Pages-Pipeline führt dieselben Installations-, Test-, Build- und Prüfbefehle aus
+und veröffentlicht ausschließlich `dist/` als Pages-Artefakt. Dieses Build-Artefakt kann
+später auch von einem separaten Deployment-Job für einen externen Server verwendet werden.
+
+### Docker-Produktion
+
+```powershell
+docker compose up -d --build webar_proto
+```
+
+Das Produktionsimage wird in einer separaten Build-Stage aus dem Lockfile erzeugt. Die
+Runtime-Stage enthält ausschließlich Nginx, dessen Konfiguration und den geprüften
+`dist/`-Inhalt. Das Frontend ist anschließend unter http://localhost:8080 erreichbar.
+
+Das erzeugte Image kann ohne projektspezifische Serveradresse auch direkt gestartet werden:
+
+```powershell
+docker run --rm -p 8080:80 epartwin-webar:production
+```
+
+Der vollständige bestehende Stack mit WebAR, PHP und PostgreSQL bleibt verfügbar:
+
+```powershell
+docker compose up -d --build
+```
 
 ### Hinweise
-- Die statischen Dateien werden ueber einen nginx-Webserver bereitgestellt.
-- Aenderungen an den Dateien werden beim naechsten `docker compose up -d` automatisch uebernommen.
+- Für die schnelle lokale Frontend-Entwicklung weiterhin `npm run dev` verwenden. Änderungen
+  werden dort ohne Docker-Image-Rebuild sichtbar.
+- Nginx liefert im Container HTTP auf Port 80 aus. Für Kamera, Standort und WebAR muss ein
+  externer Server HTTPS terminieren; lokale Browser akzeptieren dafür weiterhin `localhost`.
+- `cert.pem` und `key.pem` sind nicht in die bestehende Konfiguration eingebunden und werden
+  weder in den Docker-Build-Kontext noch in das Image übernommen.
 
 ## Aktueller Funktionsstand (Kurzfassung)
 
@@ -244,8 +288,7 @@ Die Entwickleransicht bietet dafür unter „Geo Test-Anpassung“ eine Auswahl 
 Knoten. Die dort getesteten Werte wirken sofort auf die Vorschau und Geo-Instanzen. Der
 Übernehmen-Button hält sie in der zur Laufzeit geladenen Site-Konfiguration; für einen
 Neustart müssen dieselben Werte in die zugehörige `frontend/public/sites/*.json` übernommen
-werden. iOS Quick Look kann diese Laufzeit-Transformationen nicht übernehmen, weil es die
-separate USDZ-Datei öffnet.
+werden.
 
 ## Einschraenkungen
 

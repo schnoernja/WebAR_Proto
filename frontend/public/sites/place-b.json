@@ -8,12 +8,10 @@
     "yawDeg": 0
   },
   "scene": {
-    "asset": "/assets/flowerpots_benches_gras.glb",
-    "usdzAsset": "/assets/flowerpots_benches_gras.usdz"
+    "asset": "/assets/flowerpots_benches_gras.glb"
   },
   "placement": {
     "asset": "assets/flowerpots_benches_gras.glb",
-    "usdzAsset": "assets/flowerpots_benches_gras.usdz",
     "target": {
       "lat": 50.985242,
       "lon": 11.043993

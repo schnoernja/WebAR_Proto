@@ -5,6 +5,7 @@ import test from "node:test";
 import { ArCapabilityDetector, ARLaunchMode } from "../ar/ArCapabilityDetector.js";
 import { ArLauncher } from "../ar/ArLauncher.js";
 import { GeoLocationService } from "../ar/GeoLocationService.js";
+import { SiteLoader } from "../ar/geo/SiteLoader.js";
 import {
   IOSWebSLAMPlacementBackend,
   PlacementBackendState
@@ -313,4 +314,50 @@ test("iOS platziert nach geglätteter stabiler Bodenpose automatisch", async () 
   assert.match(appSource, /this\.placeFreeObject\("ios-auto"\)/);
   assert.match(appSource, /slamResult\.isStable/);
   assert.match(stabilizerSource, /this\.config\.stabilityUsesSmoothedPose/);
+});
+
+test("3D-Assets werden erst beim AR-Start geladen", async () => {
+  const appSource = await readFile(new URL("../ar/App.js", import.meta.url), "utf8");
+
+  assert.match(appSource, /this\.prepareLazyPlacementAsset\(\)/);
+  assert.doesNotMatch(appSource, /prepareInitialPlacementAsset/);
+  assert.match(appSource, /startIOSWebTrackingExperience[\s\S]*ensurePlacementAssetForExperience\(ExperienceMode\.XR\)/);
+  assert.match(appSource, /startSelectedWebXRExperience[\s\S]*ensurePlacementAssetForExperience\(ExperienceMode\.XR\)/);
+  assert.match(appSource, /pending:\s*this\.scenarioSwitchPending\s*\|\|\s*this\.placementAssetLoadPending/);
+  assert.match(appSource, /maybePlaceGeoObject[\s\S]*this\.placementAssetLoadPending/);
+});
+
+test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async () => {
+  const rawConfig = JSON.parse(
+    await readFile(new URL("../public/sites/klimawocheFHE.json", import.meta.url), "utf8")
+  );
+  const locationRef = new URL("https://example.test/webar/index.html?site=klimawocheFHE");
+  const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: locationRef }
+  });
+
+  let site = null;
+  try {
+    const loader = new SiteLoader({ locationRef, fetchImpl: async () => null });
+    site = loader.normalizeSite("klimawocheFHE", rawConfig, locationRef.href);
+  } finally {
+    if (windowDescriptor) {
+      Object.defineProperty(globalThis, "window", windowDescriptor);
+    } else {
+      delete globalThis.window;
+    }
+  }
+
+  assert.equal(site.scenarios.length, 2);
+  assert.notEqual(site.scenarios[0].placement.asset, site.scenarios[1].placement.asset);
+  assert.match(site.scenarios[0].placement.asset, /scene_a_environment_final\.glb/);
+  assert.match(site.scenarios[1].placement.asset, /scene_b_environment_final_webar\.glb/);
+
+  const appSource = await readFile(new URL("../ar/App.js", import.meta.url), "utf8");
+  assert.match(
+    appSource,
+    /switchToNextScenario[\s\S]*ensurePlacementAssetForExperience\(this\.selectedExperienceMode,\s*\{[\s\S]*preservePlacement:\s*true/
+  );
 });

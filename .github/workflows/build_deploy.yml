@@ -24,13 +24,38 @@ jobs:
         with:
           lfs: true
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build production artifact
+        working-directory: frontend
+        run: npm run build
+
+      - name: Verify production artifact
+        working-directory: frontend
+        run: npm run check:dist
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
+        id: upload-pages-artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./frontend
+          name: github-pages
+          path: ./dist
 
   deploy:
     runs-on: ubuntu-latest

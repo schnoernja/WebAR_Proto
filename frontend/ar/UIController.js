@@ -58,18 +58,10 @@ const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
     "Geo mode is not available without a site QR configuration.",
   "Starte Geo-Modus...": "Starting geo mode...",
   "Starte immersive AR...": "Starting immersive AR...",
+  "3D-Modell wird geladen...": "Loading 3D model...",
+  "Fallback-3D-Ansicht aktiv. Das 3D-Modell wird beim AR-Start geladen.":
+    "Fallback 3D view active. The 3D model will be loaded when AR starts.",
   "Fallback-3D-Ansicht bleibt aktiv.": "Fallback 3D view remains active.",
-  "WebXR nicht verfuegbar, iOS erkannt: Quick-Look-Fallback ist verfuegbar.":
-    "WebXR is unavailable; iOS detected: the Quick Look fallback is available.",
-  "iOS erkannt, aber AR Quick Look wird von diesem Browser nicht angeboten.":
-    "iOS was detected, but this browser does not provide AR Quick Look.",
-  "iOS-Fallback nicht moeglich: USDZ-Datei fehlt.":
-    "The iOS fallback is unavailable: the USDZ file is missing.",
-  "iOS AR benoetigt eine USDZ-Datei fuer dieses Modell.":
-    "iOS AR requires a USDZ file for this model.",
-  "AR Quick Look Link wurde geoeffnet.": "The AR Quick Look link was opened.",
-  "Das Modell wird in Apples AR Quick Look angezeigt.":
-    "The model is being displayed in Apple AR Quick Look.",
   "Dieses Geraet unterstuetzt keinen bekannten AR-Modus.":
     "This device does not support a known AR mode.",
   "Geo-Modus benoetigt GPS sowie Kompass-/IMU-Zugriff.":
@@ -232,10 +224,6 @@ const REGEX_RUNTIME_TRANSLATIONS_EN = Object.freeze([
   {
     pattern: /^XR-Session konnte nicht an den Renderer gebunden werden: (.+)$/,
     replace: (_, detail) => `Could not bind the XR session to the renderer: ${detail}`
-  },
-  {
-    pattern: /^iOS AR benoetigt eine USDZ-Datei fuer dieses Modell: (.+)$/,
-    replace: (_, detail) => `iOS AR requires a USDZ file for this model: ${detail}`
   }
 ]);
 
