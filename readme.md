@@ -7,7 +7,7 @@ https://webar.duckdns.org/
 
 ### Voraussetzungen
 - Node.js 20 oder neuer für lokale Entwicklung und Produktions-Build.
-- Docker und Docker Compose für den bestehenden Container-Stack.
+- Docker und Docker Compose für den WebAR-Produktionscontainer.
 
 ### Frontend lokal entwickeln
 
@@ -33,6 +33,14 @@ die explizit freigegebenen Laufzeitdateien und die von den Site-Konfigurationen 
 Assets. `dist/` ist ein nicht versioniertes Build-Artefakt und darf nicht manuell bearbeitet
 werden. `npm run preview` stellt den Build unter http://127.0.0.1:4173 bereit.
 
+Three.js wird in der bereits verwendeten Version `0.172.0` über `npm ci` installiert.
+`npm run dev`, `npm test` und `npm run build` erzeugen die benötigten lokalen Browsermodule
+unter `frontend/vendor/three/` automatisch; dieser generierte Ordner darf nicht manuell bearbeitet werden.
+
+Bearbeitbare Modell-, Design- und Referenzquellen sowie nicht veröffentlichte
+Zwischenstände liegen unter `source-assets/`. Aktive Browser-Assets verbleiben unter
+`frontend/assets/` und `frontend/models/`.
+
 Die GitHub-Pages-Pipeline führt dieselben Installations-, Test-, Build- und Prüfbefehle aus
 und veröffentlicht ausschließlich `dist/` als Pages-Artefakt. Dieses Build-Artefakt kann
 später auch von einem separaten Deployment-Job für einen externen Server verwendet werden.
@@ -53,19 +61,13 @@ Das erzeugte Image kann ohne projektspezifische Serveradresse auch direkt gestar
 docker run --rm -p 8080:80 epartwin-webar:production
 ```
 
-Der vollständige bestehende Stack mit WebAR, PHP und PostgreSQL bleibt verfügbar:
-
-```powershell
-docker compose up -d --build
-```
-
 ### Hinweise
 - Für die schnelle lokale Frontend-Entwicklung weiterhin `npm run dev` verwenden. Änderungen
   werden dort ohne Docker-Image-Rebuild sichtbar.
 - Nginx liefert im Container HTTP auf Port 80 aus. Für Kamera, Standort und WebAR muss ein
   externer Server HTTPS terminieren; lokale Browser akzeptieren dafür weiterhin `localhost`.
-- `cert.pem` und `key.pem` sind nicht in die bestehende Konfiguration eingebunden und werden
-  weder in den Docker-Build-Kontext noch in das Image übernommen.
+- Lokale `cert.pem`- und `key.pem`-Dateien sind nicht in die bestehende Konfiguration eingebunden,
+  werden ignoriert und weder in den Docker-Build-Kontext noch in das Image übernommen.
 
 ## Aktueller Funktionsstand (Kurzfassung)
 
@@ -92,7 +94,6 @@ docker compose up -d --build
 - Der Koordinatenmodus rechnet Zielkoordinaten lokal in ein X/Z-Offset im aktuellen AR-Raum um.
 - Die Y-Hoehe des Geo-Objekts kommt weiterhin von der stabilen Hit-Test-Flaeche.
 - Ein lokaler Heading-Wert aus der Device Orientation API kann fuer die Geo-Ausrichtung verwendet werden.
-- Infrastruktur fuer PHP-API und Postgres ist weiterhin im Projekt vorhanden, wird im aktuellen WebXR-Frontend aber nicht fuer die Platzierung benoetigt.
 
 ## Benutzeroberflaeche (UI)
 
@@ -177,8 +178,6 @@ docker compose up -d --build
 - Docker
 - Docker Compose
 - nginx fuer das statische Frontend
-- PHP-Container fuer den Legacy-/API-Pfad
-- Postgres 16 fuer den Legacy-/API-Pfad
 
 ## Architektur
 
@@ -298,4 +297,3 @@ werden.
 - Die Genauigkeit haengt direkt von GPS, Sensoren, Heading und WebXR-Tracking ab.
 - Der Heading-Wert wird fuer die Platzierungsreferenz nur einmalig sinnvoll uebernommen, nicht kontinuierlich nachgeregelt.
 - Die Hoehe stammt von der lokal erkannten Flaeche, nicht von einer echten Zielhoehe.
-- Infrastruktur fuer PHP/Postgres ist noch im Projekt enthalten, gehoert aber nicht zur eigentlichen WebXR-Platzierungslogik.

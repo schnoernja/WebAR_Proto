@@ -36,11 +36,12 @@ def apply_transform_to_point(mat, point):
 
 def main():
     p = Path(__file__).resolve().parents[1]
+    source_models = p / "source-assets" / "models"
     parser = argparse.ArgumentParser()
-    parser.add_argument("--glb", default=str(p / "models" / "Erfurt_FH_Umkreis_Haus11Markiert.glb"))
-    parser.add_argument("--models", default=str(p / "models" / "models.json"))
+    parser.add_argument("--glb", default=str(source_models / "Erfurt_FH_Umkreis_Haus11Markiert.glb"))
+    parser.add_argument("--models", default=str(source_models / "models.json"))
     parser.add_argument("--keep", default=str(p / "scripts" / "keep_buildings.txt"))
-    parser.add_argument("--out", default=str(p / "models" / "models_filtered_matched.json"))
+    parser.add_argument("--out", default=str(source_models / "models_filtered_matched.json"))
     parser.add_argument("--placeholder", default="models/placeholder_small.glb")
     parser.add_argument("--axis", choices=["x_y","x_z","y_x"], default="x_y",
                         help="Mapping from mesh centroid (x,y,z) to (easting, northing). Default x->easting, y->northing")

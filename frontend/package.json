@@ -3,13 +3,20 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prepare:three": "node ../scripts/prepare-three-runtime.mjs",
+    "predev": "npm run prepare:three",
     "dev": "node ../scripts/serve-static.mjs --root . --port 5173",
+    "prebuild": "npm run prepare:three",
     "build": "node ../scripts/build-frontend.mjs",
     "preview": "node ../scripts/serve-static.mjs --root ../dist --port 4173",
     "check:dist": "node ../scripts/verify-dist.mjs",
+    "pretest": "npm run prepare:three",
     "test": "node --test --test-isolation=none tests/*.test.mjs"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "three": "0.172.0"
   }
 }

@@ -1,2 +1,12 @@
 CityGmls/
 /dist/
+/frontend/node_modules/
+/frontend/vendor/three/
+
+# Generierte Python-Artefakte
+__pycache__/
+*.py[cod]
+
+# Lokale Entwicklungszertifikate
+/cert.pem
+/key.pem

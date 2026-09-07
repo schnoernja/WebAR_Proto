@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-models_file = Path("d:/EPARtwin_Projekt/Website/WebAR_Proto/models/models.json")
+models_file = Path(__file__).resolve().parents[1] / "source-assets" / "models" / "models.json"
 default_url = "models/meinGebaeude.glb"   # passe an
 
 data = json.loads(models_file.read_text(encoding='utf-8'))

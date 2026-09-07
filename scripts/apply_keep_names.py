@@ -2,7 +2,7 @@ import json, re
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
-models_path = BASE / "models" / "models.json"
+models_path = BASE / "source-assets" / "models" / "models.json"
 keep_buildings_path = BASE / "scripts" / "keep_buildings.txt"
 
 if not models_path.exists():

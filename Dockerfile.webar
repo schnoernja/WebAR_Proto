@@ -7,7 +7,7 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./frontend/
 RUN npm ci --prefix frontend
 
-COPY scripts/build-frontend.mjs scripts/runtime-files.mjs scripts/verify-dist.mjs ./scripts/
+COPY scripts/build-frontend.mjs scripts/prepare-three-runtime.mjs scripts/runtime-files.mjs scripts/verify-dist.mjs ./scripts/
 COPY frontend/index.html frontend/styles.css frontend/webxr.js ./frontend/
 COPY frontend/ar ./frontend/ar
 COPY frontend/assets ./frontend/assets

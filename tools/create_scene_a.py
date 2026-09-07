@@ -12,7 +12,7 @@ from mathutils import Matrix, Vector
 
 
 REPOSITORY = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTPUT_BLEND = os.path.join(REPOSITORY, "frontend", "models", "scene_a_environment_final.blend")
+OUTPUT_BLEND = os.path.join(REPOSITORY, "source-assets", "models", "scene_a_environment_final.blend")
 OUTPUT_GLB = os.path.join(REPOSITORY, "frontend", "models", "scene_a_environment_final.glb")
 
 ASSETS = {

@@ -6,7 +6,7 @@ REM Conversion runs locally on Windows, not inside Docker.
 REM Usage: double-click or run from repo root.
 
 set "INPUT_DIR=%~dp0..\CityGmls"
-set "OUTPUT_DIR=%~dp0..\frontend\models\generated"
+set "OUTPUT_DIR=%~dp0..\source-assets\models\generated"
 set "C2G_EXE=D:\EPARtwin_Projekt\Website\CityGML2glTF_converter\collada2gltf.exe"
 
 if not exist "%OUTPUT_DIR%" (

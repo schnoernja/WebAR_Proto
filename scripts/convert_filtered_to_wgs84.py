@@ -3,8 +3,9 @@ from pathlib import Path
 from pyproj import Transformer
 
 BASE = Path(__file__).resolve().parents[1]
-inp = BASE / "models" / "models_filtered_matched_offset.json"
-out = BASE / "models" / "models_filtered_matched_wgs84.json"
+SOURCE_MODELS = BASE / "source-assets" / "models"
+inp = SOURCE_MODELS / "models_filtered_matched_offset.json"
+out = SOURCE_MODELS / "models_filtered_matched_wgs84.json"
 
 # Falls deine Projektion anders ist, ändere "EPSG:25832"
 src_crs = "EPSG:25832"

@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { THREE_RUNTIME_TARGET_FILES } from "./prepare-three-runtime.mjs";
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -104,6 +105,7 @@ export async function collectRuntimeFiles() {
     ...DEFAULT_MODEL_FILES,
     ...UI_ASSET_FILES,
     ...IOS_ENGINE_FILES,
+    ...THREE_RUNTIME_TARGET_FILES,
     ...assetFiles
   ])].sort();
 }

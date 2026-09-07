@@ -1,0 +1,4 @@
+#2e85c6 main color
+#35abe2 secondary color
+#ddf1fd 
+#5ab776 accent

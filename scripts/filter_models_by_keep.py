@@ -2,10 +2,11 @@ import json, re
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parents[1]
+SOURCE_MODELS = BASE / "source-assets" / "models"
 # falls du nach der Koordinaten‑Konvertierung models_wgs84.json erzeugst, passe den Namen hier ggf. an
-models_file = BASE / "models" / "models.json"
+models_file = SOURCE_MODELS / "models.json"
 keep_file = BASE / "scripts" / "keep_buildings.txt"
-nodes_file = BASE / "models" / "Erfurt_FH_Umkreis_Haus11Markiert.nodes.json"
+nodes_file = SOURCE_MODELS / "Erfurt_FH_Umkreis_Haus11Markiert.nodes.json"
 
 def read_keep():
     txt = keep_file.read_text(encoding='utf-8')

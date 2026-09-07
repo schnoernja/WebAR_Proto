@@ -2,7 +2,7 @@ import sys, json
 from pathlib import Path
 from pygltflib import GLTF2
 
-glb_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[1] / "models" / "Erfurt_FH_Umkreis_Haus11Markiert.glb"
+glb_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[1] / "source-assets" / "models" / "Erfurt_FH_Umkreis_Haus11Markiert.glb"
 g = GLTF2().load(glb_path)
 
 nodes = []

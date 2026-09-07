@@ -1,8 +1,8 @@
 import json, re
 from pathlib import Path
 
-BASE = Path("d:/EPARtwin_Projekt/Website/WebAR_Proto")
-models_path = BASE / "models" / "models.json"
+BASE = Path(__file__).resolve().parents[1]
+models_path = BASE / "source-assets" / "models" / "models.json"
 keep_path = BASE / "scripts" / "keep_buildings.txt"
 
 if not models_path.exists():

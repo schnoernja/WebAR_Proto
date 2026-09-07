@@ -7,12 +7,14 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no"
   />
   <title>EPARtwin WebAR</title>
+  <link rel="icon" href="./assets/design/logo.png" />
   <link rel="stylesheet" href="./styles.css?v=iphone-tracking-20260904" />
   <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.172.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.172.0/examples/jsm/"
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/controls/OrbitControls.js": "./vendor/three/examples/jsm/controls/OrbitControls.js",
+        "three/addons/loaders/GLTFLoader.js": "./vendor/three/examples/jsm/loaders/GLTFLoader.js"
       }
     }
   </script>

@@ -6,6 +6,7 @@
 !scripts/
 scripts/*
 !scripts/build-frontend.mjs
+!scripts/prepare-three-runtime.mjs
 !scripts/runtime-files.mjs
 !scripts/verify-dist.mjs
 

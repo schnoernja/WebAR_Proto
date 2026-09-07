@@ -7,6 +7,7 @@ import { collectRuntimeFiles, distRoot, frontendRoot } from "./runtime-files.mjs
 
 const FORBIDDEN_FILE_PATTERN = /(?:\.blend(?:1|@)?|\.kra|\.pyc|\.md|\.txt)$/i;
 const EXTERNAL_REFERENCE_PATTERN = /^(?:[a-z]+:)?\/\//i;
+const EXTERNAL_THREE_REFERENCE_PATTERN = /(?:https?:)?\/\/[^\s"'`]*three(?:@|\/)/i;
 
 function toPosixPath(value) {
   return value.split(path.sep).join("/");
@@ -91,6 +92,53 @@ function extractHtmlReferences(content) {
   return [...content.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)].map((match) => match[1]);
 }
 
+function extractImportMap(content) {
+  const imports = {};
+  const pattern = /<script\b[^>]*\btype\s*=\s*["']importmap["'][^>]*>([\s\S]*?)<\/script>/gi;
+
+  for (const match of content.matchAll(pattern)) {
+    const importMap = JSON.parse(match[1]);
+    Object.assign(imports, importMap.imports || {});
+  }
+
+  return imports;
+}
+
+function extractJavaScriptModuleSpecifiers(content) {
+  const specifiers = [];
+  const patterns = [
+    /\b(?:import|export)\s+(?:[^"']*?\s+from\s+)?["']([^"']+)["']/g,
+    /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of content.matchAll(pattern)) {
+      specifiers.push(match[1]);
+    }
+  }
+
+  return specifiers;
+}
+
+function isBareModuleSpecifier(specifier) {
+  return !specifier.startsWith(".") &&
+    !specifier.startsWith("/") &&
+    !EXTERNAL_REFERENCE_PATTERN.test(specifier) &&
+    !specifier.includes(":");
+}
+
+function resolveImportMapSpecifier(specifier, imports) {
+  if (Object.hasOwn(imports, specifier)) {
+    return imports[specifier];
+  }
+
+  const prefix = Object.keys(imports)
+    .filter((key) => key.endsWith("/") && specifier.startsWith(key))
+    .sort((left, right) => right.length - left.length)[0];
+
+  return prefix ? `${imports[prefix]}${specifier.slice(prefix.length)}` : null;
+}
+
 function extractCssReferences(content) {
   return [...content.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)].map((match) => match[1]);
 }
@@ -134,6 +182,19 @@ function collectJsonAssetReferences(value, references) {
 
 async function collectReferencedFiles(files) {
   const references = new Map();
+  const indexContent = await readFile(path.join(distRoot, "index.html"), "utf8");
+  const importMap = extractImportMap(indexContent);
+  const unresolvedModules = [];
+
+  for (const [specifier, target] of Object.entries(importMap)) {
+    if (typeof target !== "string") {
+      throw new Error(`Ungültiges Import-Map-Ziel für ${specifier}`);
+    }
+    const normalized = normalizeLocalReference("index.html", target);
+    if (normalized) {
+      references.set(normalized, `index.html -> Import Map ${specifier}`);
+    }
+  }
 
   for (const file of files) {
     if (file.startsWith("vendor/8thwall/")) {
@@ -153,6 +214,20 @@ async function collectReferencedFiles(files) {
       rawReferences = extractCssReferences(content);
     } else if (extension === ".js") {
       rawReferences = extractJavaScriptReferences(content);
+      for (const specifier of extractJavaScriptModuleSpecifiers(content)) {
+        if (!isBareModuleSpecifier(specifier)) {
+          continue;
+        }
+        const target = resolveImportMapSpecifier(specifier, importMap);
+        if (!target) {
+          unresolvedModules.push(`${file} -> ${specifier}`);
+          continue;
+        }
+        const normalized = normalizeLocalReference("index.html", target);
+        if (normalized) {
+          references.set(normalized, `${file} -> Import Map ${specifier}`);
+        }
+      }
       for (const match of content.matchAll(/dataset\.preloadChunks\s*=\s*["']([^"']+)["']/g)) {
         for (const chunk of match[1].split(",").map((value) => value.trim()).filter(Boolean)) {
           references.set(`vendor/8thwall/xr-${chunk}.js`, `${file} -> iOS-Engine-Chunk ${chunk}`);
@@ -168,6 +243,10 @@ async function collectReferencedFiles(files) {
         references.set(normalized, `${file} -> ${rawReference}`);
       }
     }
+  }
+
+  if (unresolvedModules.length) {
+    throw new Error(`Nicht auflösbare ES-Module:\n${unresolvedModules.join("\n")}`);
   }
 
   return references;
@@ -214,11 +293,18 @@ export async function verifyDist() {
     !file.startsWith("vendor/") && [".html", ".css", ".js", ".json"].includes(path.posix.extname(file).toLowerCase())
   );
   const usdzReferences = [];
+  const externalThreeReferences = [];
   for (const file of firstPartyTextFiles) {
     const content = await readFile(path.join(distRoot, file), "utf8");
+    if (EXTERNAL_THREE_REFERENCE_PATTERN.test(content)) {
+      externalThreeReferences.push(file);
+    }
     if (/\.usdz(?:[?#"']|$)/i.test(content) || /usdzAsset/i.test(content)) {
       usdzReferences.push(file);
     }
+  }
+  if (externalThreeReferences.length) {
+    throw new Error(`Externe Three.js-Referenzen in dist:\n${externalThreeReferences.join("\n")}`);
   }
   if (usdzReferences.length) {
     throw new Error(`Unerwartete USDZ-Referenzen in dist:\n${usdzReferences.join("\n")}`);
