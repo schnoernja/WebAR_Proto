@@ -68,10 +68,10 @@
         "yawDeg": 0
       },
       "scene": {
-        "asset": "/models/scene_b_environment_final_webar.glb?v=planter-material-20260825"
+        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260908"
       },
       "placement": {
-        "asset": "/models/scene_b_environment_final_webar.glb?v=planter-material-20260825",
+        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260908",
         "target": {
           "lat": 50.984751,
           "lon": 11.044106
