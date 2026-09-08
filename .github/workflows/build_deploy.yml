@@ -27,7 +27,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24.20.0"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -49,6 +49,18 @@ jobs:
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+
+      - name: Validate Pages artifact
+        shell: bash
+        run: |
+          if [ ! -d ./dist ]; then
+            echo "::error::Pages artifact directory ./dist does not exist."
+            exit 1
+          fi
+          if [ -z "$(find ./dist -type f -print -quit)" ]; then
+            echo "::error::Pages artifact directory ./dist is empty."
+            exit 1
+          fi
 
       - name: Upload Pages artifact
         id: upload-pages-artifact

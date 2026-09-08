@@ -6,7 +6,7 @@ https://webar.duckdns.org/
 ## Entwicklung & Selbst-Hosting
 
 ### Voraussetzungen
-- Node.js 20 oder neuer für lokale Entwicklung und Produktions-Build.
+- Node.js 24.20.0 (LTS) für lokale Entwicklung und Produktions-Build.
 - Docker und Docker Compose für den WebAR-Produktionscontainer.
 
 ### Frontend lokal entwickeln
