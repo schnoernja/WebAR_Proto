@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
+import { InfoBoardManager } from "./InfoBoard.js?v=info-board-scenes-20260909";
 import { applyPose, disposeObject3D } from "./utils.js";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -250,13 +251,30 @@ function cloneGeoPlacements(placements) {
   return placements.map((placement) => cloneGeoPlacement(placement)).filter((placement) => placement !== null);
 }
 
+function toInfoBoardRenderConfig(config) {
+  return {
+    id: config.id,
+    text: config.text,
+    position: config.offset,
+    widthMeters: config.widthMeters,
+    scaleFactor: config.scaleFactor,
+    rotationDeg: config.rotationDeg,
+    billboard: config.billboard,
+    style: config.style
+  };
+}
+
 export class PlacementController {
-  constructor({ scene }) {
+  constructor({ scene, infoBoardManager = null }) {
     this.scene = scene;
     this.objectRoot = new THREE.Group();
     this.transformRoot = new THREE.Group();
     this.geoInstancesRoot = new THREE.Group();
     this.geoInstancesRoot.name = "geo-local-instances";
+    this.infoBoardManagerOwned = !infoBoardManager;
+    this.infoBoardStagingRoot = infoBoardManager ? infoBoardManager.parent : new THREE.Group();
+    this.infoBoardStagingRoot.name = "info-board-staging-root";
+    this.infoBoardManager = infoBoardManager || new InfoBoardManager({ parent: this.infoBoardStagingRoot });
     this.objectRoot.visible = true;
     this.objectRoot.add(this.transformRoot);
     this.objectRoot.add(this.geoInstancesRoot);
@@ -367,6 +385,7 @@ export class PlacementController {
     this.clearGeoInstances();
 
     if (this.asset) {
+      this.infoBoardManager.setParent(this.infoBoardStagingRoot);
       this.transformRoot.remove(this.asset);
       disposeObject3D(this.asset);
     }
@@ -375,6 +394,8 @@ export class PlacementController {
     this.animationClips = Array.isArray(animationClips) ? animationClips : [];
     this.initializeEditableObjectNodes(this.asset);
     this.transformRoot.add(this.asset);
+    const assetContentRoot = this.asset.children && this.asset.children.length ? this.asset.children[0] : this.asset;
+    this.infoBoardManager.setParent(assetContentRoot);
     this.assetMixer = this.createAnimationMixer(this.asset);
     this.applyObjectTransformsToAsset(this.asset);
     this.applyPlacementTransform();
@@ -409,9 +430,13 @@ export class PlacementController {
 
     const instance = this.asset ? this.asset.clone(true) : null;
     if (instance) {
+      this.infoBoardManager.removeUnmanagedClones(instance);
       this.applyObjectTransformsToAsset(instance);
       this.applyPlacementTransformToInstance(instance);
       slot.add(instance);
+      const instanceContentRoot = instance.children && instance.children.length ? instance.children[0] : instance;
+      this.infoBoardManager.addInstanceParent(instanceContentRoot);
+      slot.userData.infoBoardParent = instanceContentRoot;
       const mixer = this.createAnimationMixer(instance);
       if (mixer) {
         this.geoInstanceMixers.push({ mixer, root: instance });
@@ -617,9 +642,16 @@ export class PlacementController {
 
     const targetsByName = new Map(targets.map((target) => [target.name, target]));
     return this.editableObjectNodes.reduce((filtered, definition) => {
-      const target = targetsByName.get(definition.node);
-      if (target) {
-        filtered.push({ ...target, name: definition.label, depth: 1 });
+      const memberTargets = definition.nodes.map((nodeName) => targetsByName.get(nodeName));
+      if (memberTargets.every(Boolean)) {
+        const nodePaths = memberTargets.map((target) => target.nodePath);
+        filtered.push({
+          nodePath: nodePaths.length === 1 ? nodePaths[0] : `group:${nodePaths.join("|")}`,
+          nodePaths,
+          nodeNames: memberTargets.map((target) => target.name),
+          name: definition.label,
+          depth: 1
+        });
       }
       return filtered;
     }, []);
@@ -627,9 +659,53 @@ export class PlacementController {
 
   setEditableObjectNodes(nodes) {
     this.editableObjectNodes = Array.isArray(nodes)
-      ? nodes.map((entry) => ({ node: entry.node, label: entry.label || entry.node }))
+      ? nodes.map((entry) => {
+          const nodeNames = Array.isArray(entry.nodes) ? entry.nodes : [entry.node];
+          return {
+            nodes: nodeNames,
+            label: entry.label || nodeNames.join(" + ")
+          };
+        })
       : null;
     return this.getEditableObjectNodes();
+  }
+
+  setInfoBoards(configs, { reset = false } = {}) {
+    if (reset) {
+      this.infoBoardManager.clear();
+    }
+    const activeConfigs = Array.isArray(configs)
+      ? configs
+          .filter((config) => config && config.active !== false)
+          .map(toInfoBoardRenderConfig)
+      : [];
+    return this.infoBoardManager.setBoards(activeConfigs);
+  }
+
+  updateInfoBoard(config) {
+    if (!config || typeof config.id !== "string" || !config.id.trim()) {
+      return false;
+    }
+    const id = config.id.trim();
+    if (config.active === false) {
+      this.infoBoardManager.removeBoard(id);
+      return true;
+    }
+    const renderConfig = toInfoBoardRenderConfig({ ...config, id });
+    if (this.infoBoardManager.boards.has(id)) {
+      this.infoBoardManager.updateBoard(id, renderConfig);
+    } else {
+      this.infoBoardManager.createBoard(renderConfig);
+    }
+    return true;
+  }
+
+  updateInfoBoardBillboards(cameraOrState) {
+    this.infoBoardManager.updateBillboards(cameraOrState);
+  }
+
+  getInfoBoardCount() {
+    return this.infoBoardManager.boards.size;
   }
 
   setObjectTransforms(transforms) {
@@ -1037,6 +1113,9 @@ export class PlacementController {
     this.geoInstanceMixers = [];
 
     for (const child of [...this.geoInstancesRoot.children]) {
+      if (child.userData.infoBoardParent) {
+        this.infoBoardManager.removeInstanceParent(child.userData.infoBoardParent);
+      }
       this.geoInstancesRoot.remove(child);
       disposeObject3D(child);
     }
@@ -1131,6 +1210,10 @@ export class PlacementController {
   dispose() {
     this.stopAssetMixer();
     this.clearGeoInstances();
+    this.infoBoardManager.setParent(this.infoBoardStagingRoot);
+    if (this.infoBoardManagerOwned) {
+      this.infoBoardManager.dispose();
+    }
     this.scene.remove(this.objectRoot);
     this.scene.remove(this.reticle);
 

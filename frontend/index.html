@@ -865,6 +865,45 @@
                     <textarea id="object-transform-json" class="field-input object-transform-json" rows="8" readonly></textarea>
                   </label>
                 </div>
+
+                <div class="object-transform-editor info-board-editor startup-developer-only">
+                  <p class="hint-text">
+                    Infotafeln der aktiven Szene bearbeiten. Änderungen gelten sofort; die JSON-Ausgabe muss für eine dauerhafte Änderung in die Site-Konfiguration kopiert werden.
+                  </p>
+                  <label class="field-group">
+                    <span class="field-label">Infotafel</span>
+                    <select id="info-board-select" class="field-input"></select>
+                  </label>
+                  <p id="info-board-selection" class="hint-text info-board-selection">Keine Infotafel ausgewählt.</p>
+                  <div class="object-transform-grid">
+                    <label class="offset-slider-block"><span class="field-label">X-Offset</span><input id="info-board-x" class="offset-range-input" type="range" min="-30" max="30" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Y-Offset</span><input id="info-board-y" class="offset-range-input" type="range" min="-5" max="10" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Z-Offset</span><input id="info-board-z" class="offset-range-input" type="range" min="-30" max="30" step="0.01" value="0" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Skalierung</span><input id="info-board-scale" class="offset-range-input" type="range" min="0.1" max="3" step="0.01" value="1" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Tafelbreite</span><input id="info-board-width" class="offset-range-input" type="range" min="0.4" max="3" step="0.05" value="1.2" /></label>
+                    <label class="offset-slider-block"><span class="field-label">Grundrotation Y</span><input id="info-board-rotation" class="offset-range-input" type="range" min="0" max="360" step="1" value="0" /></label>
+                  </div>
+                  <label class="offset-toggle-row">
+                    <span class="field-label">Tafel aktiviert</span>
+                    <input id="info-board-active" class="offset-toggle-input" type="checkbox" checked />
+                  </label>
+                  <label class="offset-toggle-row">
+                    <span class="field-label">Billboard aktiviert</span>
+                    <input id="info-board-billboard" class="offset-toggle-input" type="checkbox" checked />
+                  </label>
+                  <label class="field-group">
+                    <span class="field-label">Textinhalt</span>
+                    <textarea id="info-board-text" class="field-input info-board-text" rows="4"></textarea>
+                  </label>
+                  <div class="coord-actions">
+                    <button id="info-board-adopt-button" class="button" type="button">Infotafelwerte in JSON übernehmen</button>
+                    <button id="info-board-reset-button" class="button button-ghost" type="button">Ausgewählte Tafel zurücksetzen</button>
+                  </div>
+                  <label class="field-group">
+                    <span class="field-label">JSON-Ausgabe für infoBoards</span>
+                    <textarea id="info-board-json" class="field-input object-transform-json" rows="9" readonly></textarea>
+                  </label>
+                </div>
               </div>
             </section>
 
@@ -961,6 +1000,6 @@
     </div>
   </noscript>
 
-    <script type="module" src="./webxr.js?v=surface-dwell-20260905"></script>
+    <script type="module" src="./webxr.js?v=info-board-dev-20260909"></script>
 </body>
 </html>

@@ -2,19 +2,19 @@ import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
-import { SceneManager } from "./SceneManager.js?v=ios-paths-20260827-2";
+import { SceneManager } from "./SceneManager.js?v=info-board-dev-20260909";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=surface-dwell-20260905";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=surface-dwell-20260905";
-import { PlacementController, PlacementMode } from "./PlacementController.js?v=iphone-tracking-20260904";
-import { UIController } from "./UIController.js?v=iphone-tracking-20260904";
+import { PlacementController, PlacementMode } from "./PlacementController.js?v=info-board-dev-20260909";
+import { UIController } from "./UIController.js?v=info-board-dev-20260909";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
-import { SiteLoader } from "./geo/SiteLoader.js?v=scene-transform-20260826";
+import { SiteLoader } from "./geo/SiteLoader.js?v=info-board-dev-20260909";
 import { SensorFusion } from "./geo/SensorFusion.js";
-import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=scene-b-editor-20260825";
+import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=info-board-dev-20260909";
 
 const ExperienceMode = Object.freeze({
   XR: "xr",
@@ -347,7 +347,8 @@ export class ARApp {
     await this.loadSiteConfiguration();
 
     this.placementController = new PlacementController({
-      scene: this.sceneManager.getScene()
+      scene: this.sceneManager.getScene(),
+      infoBoardManager: this.sceneManager.getInfoBoardManager()
     });
     this.syncSceneTransformStateFromConfig();
 
@@ -359,6 +360,7 @@ export class ARApp {
     this.applySiteGeoCalibrationFromConfig({ force: true });
     this.applySitePlacementTransformFromConfig({ force: true });
     this.applySiteObjectTransformsFromConfig({ force: true });
+    this.applySiteInfoBoardsFromConfig({ reset: true });
     this.applySiteLocalObjectsFromConfig({ force: true });
     this.ui.setGeoTargetInputs(this.placementController.getGeoTarget());
     this.ui.bindGeoLocationService(this.geoLocationService);
@@ -389,12 +391,15 @@ export class ARApp {
       onSceneTransformReset: () => this.resetSceneTransformState(),
       onObjectTransformsChange: (transforms) => this.applyObjectTransformsState(transforms),
       onObjectTransformsAdopt: (transforms) => this.adoptObjectTransformsAsSiteConfig(transforms),
+      onInfoBoardChange: (board) => this.applyInfoBoardDraftState(board),
+      onInfoBoardsAdopt: (boards) => this.adoptInfoBoardsAsSiteConfig(boards),
       onToggleScenario: () => this.switchToNextScenario(),
       onUIInteractionChange: (isInteracting) => this.handleUIInteractionChange(isInteracting),
       onTextInputActiveChange: (isActive) => this.handleTextInputActiveChange(isActive)
     });
     this.ui.setSceneTransformState(this.sceneTransformUiState);
     this.syncObjectTransformEditor();
+    this.syncInfoBoardEditor();
 
     const capability = await this.arLauncher.detectCapabilities();
     const arAvailable = capability.mode !== ARLaunchMode.UNSUPPORTED;
@@ -475,6 +480,7 @@ export class ARApp {
       orientation: scenario.orientation || this.siteConfig.orientation,
       scene: scenario.scene,
       objects: scenario.objects,
+      infoBoards: scenario.infoBoards,
       placement: scenario.placement
     };
   }
@@ -505,6 +511,7 @@ export class ARApp {
     const nextScenario = scenarios[(activeIndex + 1) % scenarios.length];
 
     this.scenarioSwitchPending = true;
+    this.placementController.setInfoBoards([], { reset: true });
     this.syncScenarioSwitchControl();
 
     try {
@@ -523,6 +530,8 @@ export class ARApp {
       if (!assetReady) {
         throw new Error("Szenario-Modell konnte nicht geladen werden.");
       }
+      this.applySiteInfoBoardsFromConfig({ reset: true });
+      this.syncInfoBoardEditor();
 
       const activeSiteConfig = this.getActiveSiteConfig();
       if (this.geoSensorActive && activeSiteConfig && activeSiteConfig.origin) {
@@ -543,6 +552,8 @@ export class ARApp {
       this.applySitePlacementTransformFromConfig({ force: true });
       this.applySiteLocalObjectsFromConfig({ force: true });
       this.applySiteObjectTransformsFromConfig({ force: true });
+      this.applySiteInfoBoardsFromConfig({ reset: true });
+      this.syncInfoBoardEditor();
       this.ui.setMessage(`Szenariowechsel fehlgeschlagen: ${toMessage(error)}`);
       this.ui.setHint("Das vorherige Szenario bleibt aktiv.");
       return false;
@@ -885,6 +896,78 @@ export class ARApp {
     this.activePlacementAssetUrl = null;
     this.ui.setAssetLabel(assetLabel);
     return assetLabel;
+  }
+
+  applySiteInfoBoardsFromConfig({ reset = false } = {}) {
+    if (!this.placementController) {
+      return 0;
+    }
+    const activeSiteConfig = this.getActiveSiteConfig();
+    const infoBoards = activeSiteConfig && Array.isArray(activeSiteConfig.infoBoards)
+      ? activeSiteConfig.infoBoards
+      : [];
+    return this.placementController.setInfoBoards(infoBoards, { reset });
+  }
+
+  applyInfoBoardDraftState(board) {
+    if (!this.placementController || !board) {
+      return false;
+    }
+    try {
+      this.placementController.updateInfoBoard(board);
+      this.geoSceneManager.updateInfoBoard(board);
+      return true;
+    } catch (error) {
+      this.ui.setMessage(`Infotafel konnte nicht aktualisiert werden: ${toMessage(error)}`);
+      this.ui.setHint("Kürze den Text oder prüfe Position, Skalierung und Tafeldimensionen.");
+      return false;
+    }
+  }
+
+  adoptInfoBoardsAsSiteConfig(infoBoards) {
+    const scenarioOwner = this.getActivePlacementConfigOwner();
+    if (!scenarioOwner || !Array.isArray(infoBoards)) {
+      this.ui.setMessage("Keine aktive Szenenkonfiguration für Infotafeln verfügbar.");
+      return null;
+    }
+    if (infoBoards.some((board) => !board || typeof board.text !== "string" || !board.text.trim())) {
+      this.ui.setMessage("Infotafeltexte dürfen für die JSON-Konfiguration nicht leer sein.");
+      return null;
+    }
+
+    const adoptedBoards = infoBoards.map((board) => ({
+      ...board,
+      offset: { ...board.offset },
+      ...(board.style ? { style: { ...board.style } } : {})
+    }));
+    try {
+      this.placementController.setInfoBoards(adoptedBoards);
+      this.geoSceneManager.setInfoBoards(adoptedBoards);
+    } catch (error) {
+      this.ui.setMessage(`Infotafelwerte konnten nicht übernommen werden: ${toMessage(error)}`);
+      this.ui.setHint("Prüfe insbesondere Textlänge und Tafeldimensionen in der JSON-Ausgabe.");
+      return null;
+    }
+    scenarioOwner.infoBoards = adoptedBoards;
+    this.syncInfoBoardEditor();
+    this.ui.setMessage(`${adoptedBoards.length} Infotafel-Konfiguration(en) in die laufende JSON-Konfiguration übernommen.`);
+    this.ui.setHint("Die Werte gelten nur in dieser Sitzung. Kopiere die JSON-Ausgabe für eine dauerhafte Änderung in die Site-Datei.");
+    return adoptedBoards;
+  }
+
+  syncInfoBoardEditor() {
+    if (!this.ui) {
+      return;
+    }
+    const scenario = this.getActiveScenario();
+    const activeSiteConfig = this.getActiveSiteConfig();
+    this.ui.setInfoBoardTargets({
+      sceneId: scenario ? scenario.id : activeSiteConfig ? activeSiteConfig.id : null,
+      sceneLabel: scenario ? scenario.label : activeSiteConfig ? activeSiteConfig.id : null,
+      infoBoards: activeSiteConfig && Array.isArray(activeSiteConfig.infoBoards)
+        ? activeSiteConfig.infoBoards
+        : []
+    });
   }
 
   async ensurePlacementAssetForExperience(experienceMode, { preservePlacement = false } = {}) {
@@ -1502,7 +1585,7 @@ export class ARApp {
 
     if (this.arSessionManager && this.arSessionManager.isActive()) {
       if (this.isTextInputActive) {
-        this.sceneManager.render();
+        this.sceneManager.render(this.lastCameraState);
         return;
       }
 
@@ -1547,7 +1630,8 @@ export class ARApp {
       this.updateGeoSensorFrame(deltaSeconds);
     }
 
-    this.sceneManager.render();
+    this.geoSceneManager.updateInfoBoardBillboards(this.lastCameraState || this.sceneManager.getCamera());
+    this.sceneManager.render(this.lastCameraState);
     if (this.iosSlamActive) {
       this.iosPlacementBackend.finishFrame();
     }

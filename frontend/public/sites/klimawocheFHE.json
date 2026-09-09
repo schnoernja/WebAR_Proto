@@ -41,7 +41,9 @@
           { "node": "Tree_01", "label": "tree01" },
           { "node": "Tree_02", "label": "tree02" },
           { "node": "Tree_03", "label": "tree03" },
-          { "node": "Tree_04", "label": "tree04" }
+          { "node": "Tree_04", "label": "tree04" },
+          { "nodes": ["Gras", "Gras001"], "label": "Gras" },
+          { "node": "Steinplatte", "label": "Steinplatte" }
         ],
         "maxDistanceMeters": 100
       },
@@ -53,6 +55,47 @@
             "z": 0,
             "y": 0
           }
+        }
+      ],
+      "infoBoards": [
+        {
+          "id": "tafel-1",
+          "text": "Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)",
+          "sceneId": "a",
+          "active": true,
+          "offset": { "x": 13.49, "y": 1.5, "z": 2.1 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Tree_02",
+          "provisional": false
+        },
+        {
+          "id": "tafel-2",
+          "text": "ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad",
+          "sceneId": "a",
+          "active": true,
+          "offset": { "x": 5.75, "y": 1.05, "z": 0.35 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Hochbeetrechts",
+          "provisional": false
+        },
+        {
+          "id": "tafel-3",
+          "text": "Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)",
+          "sceneId": "a",
+          "active": true,
+          "offset": { "x": 17, "y": 1, "z": -2.15 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Gras/Gras001",
+          "provisional": true
         }
       ]
     },
@@ -98,11 +141,12 @@
           { "node": "Hochbeetlinks", "label": "hochbeetlinks" },
           { "node": "Hochbeetrechts", "label": "hochbeetrechts" },
           { "node": "Hochbeetrechts001", "label": "hochbeetrechts.001" },
-          { "node": "Tree_01001", "label": "tree_links" },
-          { "node": "Tree_01002", "label": "tree_links2" },
-          { "node": "Tree_01", "label": "tree_mitte" },
-          { "node": "Tree_02", "label": "tree_rechts2" },
-          { "node": "Tree_03", "label": "tree_rechts" }
+          { "node": "Tree_links", "label": "tree_links" },
+          { "node": "Tree_links2", "label": "tree_links2" },
+          { "node": "Tree_mitte", "label": "tree_mitte" },
+          { "node": "Tree_rechts2", "label": "tree_rechts2" },
+          { "node": "Tree_rechts", "label": "tree_rechts" },
+          { "nodes": ["Plane", "Plane002"], "label": "Rasen und Bordsteinkante" }
         ],
         "maxDistanceMeters": 100
       },
@@ -114,6 +158,60 @@
             "z": 0,
             "y": 0
           }
+        }
+      ],
+      "infoBoards": [
+        {
+          "id": "tafel-1",
+          "text": "Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)",
+          "sceneId": "b",
+          "active": true,
+          "offset": { "x": 11.22, "y": 1.5, "z": 0.3 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Tree_mitte",
+          "provisional": false
+        },
+        {
+          "id": "tafel-2",
+          "text": "ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad",
+          "sceneId": "b",
+          "active": true,
+          "offset": { "x": 4.33, "y": 1.05, "z": -0.4 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Hochbeetrechts001",
+          "provisional": false
+        },
+        {
+          "id": "tafel-3",
+          "text": "Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)",
+          "sceneId": "b",
+          "active": true,
+          "offset": { "x": 9, "y": 1, "z": 1.5 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Plane/Plane002",
+          "provisional": true
+        },
+        {
+          "id": "tafel-4",
+          "text": "Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)",
+          "sceneId": "b",
+          "active": true,
+          "offset": { "x": 15.47, "y": 1.35, "z": 2.1 },
+          "rotationDeg": 0,
+          "scaleFactor": 1,
+          "widthMeters": 1.2,
+          "billboard": true,
+          "referenceNode": "Brunnen",
+          "provisional": false
         }
       ]
     }

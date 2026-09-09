@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { APP_CONFIG } from "./config.js";
+import { InfoBoardManager } from "./InfoBoard.js?v=info-board-scenes-20260909";
 import { resolveAppUrl } from "./urlUtils.js";
 import { disposeObject3D } from "./utils.js";
 
@@ -31,6 +32,9 @@ export class SceneManager {
   constructor({ container }) {
     this.container = container;
     this.scene = new THREE.Scene();
+    this.infoBoardStagingRoot = new THREE.Group();
+    this.infoBoardStagingRoot.name = "info-board-staging-root";
+    this.infoBoardManager = new InfoBoardManager({ parent: this.infoBoardStagingRoot });
     this.camera = new THREE.PerspectiveCamera(
       APP_CONFIG.renderer.cameraFov,
       1,
@@ -430,12 +434,37 @@ export class SceneManager {
     this.camera.updateMatrixWorld(true);
   }
 
-  render() {
+  render(cameraState = null) {
     if (!this.isARMode && this.controls) {
       this.controls.update();
     }
 
+    this.infoBoardManager.updateBillboards(cameraState || this.camera);
     this.renderer.render(this.scene, this.camera);
+  }
+
+  getInfoBoardManager() {
+    return this.infoBoardManager;
+  }
+
+  createInfoBoard(config) {
+    return this.infoBoardManager.createBoard(config);
+  }
+
+  setInfoBoards(configs) {
+    return this.infoBoardManager.setBoards(configs);
+  }
+
+  updateInfoBoard(id, options) {
+    return this.infoBoardManager.updateBoard(id, options);
+  }
+
+  removeInfoBoard(id) {
+    return this.infoBoardManager.removeBoard(id);
+  }
+
+  clearInfoBoards() {
+    this.infoBoardManager.clear();
   }
 
   handleResize() {
@@ -480,6 +509,7 @@ export class SceneManager {
     window.removeEventListener("resize", this.handleResize);
     this.renderer.setAnimationLoop(null);
     this.stopCameraVideo();
+    this.infoBoardManager.dispose();
 
     if (this.controls) {
       this.controls.dispose();

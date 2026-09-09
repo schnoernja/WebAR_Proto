@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import { HitTestManager } from "../ar/HitTestManager.js";
 import { PlacementController } from "../ar/PlacementController.js";
+import { UIController } from "../ar/UIController.js";
 import {
   THREE_RUNTIME_FILES,
   THREE_VERSION
@@ -112,4 +113,81 @@ test("Reticle und freie Platzierung bleiben mit der lokalen Three.js-Version fun
   assert.equal(controller.reticle.visible, false);
 
   controller.dispose();
+});
+
+test("Gruppierte Einzelobjekte werden gemeinsam zur Bearbeitung angeboten", () => {
+  const scene = new THREE.Scene();
+  const controller = new PlacementController({ scene });
+  const wrapper = new THREE.Group();
+  const model = new THREE.Group();
+  wrapper.add(model);
+
+  for (const name of ["Gras", "Gras001", "Steinplatte"]) {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
+    mesh.name = name;
+    model.add(mesh);
+  }
+
+  controller.setAsset(wrapper);
+  controller.setEditableObjectNodes([
+    { nodes: ["Gras", "Gras001"], label: "Gras" },
+    { node: "Steinplatte", label: "Steinplatte" }
+  ]);
+
+  assert.deepEqual(controller.getEditableObjectNodes(), [
+    {
+      nodePath: "group:0|1",
+      nodePaths: ["0", "1"],
+      nodeNames: ["Gras", "Gras001"],
+      name: "Gras",
+      depth: 1
+    },
+    {
+      nodePath: "2",
+      nodePaths: ["2"],
+      nodeNames: ["Steinplatte"],
+      name: "Steinplatte",
+      depth: 1
+    }
+  ]);
+
+  controller.dispose();
+});
+
+test("Eine Gruppenbearbeitung erzeugt identische Transformationen für alle Knoten", () => {
+  const ui = Object.create(UIController.prototype);
+  ui.objectTransformTargets = [{
+    nodePath: "group:11|12",
+    nodePaths: ["11", "12"],
+    nodeNames: ["Plane", "Plane002"],
+    name: "Rasen und Bordsteinkante"
+  }];
+  ui.selectedObjectTransformPath = "group:11|12";
+  ui.objectTransformDrafts = [];
+  ui.objectTransformRefs = {
+    xRange: { value: "1.25" },
+    yRange: { value: "-0.50" },
+    zRange: { value: "2.00" },
+    scaleRange: { value: "1.40" },
+    rotationRange: { value: "35" }
+  };
+
+  ui.updateSelectedObjectTransformDraft();
+
+  assert.deepEqual(ui.getObjectTransformDrafts(), [
+    {
+      nodePath: "11",
+      node: "Plane",
+      position: { x: 1.25, y: -0.5, z: 2 },
+      scaleFactor: 1.4,
+      rotationDeg: 35
+    },
+    {
+      nodePath: "12",
+      node: "Plane002",
+      position: { x: 1.25, y: -0.5, z: 2 },
+      scaleFactor: 1.4,
+      rotationDeg: 35
+    }
+  ]);
 });

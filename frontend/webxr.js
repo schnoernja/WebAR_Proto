@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=surface-dwell-20260905";
+import { ARApp } from "./ar/App.js?v=info-board-dev-20260909";
 
 const app = new ARApp();
 

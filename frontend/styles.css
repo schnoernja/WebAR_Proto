@@ -1607,6 +1607,16 @@ body.ar-active .object-transform-editor {
   line-height: 1.4;
 }
 
+.info-board-selection {
+  margin: 0;
+  font-weight: 700;
+}
+
+.info-board-text {
+  min-height: 96px;
+  resize: vertical;
+}
+
 .geo-item,
 .debug-item,
 .state-item {

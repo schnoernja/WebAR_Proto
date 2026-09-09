@@ -297,12 +297,17 @@ test("Fehler beim Laden der iOS-Engine wird kontrolliert gemeldet", async () => 
 });
 
 test("gemeinsame Oberfläche enthält genau einen neutralen AR-Start", async () => {
-  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const [html, styles] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8")
+  ]);
   assert.equal((html.match(/id="start-ar-button"/g) || []).length, 1);
   assert.match(html, />\s*AR starten\s*</);
   assert.doesNotMatch(html, /WebXR|8th Wall|SLAM|ARCore|ARKit|iOS-Fallback/);
   assert.match(html, /href="\.\/vendor\/8thwall\/LICENSE"/);
   assert.match(html, /© 2026 Niantic Spatial, Inc\./);
+  assert.match(html, /class="object-transform-editor info-board-editor startup-developer-only"/);
+  assert.match(styles, /body\[data-ui-mode="user"\] \.startup-developer-only\s*\{\s*display:\s*none;/);
 });
 
 test("iOS platziert nach geglätteter stabiler Bodenpose automatisch", async () => {
@@ -342,6 +347,12 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   try {
     const loader = new SiteLoader({ locationRef, fetchImpl: async () => null });
     site = loader.normalizeSite("klimawocheFHE", rawConfig, locationRef.href);
+    const duplicateBoardConfig = structuredClone(rawConfig);
+    duplicateBoardConfig.scenarios[0].infoBoards[1].id = "tafel-1";
+    assert.throws(
+      () => loader.normalizeSite("klimawocheFHE", duplicateBoardConfig, locationRef.href),
+      /eindeutige ID/
+    );
   } finally {
     if (windowDescriptor) {
       Object.defineProperty(globalThis, "window", windowDescriptor);
@@ -354,6 +365,46 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   assert.notEqual(site.scenarios[0].placement.asset, site.scenarios[1].placement.asset);
   assert.match(site.scenarios[0].placement.asset, /scene_a_environment_final\.glb/);
   assert.match(site.scenarios[1].placement.asset, /scene_b_environment_final_webar\.glb/);
+  assert.deepEqual(site.scenarios[0].placement.editableNodes.at(-2), {
+    nodes: ["Gras", "Gras001"],
+    label: "Gras"
+  });
+  assert.deepEqual(site.scenarios[1].placement.editableNodes.at(-1), {
+    nodes: ["Plane", "Plane002"],
+    label: "Rasen und Bordsteinkante"
+  });
+
+  const [sceneA, sceneB] = site.scenarios;
+  assert.equal(sceneA.infoBoards.length, 3);
+  assert.equal(sceneB.infoBoards.length, 4);
+  assert.deepEqual(sceneA.infoBoards.map((board) => board.id), ["tafel-1", "tafel-2", "tafel-3"]);
+  assert.deepEqual(sceneB.infoBoards.map((board) => board.id), ["tafel-1", "tafel-2", "tafel-3", "tafel-4"]);
+  assert.ok(sceneA.infoBoards.every((board) => board.sceneId === "a" && board.active && board.billboard));
+  assert.ok(sceneB.infoBoards.every((board) => board.sceneId === "b" && board.active && board.billboard));
+  assert.deepEqual(sceneA.infoBoards.map((board) => board.offset), [
+    { x: 13.49, y: 1.5, z: 2.1 },
+    { x: 5.75, y: 1.05, z: 0.35 },
+    { x: 17, y: 1, z: -2.15 }
+  ]);
+  assert.deepEqual(sceneB.infoBoards.map((board) => board.offset), [
+    { x: 11.22, y: 1.5, z: 0.3 },
+    { x: 4.33, y: 1.05, z: -0.4 },
+    { x: 9, y: 1, z: 1.5 },
+    { x: 15.47, y: 1.35, z: 2.1 }
+  ]);
+  assert.deepEqual(sceneA.infoBoards.map((board) => board.provisional), [false, false, true]);
+  assert.deepEqual(sceneB.infoBoards.map((board) => board.provisional), [false, false, true, false]);
+  assert.equal(
+    sceneA.infoBoards[0].text,
+    "Kühlungseffekt von Bäumen: Kühlung der Lufttemperatur um ca. 5 Grad, Kühlung der Oberflächentemperatur um ca. 11 Grad bei 100%iger Bedeckung durch Stadtbäume im Vergleich zu vollversiegelten Flächen (Referenz Deutschland)"
+  );
+  assert.equal(
+    sceneA.infoBoards[1].text,
+    "ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad"
+  );
+  assert.equal(sceneA.infoBoards[2].text, sceneA.infoBoards[0].text);
+  assert.equal(sceneB.infoBoards[1].text, sceneA.infoBoards[1].text);
+  assert.equal(sceneB.infoBoards[3].text, sceneB.infoBoards[0].text);
 
   const appSource = await readFile(new URL("../ar/App.js", import.meta.url), "utf8");
   assert.match(

@@ -167,6 +167,126 @@ function normalizePlacementTransform(transform) {
   };
 }
 
+const INFO_BOARD_STYLE_FIELDS = Object.freeze([
+  "backgroundColor",
+  "textColor",
+  "borderColor",
+  "shadowColor",
+  "fontFamily",
+  "fontWeight",
+  "fontSizePx",
+  "minFontSizePx",
+  "lineHeight",
+  "paddingX",
+  "paddingY",
+  "borderWidth",
+  "cornerRadius",
+  "shadowBlur",
+  "shadowOffsetY",
+  "shadowPadding",
+  "textureWidth",
+  "maxTextureHeight"
+]);
+
+function normalizeInfoBoardStyle(style, index) {
+  if (style == null) {
+    return null;
+  }
+  if (typeof style !== "object" || Array.isArray(style)) {
+    throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}].style muss ein Objekt sein.`);
+  }
+
+  const normalized = {};
+  for (const field of INFO_BOARD_STYLE_FIELDS) {
+    const value = style[field];
+    if (value === undefined) {
+      continue;
+    }
+    if (field.endsWith("Color") || field === "fontFamily") {
+      if (typeof value !== "string" || !value.trim()) {
+        throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}].style.${field} muss Text enthalten.`);
+      }
+      normalized[field] = value.trim();
+    } else if (field === "fontWeight") {
+      if (typeof value !== "string" && !Number.isFinite(value)) {
+        throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}].style.fontWeight ist ungültig.`);
+      }
+      normalized[field] = value;
+    } else {
+      normalized[field] = ensureFiniteNumber(
+        value,
+        `infoBoards[${index}].style.${field}`
+      );
+    }
+  }
+  return normalized;
+}
+
+function normalizeInfoBoards(infoBoards, expectedSceneId = null) {
+  if (infoBoards == null) {
+    return [];
+  }
+  if (!Array.isArray(infoBoards)) {
+    throw new Error("Site-Konfiguration ungültig: infoBoards muss eine Liste sein.");
+  }
+
+  const ids = new Set();
+  return infoBoards.map((board, index) => {
+    if (!board || typeof board !== "object" || Array.isArray(board)) {
+      throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}] muss ein Objekt sein.`);
+    }
+
+    const id = typeof board.id === "string" ? board.id.trim() : "";
+    if (!id || ids.has(id)) {
+      throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}] benötigt eine eindeutige ID.`);
+    }
+    ids.add(id);
+
+    const text = typeof board.text === "string" ? board.text.trim() : "";
+    if (!text) {
+      throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}].text darf nicht leer sein.`);
+    }
+
+    const configuredSceneId = typeof board.sceneId === "string" ? board.sceneId.trim() : "";
+    const sceneId = configuredSceneId || expectedSceneId;
+    if (!sceneId || (expectedSceneId && sceneId !== expectedSceneId)) {
+      throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}].sceneId passt nicht zum Szenario.`);
+    }
+
+    const offset = board.offset;
+    if (!offset || typeof offset !== "object" || Array.isArray(offset)) {
+      throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}].offset muss ein Objekt sein.`);
+    }
+
+    const scaleFactor = Number.isFinite(board.scaleFactor) ? board.scaleFactor : 1;
+    const widthMeters = Number.isFinite(board.widthMeters) ? board.widthMeters : 1.2;
+    if (scaleFactor <= 0 || widthMeters <= 0) {
+      throw new Error(`Site-Konfiguration ungültig: infoBoards[${index}] benötigt eine positive Skalierung und Breite.`);
+    }
+
+    return {
+      id,
+      text,
+      sceneId,
+      active: board.active !== false,
+      offset: {
+        x: ensureFiniteNumber(offset.x, `infoBoards[${index}].offset.x`),
+        y: ensureFiniteNumber(offset.y, `infoBoards[${index}].offset.y`),
+        z: ensureFiniteNumber(offset.z, `infoBoards[${index}].offset.z`)
+      },
+      rotationDeg: Number.isFinite(board.rotationDeg) ? board.rotationDeg : 0,
+      scaleFactor,
+      widthMeters,
+      billboard: board.billboard !== false,
+      referenceNode: typeof board.referenceNode === "string" && board.referenceNode.trim()
+        ? board.referenceNode.trim()
+        : null,
+      provisional: board.provisional === true,
+      style: normalizeInfoBoardStyle(board.style, index)
+    };
+  });
+}
+
 function normalizeObjectTransforms(transforms) {
   if (transforms == null) {
     return [];
@@ -216,15 +336,25 @@ function normalizeEditableNodes(nodes) {
 
   const nodeNames = new Set();
   return nodes.map((entry, index) => {
-    const node = entry && typeof entry.node === "string" ? entry.node.trim() : "";
-    if (!node || nodeNames.has(node)) {
-      throw new Error(`Site-Konfiguration ungueltig: placement.editableNodes[${index}] benoetigt einen eindeutigen node-Wert.`);
+    const entryNodes = Array.isArray(entry && entry.nodes)
+      ? entry.nodes
+      : [entry && entry.node];
+    const normalizedNodes = entryNodes.map((node) => typeof node === "string" ? node.trim() : "");
+    if (
+      normalizedNodes.length === 0 ||
+      normalizedNodes.some((node) => !node || nodeNames.has(node)) ||
+      new Set(normalizedNodes).size !== normalizedNodes.length
+    ) {
+      throw new Error(`Site-Konfiguration ungültig: placement.editableNodes[${index}] benötigt eindeutige node-/nodes-Werte.`);
     }
-    nodeNames.add(node);
+    normalizedNodes.forEach((node) => nodeNames.add(node));
 
     return {
-      node,
-      label: entry && typeof entry.label === "string" && entry.label.trim() ? entry.label.trim() : node
+      ...(normalizedNodes.length === 1 ? { node: normalizedNodes[0] } : { nodes: normalizedNodes }),
+      label:
+        entry && typeof entry.label === "string" && entry.label.trim()
+          ? entry.label.trim()
+          : normalizedNodes.join(" + ")
     };
   });
 }
@@ -299,6 +429,7 @@ function normalizeScenarios(scenarios) {
       orientation: scenario.orientation == null ? null : normalizeOrientation(scenario.orientation),
       scene: normalizeScene(scenario.scene),
       objects: normalizeObjects(scenario.objects),
+      infoBoards: normalizeInfoBoards(scenario.infoBoards, id),
       placement: normalizePlacement(scenario.placement)
     });
   }
@@ -329,6 +460,7 @@ export class SiteLoader {
       orientation: normalizeOrientation(rawConfig.orientation),
       scene: normalizeScene(rawConfig.scene),
       objects: normalizeObjects(rawConfig.objects),
+      infoBoards: normalizeInfoBoards(rawConfig.infoBoards),
       placement: normalizePlacement(rawConfig.placement),
       scenarios: normalizeScenarios(rawConfig.scenarios)
     };

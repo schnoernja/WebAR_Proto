@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { InfoBoardManager } from "../InfoBoard.js?v=info-board-scenes-20260909";
 import { disposeObject3D } from "../utils.js";
 import { resolveAppUrl } from "../urlUtils.js";
 import { enuToVector3 } from "./GeoENU.js";
@@ -35,6 +36,23 @@ function createObjectMarker(id) {
   return marker;
 }
 
+function toActiveInfoBoardConfigs(infoBoards) {
+  return Array.isArray(infoBoards)
+    ? infoBoards
+        .filter((config) => config && config.active !== false)
+        .map((config) => ({
+          id: config.id,
+          text: config.text,
+          position: config.offset,
+          widthMeters: config.widthMeters,
+          scaleFactor: config.scaleFactor,
+          rotationDeg: config.rotationDeg,
+          billboard: config.billboard,
+          style: config.style
+        }))
+    : [];
+}
+
 export class GeoSceneManager {
   constructor({ scene }) {
     this.scene = scene;
@@ -46,6 +64,9 @@ export class GeoSceneManager {
     this.sceneAssetRoot = null;
     this.sceneAssetUrl = null;
     this.sceneAssetMixer = null;
+    this.infoBoardStagingRoot = new THREE.Group();
+    this.infoBoardStagingRoot.name = "geo-info-board-staging-root";
+    this.infoBoardManager = new InfoBoardManager({ parent: this.infoBoardStagingRoot });
     this.objectMarkersRoot = new THREE.Group();
     this.objectMarkersRoot.name = "geo-global-markers";
     this.root.add(this.objectMarkersRoot);
@@ -120,6 +141,8 @@ export class GeoSceneManager {
     this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
     this.sceneAssetUrl = assetUrl;
     this.root.add(this.sceneAssetRoot);
+    this.infoBoardManager.setParent(this.sceneAssetRoot);
+    this.infoBoardManager.setBoards(toActiveInfoBoardConfigs(this.siteConfig.infoBoards));
     if (Array.isArray(gltf.animations) && gltf.animations.length) {
       this.sceneAssetMixer = new THREE.AnimationMixer(this.sceneAssetRoot);
       for (const clip of gltf.animations) {
@@ -138,11 +161,48 @@ export class GeoSceneManager {
     this.sceneAssetMixer.update(delta);
   }
 
+  updateInfoBoardBillboards(cameraOrState) {
+    if (this.root.visible) {
+      this.infoBoardManager.updateBillboards(cameraOrState);
+    }
+  }
+
+  getInfoBoardCount() {
+    return this.infoBoardManager.boards.size;
+  }
+
+  setInfoBoards(infoBoards) {
+    if (!this.sceneAssetRoot) {
+      return 0;
+    }
+    return this.infoBoardManager.setBoards(toActiveInfoBoardConfigs(infoBoards));
+  }
+
+  updateInfoBoard(config) {
+    if (!this.sceneAssetRoot || !config || typeof config.id !== "string" || !config.id.trim()) {
+      return false;
+    }
+    const id = config.id.trim();
+    if (config.active === false) {
+      this.infoBoardManager.removeBoard(id);
+      return true;
+    }
+    const renderConfig = toActiveInfoBoardConfigs([{ ...config, id }])[0];
+    if (this.infoBoardManager.boards.has(id)) {
+      this.infoBoardManager.updateBoard(id, renderConfig);
+    } else {
+      this.infoBoardManager.createBoard(renderConfig);
+    }
+    return true;
+  }
+
   setVisible(visible) {
     this.root.visible = Boolean(visible) && Boolean(this.siteConfig);
   }
 
   clearSite() {
+    this.infoBoardManager.setParent(this.infoBoardStagingRoot);
+    this.infoBoardManager.clear();
     if (this.sceneAssetRoot) {
       if (this.sceneAssetMixer) {
         this.sceneAssetMixer.stopAllAction();
@@ -163,6 +223,7 @@ export class GeoSceneManager {
 
   dispose() {
     this.clearSite();
+    this.infoBoardManager.dispose();
     this.scene.remove(this.root);
   }
 }

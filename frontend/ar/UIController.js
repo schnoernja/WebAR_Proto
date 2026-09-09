@@ -45,6 +45,12 @@ const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze([]);
 const MAX_GEO_OFFSET_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
+const MIN_INFO_BOARD_OFFSET = -30;
+const MAX_INFO_BOARD_OFFSET = 30;
+const MIN_INFO_BOARD_Y = -5;
+const MAX_INFO_BOARD_Y = 10;
+const MIN_INFO_BOARD_WIDTH = 0.4;
+const MAX_INFO_BOARD_WIDTH = 3;
 
 const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
   "tree.glb konnte nicht geladen werden. Platzhalter aktiv.": "Could not load tree.glb. Placeholder active.",
@@ -1087,6 +1093,44 @@ function normalizeRotationDeg(value) {
   return normalized < 0 ? normalized + 360 : normalized;
 }
 
+function clampNumber(value, min, max, fallback) {
+  return Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback;
+}
+
+function normalizeInfoBoardDraft(board, fallbackSceneId = "") {
+  const source = board && typeof board === "object" ? board : {};
+  const offset = source.offset && typeof source.offset === "object" ? source.offset : {};
+  const sceneId = typeof source.sceneId === "string" && source.sceneId.trim()
+    ? source.sceneId.trim()
+    : fallbackSceneId;
+  const normalized = {
+    id: typeof source.id === "string" ? source.id.trim() : "",
+    text: typeof source.text === "string" ? source.text : "",
+    sceneId,
+    active: source.active !== false,
+    offset: {
+      x: clampNumber(offset.x, MIN_INFO_BOARD_OFFSET, MAX_INFO_BOARD_OFFSET, 0),
+      y: clampNumber(offset.y, MIN_INFO_BOARD_Y, MAX_INFO_BOARD_Y, 0),
+      z: clampNumber(offset.z, MIN_INFO_BOARD_OFFSET, MAX_INFO_BOARD_OFFSET, 0)
+    },
+    rotationDeg: normalizeRotationDeg(source.rotationDeg),
+    scaleFactor: clampNumber(source.scaleFactor, MIN_GEO_SCALE_FACTOR, MAX_GEO_SCALE_FACTOR, 1),
+    widthMeters: clampNumber(source.widthMeters, MIN_INFO_BOARD_WIDTH, MAX_INFO_BOARD_WIDTH, 1.2),
+    billboard: source.billboard !== false
+  };
+
+  if (typeof source.referenceNode === "string" && source.referenceNode.trim()) {
+    normalized.referenceNode = source.referenceNode.trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(source, "provisional")) {
+    normalized.provisional = source.provisional === true;
+  }
+  if (source.style && typeof source.style === "object" && !Array.isArray(source.style)) {
+    normalized.style = { ...source.style };
+  }
+  return normalized;
+}
+
 export class UIController {
   constructor(documentRef = document) {
     this.document = documentRef;
@@ -1186,6 +1230,22 @@ export class UIController {
       adoptButton: this.document.getElementById("object-transform-adopt-button"),
       resetButton: this.document.getElementById("object-transform-reset-button"),
       jsonOutput: this.document.getElementById("object-transform-json")
+    };
+    this.infoBoardRefs = {
+      select: this.document.getElementById("info-board-select"),
+      selection: this.document.getElementById("info-board-selection"),
+      xRange: this.document.getElementById("info-board-x"),
+      yRange: this.document.getElementById("info-board-y"),
+      zRange: this.document.getElementById("info-board-z"),
+      scaleRange: this.document.getElementById("info-board-scale"),
+      widthRange: this.document.getElementById("info-board-width"),
+      rotationRange: this.document.getElementById("info-board-rotation"),
+      activeToggle: this.document.getElementById("info-board-active"),
+      billboardToggle: this.document.getElementById("info-board-billboard"),
+      textInput: this.document.getElementById("info-board-text"),
+      adoptButton: this.document.getElementById("info-board-adopt-button"),
+      resetButton: this.document.getElementById("info-board-reset-button"),
+      jsonOutput: this.document.getElementById("info-board-json")
     };
 
     this.geoDebugRefs = {
@@ -1388,6 +1448,11 @@ export class UIController {
     this.objectTransformTargets = [];
     this.objectTransformDrafts = [];
     this.selectedObjectTransformPath = null;
+    this.infoBoardSceneId = null;
+    this.infoBoardSceneLabel = null;
+    this.infoBoardSourceDrafts = [];
+    this.infoBoardDrafts = [];
+    this.selectedInfoBoardId = null;
     this.latestGeoPosition = null;
     this.lastGeoSnapshot = createGeoSnapshotDefaults();
     this.lastSensorSnapshot = createSensorSnapshotDefaults();
@@ -1522,6 +1587,8 @@ export class UIController {
     onSceneTransformReset,
     onObjectTransformsChange,
     onObjectTransformsAdopt,
+    onInfoBoardChange,
+    onInfoBoardsAdopt,
     onToggleScenario,
     onUIInteractionChange,
     onTextInputActiveChange
@@ -1572,6 +1639,7 @@ export class UIController {
     this.bindDeviceCoordinateCopy();
     this.bindSceneTransformControls({ onSceneTransformChange, onSceneTransformAdopt, onSceneTransformReset });
     this.bindObjectTransformControls({ onObjectTransformsChange, onObjectTransformsAdopt });
+    this.bindInfoBoardControls({ onInfoBoardChange, onInfoBoardsAdopt });
     this.bindTextInputActivity();
 
     this.refreshButtons();
@@ -1790,7 +1858,11 @@ export class UIController {
   }
 
   bindTextInputActivity() {
-    const inputs = [this.geoTargetInputs.latitude, this.geoTargetInputs.longitude].filter(Boolean);
+    const inputs = [
+      this.geoTargetInputs.latitude,
+      this.geoTargetInputs.longitude,
+      this.infoBoardRefs.textInput
+    ].filter(Boolean);
     for (const input of inputs) {
       const handleFocus = () => {
         this.clearPendingTextInputRelease();
@@ -2130,11 +2202,13 @@ export class UIController {
 
     if (this.objectTransformRefs.resetButton) {
       const handleReset = () => {
-        if (!this.selectedObjectTransformPath) {
+        const target = this.getSelectedObjectTransformTarget();
+        if (!target) {
           return;
         }
+        const selectedPaths = new Set(this.getObjectTransformTargetPaths(target));
         this.objectTransformDrafts = this.objectTransformDrafts.filter(
-          (transform) => transform.nodePath !== this.selectedObjectTransformPath
+          (transform) => !selectedPaths.has(transform.nodePath)
         );
         this.renderObjectTransformControls();
         if (typeof onObjectTransformsChange === "function") {
@@ -2185,15 +2259,30 @@ export class UIController {
     return this.objectTransformTargets.find((target) => target.nodePath === this.selectedObjectTransformPath) || null;
   }
 
+  getObjectTransformTargetPaths(target) {
+    if (target && Array.isArray(target.nodePaths) && target.nodePaths.length) {
+      return target.nodePaths;
+    }
+    return target && target.nodePath ? [target.nodePath] : [];
+  }
+
+  getObjectTransformTargetNames(target) {
+    if (target && Array.isArray(target.nodeNames) && target.nodeNames.length) {
+      return target.nodeNames;
+    }
+    return target && target.name ? [target.name] : [];
+  }
+
   getSelectedObjectTransformDraft() {
     const target = this.getSelectedObjectTransformTarget();
     if (!target) {
       return null;
     }
 
-    return this.objectTransformDrafts.find((transform) => transform.nodePath === target.nodePath) || {
-      nodePath: target.nodePath,
-      node: target.name,
+    const targetPaths = this.getObjectTransformTargetPaths(target);
+    return this.objectTransformDrafts.find((transform) => targetPaths.includes(transform.nodePath)) || {
+      nodePath: targetPaths[0] || target.nodePath,
+      node: this.getObjectTransformTargetNames(target)[0] || target.name,
       position: { x: 0, y: 0, z: 0 },
       scaleFactor: 1,
       rotationDeg: 0
@@ -2207,9 +2296,7 @@ export class UIController {
     }
 
     const draft = this.getSelectedObjectTransformDraft();
-    const nextDraft = {
-      ...draft,
-      node: target.name,
+    const nextValues = {
       position: {
         x: this.objectTransformRefs.xRange ? Number.parseFloat(this.objectTransformRefs.xRange.value) || 0 : draft.position.x,
         y: this.objectTransformRefs.yRange ? Number.parseFloat(this.objectTransformRefs.yRange.value) || 0 : draft.position.y,
@@ -2222,9 +2309,18 @@ export class UIController {
         ? normalizeRotationDeg(Number.parseFloat(this.objectTransformRefs.rotationRange.value))
         : draft.rotationDeg
     };
+    const targetPaths = this.getObjectTransformTargetPaths(target);
+    const targetNames = this.getObjectTransformTargetNames(target);
+    const selectedPaths = new Set(targetPaths);
     this.objectTransformDrafts = [
-      ...this.objectTransformDrafts.filter((transform) => transform.nodePath !== target.nodePath),
-      nextDraft
+      ...this.objectTransformDrafts.filter((transform) => !selectedPaths.has(transform.nodePath)),
+      ...targetPaths.map((nodePath, index) => ({
+        nodePath,
+        node: targetNames[index] || target.name,
+        position: { ...nextValues.position },
+        scaleFactor: nextValues.scaleFactor,
+        rotationDeg: nextValues.rotationDeg
+      }))
     ];
   }
 
@@ -2291,6 +2387,232 @@ export class UIController {
       );
     }
     this.renderSceneTransformControls();
+  }
+
+  bindInfoBoardControls({ onInfoBoardChange, onInfoBoardsAdopt } = {}) {
+    const emitSelectedChange = () => {
+      const draft = this.updateSelectedInfoBoardDraftFromInputs();
+      this.renderInfoBoardJsonOutput();
+      if (draft && typeof onInfoBoardChange === "function") {
+        onInfoBoardChange(draft, this.getInfoBoardDrafts());
+      }
+    };
+
+    if (this.infoBoardRefs.select) {
+      const handleSelect = () => {
+        this.selectedInfoBoardId = this.infoBoardRefs.select.value || null;
+        this.renderInfoBoardControls();
+      };
+      this.infoBoardRefs.select.addEventListener("change", handleSelect);
+      this.cleanupCallbacks.push(() => this.infoBoardRefs.select.removeEventListener("change", handleSelect));
+    }
+
+    for (const input of [
+      this.infoBoardRefs.xRange,
+      this.infoBoardRefs.yRange,
+      this.infoBoardRefs.zRange,
+      this.infoBoardRefs.scaleRange,
+      this.infoBoardRefs.widthRange,
+      this.infoBoardRefs.rotationRange,
+      this.infoBoardRefs.textInput
+    ]) {
+      if (!input) {
+        continue;
+      }
+      input.addEventListener("input", emitSelectedChange);
+      this.cleanupCallbacks.push(() => input.removeEventListener("input", emitSelectedChange));
+    }
+
+    for (const toggle of [this.infoBoardRefs.activeToggle, this.infoBoardRefs.billboardToggle]) {
+      if (!toggle) {
+        continue;
+      }
+      toggle.addEventListener("change", emitSelectedChange);
+      this.cleanupCallbacks.push(() => toggle.removeEventListener("change", emitSelectedChange));
+    }
+
+    if (this.infoBoardRefs.resetButton) {
+      const handleReset = () => {
+        const sourceDraft = this.infoBoardSourceDrafts.find((board) => board.id === this.selectedInfoBoardId);
+        if (!sourceDraft) {
+          return;
+        }
+        this.infoBoardDrafts = this.infoBoardDrafts.map((board) => (
+          board.id === sourceDraft.id ? normalizeInfoBoardDraft(sourceDraft, this.infoBoardSceneId) : board
+        ));
+        this.renderInfoBoardControls();
+        if (typeof onInfoBoardChange === "function") {
+          onInfoBoardChange(this.getSelectedInfoBoardDraft(), this.getInfoBoardDrafts());
+        }
+      };
+      this.infoBoardRefs.resetButton.addEventListener("click", handleReset);
+      this.cleanupCallbacks.push(() => this.infoBoardRefs.resetButton.removeEventListener("click", handleReset));
+    }
+
+    if (this.infoBoardRefs.adoptButton) {
+      const handleAdopt = () => {
+        if (typeof onInfoBoardsAdopt === "function") {
+          onInfoBoardsAdopt(this.getInfoBoardDrafts());
+        }
+      };
+      this.infoBoardRefs.adoptButton.addEventListener("click", handleAdopt);
+      this.cleanupCallbacks.push(() => this.infoBoardRefs.adoptButton.removeEventListener("click", handleAdopt));
+    }
+  }
+
+  setInfoBoardTargets({ sceneId = null, sceneLabel = null, infoBoards = [] } = {}) {
+    this.infoBoardSceneId = typeof sceneId === "string" && sceneId.trim() ? sceneId.trim() : null;
+    this.infoBoardSceneLabel = typeof sceneLabel === "string" && sceneLabel.trim()
+      ? sceneLabel.trim()
+      : this.infoBoardSceneId
+        ? `Szene ${this.infoBoardSceneId.toUpperCase()}`
+        : "Keine Szene";
+    this.infoBoardSourceDrafts = Array.isArray(infoBoards)
+      ? infoBoards.map((board) => normalizeInfoBoardDraft(board, this.infoBoardSceneId || ""))
+      : [];
+    this.infoBoardDrafts = this.infoBoardSourceDrafts.map((board) => (
+      normalizeInfoBoardDraft(board, this.infoBoardSceneId || "")
+    ));
+
+    const selectedBoardExists = this.infoBoardDrafts.some((board) => board.id === this.selectedInfoBoardId);
+    this.selectedInfoBoardId = selectedBoardExists
+      ? this.selectedInfoBoardId
+      : this.infoBoardDrafts.length
+        ? this.infoBoardDrafts[0].id
+        : null;
+    this.renderInfoBoardControls();
+  }
+
+  getSelectedInfoBoardDraft() {
+    return this.infoBoardDrafts.find((board) => board.id === this.selectedInfoBoardId) || null;
+  }
+
+  updateSelectedInfoBoardDraftFromInputs() {
+    const current = this.getSelectedInfoBoardDraft();
+    if (!current) {
+      return null;
+    }
+
+    const nextDraft = normalizeInfoBoardDraft({
+      ...current,
+      text: this.infoBoardRefs.textInput ? this.infoBoardRefs.textInput.value : current.text,
+      active: this.infoBoardRefs.activeToggle ? this.infoBoardRefs.activeToggle.checked : current.active,
+      billboard: this.infoBoardRefs.billboardToggle
+        ? this.infoBoardRefs.billboardToggle.checked
+        : current.billboard,
+      offset: {
+        x: this.infoBoardRefs.xRange
+          ? Number.parseFloat(this.infoBoardRefs.xRange.value)
+          : current.offset.x,
+        y: this.infoBoardRefs.yRange
+          ? Number.parseFloat(this.infoBoardRefs.yRange.value)
+          : current.offset.y,
+        z: this.infoBoardRefs.zRange
+          ? Number.parseFloat(this.infoBoardRefs.zRange.value)
+          : current.offset.z
+      },
+      scaleFactor: this.infoBoardRefs.scaleRange
+        ? Number.parseFloat(this.infoBoardRefs.scaleRange.value)
+        : current.scaleFactor,
+      widthMeters: this.infoBoardRefs.widthRange
+        ? Number.parseFloat(this.infoBoardRefs.widthRange.value)
+        : current.widthMeters,
+      rotationDeg: this.infoBoardRefs.rotationRange
+        ? Number.parseFloat(this.infoBoardRefs.rotationRange.value)
+        : current.rotationDeg
+    }, this.infoBoardSceneId || "");
+
+    this.infoBoardDrafts = this.infoBoardDrafts.map((board) => (
+      board.id === nextDraft.id ? nextDraft : board
+    ));
+    return normalizeInfoBoardDraft(nextDraft, this.infoBoardSceneId || "");
+  }
+
+  getInfoBoardDrafts() {
+    return this.infoBoardDrafts.map((board) => normalizeInfoBoardDraft(board, this.infoBoardSceneId || ""));
+  }
+
+  renderInfoBoardControls() {
+    const selected = this.getSelectedInfoBoardDraft();
+    const disabled = !selected;
+
+    if (this.infoBoardRefs.select) {
+      this.infoBoardRefs.select.replaceChildren();
+      if (!this.infoBoardDrafts.length) {
+        const option = this.document.createElement("option");
+        option.textContent = "Keine Infotafeln in dieser Szene";
+        option.value = "";
+        this.infoBoardRefs.select.append(option);
+      } else {
+        for (const board of this.infoBoardDrafts) {
+          const option = this.document.createElement("option");
+          option.value = board.id;
+          option.textContent = `${this.infoBoardSceneLabel} · ${board.id}`;
+          option.selected = board.id === this.selectedInfoBoardId;
+          this.infoBoardRefs.select.append(option);
+        }
+      }
+      this.infoBoardRefs.select.disabled = disabled;
+    }
+
+    if (this.infoBoardRefs.selection) {
+      this.infoBoardRefs.selection.textContent = selected
+        ? `${this.infoBoardSceneLabel} · ${selected.id}`
+        : `${this.infoBoardSceneLabel} · keine Infotafel`;
+    }
+
+    const values = selected || {
+      text: "",
+      active: false,
+      billboard: false,
+      offset: { x: 0, y: 0, z: 0 },
+      scaleFactor: 1,
+      widthMeters: 1.2,
+      rotationDeg: 0
+    };
+    const fields = [
+      [this.infoBoardRefs.xRange, values.offset.x, 2],
+      [this.infoBoardRefs.yRange, values.offset.y, 2],
+      [this.infoBoardRefs.zRange, values.offset.z, 2],
+      [this.infoBoardRefs.scaleRange, values.scaleFactor, 2],
+      [this.infoBoardRefs.widthRange, values.widthMeters, 2],
+      [this.infoBoardRefs.rotationRange, values.rotationDeg, 0]
+    ];
+    for (const [input, value, precision] of fields) {
+      if (input) {
+        input.value = Number(value).toFixed(precision);
+        input.disabled = disabled;
+      }
+    }
+    if (this.infoBoardRefs.activeToggle) {
+      this.infoBoardRefs.activeToggle.checked = values.active;
+      this.infoBoardRefs.activeToggle.disabled = disabled;
+    }
+    if (this.infoBoardRefs.billboardToggle) {
+      this.infoBoardRefs.billboardToggle.checked = values.billboard;
+      this.infoBoardRefs.billboardToggle.disabled = disabled;
+    }
+    if (this.infoBoardRefs.textInput) {
+      this.infoBoardRefs.textInput.value = values.text;
+      this.infoBoardRefs.textInput.disabled = disabled;
+    }
+    if (this.infoBoardRefs.adoptButton) {
+      this.infoBoardRefs.adoptButton.disabled = disabled;
+    }
+    if (this.infoBoardRefs.resetButton) {
+      this.infoBoardRefs.resetButton.disabled = disabled;
+    }
+    this.renderInfoBoardJsonOutput();
+  }
+
+  renderInfoBoardJsonOutput() {
+    if (this.infoBoardRefs.jsonOutput) {
+      this.infoBoardRefs.jsonOutput.value = JSON.stringify(
+        { infoBoards: this.getInfoBoardDrafts() },
+        null,
+        2
+      );
+    }
   }
 
   setMenuOpen(open) {
