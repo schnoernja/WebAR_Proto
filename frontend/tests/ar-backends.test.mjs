@@ -257,6 +257,31 @@ test("iOS-Backend verwendet den nächsten Treffer wie WebXR", async () => {
   backend.stop();
 });
 
+test("iOS-Backend blendet platzierte Modelle bei kurzen LIMITED-Frames nicht aus", async () => {
+  const { backend, camera, reality } = createBackendHarness();
+  await backend.start();
+
+  const normalFrame = backend.update(1000, camera);
+  backend.finishFrame();
+  assert.equal(normalFrame.tracking, true);
+  backend.setPlaced(true);
+
+  reality.trackingStatus = "LIMITED";
+  reality.position.x = 9;
+  const transientLimitedFrame = backend.update(1300, camera);
+  backend.finishFrame();
+  assert.equal(transientLimitedFrame.tracking, true);
+  assert.equal(transientLimitedFrame.trackingLost, false);
+  assert.equal(transientLimitedFrame.cameraPose.position.x, 1);
+  assert.equal(backend.state, PlacementBackendState.PLACED);
+
+  const sustainedLimitedFrame = backend.update(1501, camera);
+  backend.finishFrame();
+  assert.equal(sustainedLimitedFrame.tracking, false);
+  assert.equal(sustainedLimitedFrame.trackingLost, true);
+  backend.stop();
+});
+
 test("verweigerter Kamerazugriff wird als Backend-Fehler geliefert", async () => {
   const { backend, camera } = createBackendHarness({ cameraFailure: true });
   await backend.start();

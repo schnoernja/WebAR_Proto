@@ -4,7 +4,7 @@ import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909";
 import { ARSessionManager } from "./ARSessionManager.js";
-import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=placement-consistency-20260909";
+import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=surface-dwell-20260905";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";

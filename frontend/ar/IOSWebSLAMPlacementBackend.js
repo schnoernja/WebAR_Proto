@@ -17,6 +17,7 @@ const HIT_TEST_X = 0.5;
 const HIT_TEST_Y = 0.62;
 const SURFACE_DWELL_MS = 1200;
 const SURFACE_HIT_GRACE_MS = 300;
+const TRACKING_LOSS_GRACE_MS = 500;
 const ABSOLUTE_SCALE_MOTION_METERS = 0.12;
 const HIT_TYPE_PRIORITY = Object.freeze({
   DETECTED_SURFACE: 3,
@@ -76,6 +77,7 @@ export class IOSWebSLAMPlacementBackend {
     this.preRenderPending = false;
     this.latestReality = null;
     this.lastTracking = false;
+    this.lastNormalTrackingAtMs = null;
     this.surfaceHitStartedAtMs = null;
     this.lastSurfaceHitAtMs = null;
     this.scaleMotionOrigin = null;
@@ -221,6 +223,7 @@ export class IOSWebSLAMPlacementBackend {
     this.error = null;
     this.latestReality = null;
     this.lastTracking = false;
+    this.lastNormalTrackingAtMs = null;
     this.resetSurfaceReadiness();
     this.placed = false;
     const xr8 = await this.prepare();
@@ -293,13 +296,25 @@ export class IOSWebSLAMPlacementBackend {
     }
 
     const reality = this.latestReality;
-    const tracking = Boolean(
+    const hasCameraPose = Boolean(
       reality &&
       reality.position &&
       reality.rotation &&
-      reality.trackingStatus === "NORMAL" &&
       reality.trackingReason !== "INITIALIZING"
     );
+    const normalTracking = hasCameraPose && reality.trackingStatus === "NORMAL";
+    if (normalTracking) {
+      this.lastNormalTrackingAtMs = timeMs;
+    }
+    const withinTrackingGrace = Boolean(
+      !normalTracking &&
+      hasCameraPose &&
+      this.lastTracking &&
+      Number.isFinite(this.lastNormalTrackingAtMs) &&
+      Number.isFinite(timeMs) &&
+      timeMs - this.lastNormalTrackingAtMs <= TRACKING_LOSS_GRACE_MS
+    );
+    const tracking = normalTracking || withinTrackingGrace;
     const trackingLost = this.lastTracking && !tracking;
     this.lastTracking = tracking;
 
@@ -309,6 +324,25 @@ export class IOSWebSLAMPlacementBackend {
         trackingLost ? PlacementBackendState.TRACKING_LOST : PlacementBackendState.SCANNING
       );
       return this.emptyFrame({ trackingLost, error: this.error });
+    }
+
+    if (withinTrackingGrace) {
+      this.setState(
+        this.placed ? PlacementBackendState.PLACED : PlacementBackendState.SCANNING
+      );
+      return {
+        tracking: true,
+        trackingLost: false,
+        surfaceDetected: false,
+        isStable: false,
+        pose: null,
+        cameraPose: {
+          position: camera.position.clone(),
+          quaternion: camera.quaternion.clone()
+        },
+        hitType: null,
+        error: null
+      };
     }
 
     camera.matrixAutoUpdate = false;
@@ -385,6 +419,7 @@ export class IOSWebSLAMPlacementBackend {
   reset() {
     this.latestReality = null;
     this.lastTracking = false;
+    this.lastNormalTrackingAtMs = null;
     this.resetSurfaceReadiness();
     this.placed = false;
     if (this.active && this.xr8 && this.xr8.XrController) {
@@ -407,6 +442,7 @@ export class IOSWebSLAMPlacementBackend {
     this.preRenderPending = false;
     this.latestReality = null;
     this.lastTracking = false;
+    this.lastNormalTrackingAtMs = null;
     this.resetSurfaceReadiness();
     this.placed = false;
     this.pipelineModule = null;

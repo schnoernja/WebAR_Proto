@@ -45,11 +45,14 @@ die Engine über `XR8.runPreRender()` und `XR8.runPostRender()` an. Deshalb ents
 weder eine zweite Three.js-Szene noch ein zweiter Render-Loop.
 
 Die Kamerapose und Projektionsmatrix kommen aus dem Engine-Ergebnis. Ein
-Bildschirm-Hit-Test im unteren mittleren Kamerabereich bevorzugt
-`DETECTED_SURFACE`, danach `ESTIMATED_SURFACE` und zuletzt `FEATURE_POINT`. Die
-Ergebnisse laufen durch den vorhandenen `PoseStabilizer` und anschließend durch
-den unveränderten `PlacementController`. Das Modell behält damit Normalisierung,
-Bodenkontakt, Transformationen, Animationen und fachliche Geo-Local-Regeln.
+Bildschirm-Hit-Test im unteren mittleren Kamerabereich verwendet den nächsten
+verfügbaren Treffer. Die Ergebnisse laufen durch den vorhandenen
+`PoseStabilizer` und anschließend durch den `PlacementController`. Das Modell
+behält damit Normalisierung, Bodenkontakt, Transformationen, Animationen und
+fachliche Geo-Local-Regeln. Kurzzeitige `LIMITED`-Tracking-Frames werden für bis
+zu 500 Millisekunden überbrückt, damit bereits platzierte Modelle nicht
+frameweise aus- und wieder eingeblendet werden. Ein anhaltender Trackingverlust
+bleibt weiterhin sichtbar und wird normal behandelt.
 
 Eine semantische Bodenklassifizierung wird nicht behauptet. Die Platzierung nutzt
 World Tracking, den dokumentierten 8th-Wall-Hit-Test und die Bestätigung durch den
