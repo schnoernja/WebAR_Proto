@@ -17,6 +17,7 @@ const HIT_TEST_X = 0.5;
 const HIT_TEST_Y = 0.62;
 const SURFACE_DWELL_MS = 1200;
 const SURFACE_HIT_GRACE_MS = 300;
+const ABSOLUTE_SCALE_MOTION_METERS = 0.12;
 const HIT_TYPE_PRIORITY = Object.freeze({
   DETECTED_SURFACE: 3,
   ESTIMATED_SURFACE: 2,
@@ -37,11 +38,17 @@ function selectBestHit(results) {
   }
 
   return [...results].sort((a, b) => {
+    const distanceDifference =
+      (Number.isFinite(a.distance) ? a.distance : Number.POSITIVE_INFINITY) -
+      (Number.isFinite(b.distance) ? b.distance : Number.POSITIVE_INFINITY);
+    if (distanceDifference !== 0) {
+      return distanceDifference;
+    }
     const typeDifference = (HIT_TYPE_PRIORITY[b.type] || 0) - (HIT_TYPE_PRIORITY[a.type] || 0);
     if (typeDifference !== 0) {
       return typeDifference;
     }
-    return (a.distance || Number.POSITIVE_INFINITY) - (b.distance || Number.POSITIVE_INFINITY);
+    return 0;
   })[0];
 }
 
@@ -71,6 +78,8 @@ export class IOSWebSLAMPlacementBackend {
     this.lastTracking = false;
     this.surfaceHitStartedAtMs = null;
     this.lastSurfaceHitAtMs = null;
+    this.scaleMotionOrigin = null;
+    this.absoluteScaleMotionObserved = false;
     this.placed = false;
     this.state = PlacementBackendState.IDLE;
     this.error = null;
@@ -328,7 +337,7 @@ export class IOSWebSLAMPlacementBackend {
             : new this.THREE.Quaternion()
         }
       : null;
-    const isStable = this.updateSurfaceReadiness(timeMs, Boolean(pose));
+    const isStable = this.updateSurfaceReadiness(timeMs, Boolean(pose), camera.position);
 
     this.setState(
       this.placed
@@ -413,9 +422,22 @@ export class IOSWebSLAMPlacementBackend {
     return this.lastTracking;
   }
 
-  updateSurfaceReadiness(timeMs, hasHit) {
+  updateSurfaceReadiness(timeMs, hasHit, cameraPosition = null) {
     if (!Number.isFinite(timeMs)) {
       return false;
+    }
+
+    if (cameraPosition && !this.scaleMotionOrigin) {
+      this.scaleMotionOrigin = {
+        x: cameraPosition.x,
+        y: cameraPosition.y,
+        z: cameraPosition.z
+      };
+    } else if (cameraPosition && !this.absoluteScaleMotionObserved) {
+      const dx = cameraPosition.x - this.scaleMotionOrigin.x;
+      const dy = cameraPosition.y - this.scaleMotionOrigin.y;
+      const dz = cameraPosition.z - this.scaleMotionOrigin.z;
+      this.absoluteScaleMotionObserved = Math.hypot(dx, dy, dz) >= ABSOLUTE_SCALE_MOTION_METERS;
     }
 
     if (hasHit) {
@@ -427,21 +449,30 @@ export class IOSWebSLAMPlacementBackend {
         this.surfaceHitStartedAtMs = timeMs;
       }
       this.lastSurfaceHitAtMs = timeMs;
-      return timeMs - this.surfaceHitStartedAtMs >= SURFACE_DWELL_MS;
+      return (
+        this.absoluteScaleMotionObserved &&
+        timeMs - this.surfaceHitStartedAtMs >= SURFACE_DWELL_MS
+      );
     }
 
     if (
       this.lastSurfaceHitAtMs === null ||
       timeMs - this.lastSurfaceHitAtMs > SURFACE_HIT_GRACE_MS
     ) {
-      this.resetSurfaceReadiness();
+      this.resetSurfaceHitReadiness();
     }
     return false;
   }
 
-  resetSurfaceReadiness() {
+  resetSurfaceHitReadiness() {
     this.surfaceHitStartedAtMs = null;
     this.lastSurfaceHitAtMs = null;
+  }
+
+  resetSurfaceReadiness() {
+    this.resetSurfaceHitReadiness();
+    this.scaleMotionOrigin = null;
+    this.absoluteScaleMotionObserved = false;
   }
 
   setPlaced(placed) {

@@ -26,7 +26,7 @@
           "yawDeg": 0
         },
         "transform": {
-          "scaleFactor": 1,
+          "scaleFactor": 1.32,
           "rotationDeg": 0,
           "preserveSourceScale": true
         },

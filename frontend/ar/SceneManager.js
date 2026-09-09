@@ -169,9 +169,9 @@ export class SceneManager {
 
   async loadPlacementCandidate(loader, candidate) {
     const gltf = await loader.loadAsync(candidate.url);
-    const asset = this.normalizeAsset(gltf.scene, {
+    const asset = this.normalizePlacementAsset(gltf.scene, {
+      sourceUrl: candidate.url,
       label: candidate.label,
-      preciseGrounding: needsPreciseGrounding(candidate.url),
       preserveSourceScale: candidate.preserveSourceScale === true
     });
     return {
@@ -295,6 +295,17 @@ export class SceneManager {
     }
 
     return wrapper;
+  }
+
+  normalizePlacementAsset(
+    assetRoot,
+    { sourceUrl = null, label = "Modell", preserveSourceScale = false } = {}
+  ) {
+    return this.normalizeAsset(assetRoot, {
+      label,
+      preciseGrounding: needsPreciseGrounding(sourceUrl),
+      preserveSourceScale
+    });
   }
 
   createPlaceholderModel() {

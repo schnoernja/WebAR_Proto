@@ -376,7 +376,10 @@ export class PlacementController {
             position: this.objectRoot.position.clone(),
             quaternion: this.objectRoot.quaternion.clone()
           },
-          geoPositions: this.geoInstancesRoot.children.map((slot) => slot.position.clone()),
+          geoPoses: this.geoInstancesRoot.children.map((slot) => ({
+            position: slot.position.clone(),
+            quaternion: slot.quaternion.clone()
+          })),
           isGeoPlacement: this.transformRoot.visible === false
         }
       : null;
@@ -412,8 +415,8 @@ export class PlacementController {
     this.placed = true;
     if (previousPlacement.isGeoPlacement) {
       this.transformRoot.visible = false;
-      for (const position of previousPlacement.geoPositions) {
-        this.addGeoInstance(position);
+      for (const pose of previousPlacement.geoPoses) {
+        this.addGeoInstance(pose.position, pose.quaternion);
       }
     } else {
       this.transformRoot.visible = true;
@@ -423,10 +426,13 @@ export class PlacementController {
     this.reticle.visible = false;
   }
 
-  addGeoInstance(position) {
+  addGeoInstance(position, quaternion = null) {
     const slot = new THREE.Group();
     slot.name = "geo-scenario-instance";
     slot.position.copy(position);
+    if (quaternion) {
+      slot.quaternion.copy(quaternion);
+    }
 
     const instance = this.asset ? this.asset.clone(true) : null;
     if (instance) {
@@ -1006,18 +1012,19 @@ export class PlacementController {
     };
   }
 
-  placeAtStablePose(surfacePose) {
-    return this.placeAtPose(surfacePose);
+  placeAtStablePose(surfacePose, cameraState = null) {
+    return this.placeAtPose(surfacePose, cameraState);
   }
 
-  placeAtPose(pose) {
+  placeAtPose(pose, cameraState = null) {
     if (this.textInputActive || !this.inARMode || this.placed || !pose) {
       return false;
     }
 
     this.clearGeoInstances();
     this.transformRoot.visible = true;
-    applyPose(this.objectRoot, pose);
+    this.objectRoot.position.copy(pose.position);
+    this.objectRoot.quaternion.copy(this.createViewAlignedQuaternion(cameraState));
     this.objectRoot.visible = this.presentationVisible && this.trackingVisible;
     this.reticle.visible = false;
     this.placed = true;
@@ -1039,10 +1046,10 @@ export class PlacementController {
     this.transformRoot.visible = false;
     this.objectRoot.position.set(0, 0, 0);
     this.objectRoot.quaternion.identity();
-    void cameraState;
+    const placementQuaternion = this.createGeoPlacementQuaternion(cameraState);
 
     for (const placement of placements) {
-      this.addGeoInstance(placement.worldPosition);
+      this.addGeoInstance(placement.worldPosition, placementQuaternion);
     }
 
     this.objectRoot.visible = this.presentationVisible && this.trackingVisible;
@@ -1051,12 +1058,20 @@ export class PlacementController {
     return true;
   }
 
-  createGeoPlacementQuaternion(cameraState = null) {
+  createViewAlignedQuaternion(cameraState = null) {
     const groundedDirection =
       projectDirectionToGround(cameraState && cameraState.direction) ||
-      (this.geoReferenceForward ? this.geoReferenceForward.clone() : null) ||
       DEFAULT_GEO_FORWARD.clone();
-    const yaw = Math.atan2(groundedDirection.x, -groundedDirection.z);
+    const yaw = Math.atan2(-groundedDirection.x, -groundedDirection.z);
+    return new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
+  }
+
+  createGeoPlacementQuaternion(cameraState = null) {
+    const groundedDirection =
+      (this.geoReferenceForward ? this.geoReferenceForward.clone() : null) ||
+      projectDirectionToGround(cameraState && cameraState.direction) ||
+      DEFAULT_GEO_FORWARD.clone();
+    const yaw = Math.atan2(-groundedDirection.x, -groundedDirection.z) + this.geoCalibration.yawRad;
     return new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0));
   }
 

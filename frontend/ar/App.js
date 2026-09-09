@@ -2,19 +2,19 @@ import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
-import { SceneManager } from "./SceneManager.js?v=info-board-dev-20260909";
+import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909";
 import { ARSessionManager } from "./ARSessionManager.js";
-import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=surface-dwell-20260905";
+import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=placement-consistency-20260909";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=surface-dwell-20260905";
-import { PlacementController, PlacementMode } from "./PlacementController.js?v=info-board-dev-20260909";
+import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
 import { UIController } from "./UIController.js?v=info-board-dev-20260909";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
 import { SiteLoader } from "./geo/SiteLoader.js?v=info-board-dev-20260909";
 import { SensorFusion } from "./geo/SensorFusion.js";
-import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=info-board-dev-20260909";
+import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=placement-consistency-20260909";
 
 const ExperienceMode = Object.freeze({
   XR: "xr",
@@ -289,7 +289,9 @@ export class ARApp {
       container: this.container
     });
     this.geoSceneManager = new GeoSceneManager({
-      scene: this.sceneManager.getScene()
+      scene: this.sceneManager.getScene(),
+      preparePlacementAsset: (assetRoot, options) =>
+        this.sceneManager.normalizePlacementAsset(assetRoot, options)
     });
     this.hitTestManager = new HitTestManager();
     this.poseStabilizer = new PoseStabilizer();
@@ -639,8 +641,23 @@ export class ARApp {
     return this.geoHeadingReferenceEnabled && this.selectedPlacementMode === PlacementUIModel.GEO_LOCAL;
   }
 
-  hasGeoLocalHeading() {
-    return Number.isFinite(this.headingService.getHeadingRad());
+  isGeoHeadingReferenceRequired() {
+    return (
+      this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL ||
+      this.isGeoLocalHeadingReferenceEnabled()
+    );
+  }
+
+  getGeoReferenceHeadingRad() {
+    if (this.selectedPlacementMode === PlacementUIModel.GEO_GLOBAL) {
+      const headingDeg = this.sensorFusion.getSnapshot().headingDeg;
+      return Number.isFinite(headingDeg) ? THREE.MathUtils.degToRad(headingDeg) : null;
+    }
+    return this.headingService.getHeadingRad();
+  }
+
+  hasGeoReferenceHeading() {
+    return Number.isFinite(this.getGeoReferenceHeadingRad());
   }
 
   applyGeoHeadingReferenceMode(enabled) {
@@ -1101,7 +1118,7 @@ export class ARApp {
       });
       this.iosSlamActive = true;
       this.ui.setSessionState(true, "AR aktiv. Bewege das Gerät langsam über den Boden.");
-      this.ui.setHint("Sobald eine Bodenfläche erkannt wird, erscheint das Reticle.");
+      this.ui.setHint("Bewege das Gerät kurz vor und zurück, damit Maßstab und Bodenfläche stabil erfasst werden.");
       this.ui.setTrackingState(false);
       this.ui.setSurfaceState(false, false);
       this.ui.setPlacementState(false);
@@ -1940,7 +1957,10 @@ export class ARApp {
       return false;
     }
 
-    const placed = this.placementController.placeAtStablePose(this.activeSurfaceState.stablePose);
+    const placed = this.placementController.placeAtStablePose(
+      this.activeSurfaceState.stablePose,
+      this.lastCameraState
+    );
     if (!placed) {
       return false;
     }
@@ -1997,8 +2017,8 @@ export class ARApp {
 
     if (!this.placementController.hasGeoReferenceDirection()) {
       this.ui.setMessage(
-        this.isGeoLocalHeadingReferenceEnabled()
-          ? this.hasGeoLocalHeading()
+        this.isGeoHeadingReferenceRequired()
+          ? this.hasGeoReferenceHeading()
             ? "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig."
             : "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug."
           : "Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil."
@@ -2017,8 +2037,8 @@ export class ARApp {
         this.ui.setMessage("Lokaler QR-Ursprung fehlt noch. Halte die Bodenpose kurz stabil.");
       } else if (computation.status === "missing-reference") {
         this.ui.setMessage(
-          this.isGeoLocalHeadingReferenceEnabled()
-            ? this.hasGeoLocalHeading()
+          this.isGeoHeadingReferenceRequired()
+            ? this.hasGeoReferenceHeading()
               ? "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig."
               : "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug."
             : "Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil."
@@ -2085,11 +2105,11 @@ export class ARApp {
     const originCaptured = this.placementController.hasGeoOrigin()
       ? true
       : this.placementController.setGeoOrigin({ anchorPose: localOriginPose });
-    const usesHeadingReference = this.isGeoLocalHeadingReferenceEnabled();
+    const usesHeadingReference = this.isGeoHeadingReferenceRequired();
     const directionCaptured = this.placementController.hasGeoReferenceDirection()
       ? true
       : this.placementController.setGeoReferenceDirection(cameraState.direction, {
-          headingRad: this.headingService.getHeadingRad(),
+          headingRad: this.getGeoReferenceHeadingRad(),
           requireHeading: usesHeadingReference
         });
 
@@ -2225,8 +2245,8 @@ export class ARApp {
 
     if (!this.placementController.hasGeoReferenceDirection()) {
       this.ui.setHint(
-        this.isGeoLocalHeadingReferenceEnabled()
-          ? this.hasGeoLocalHeading()
+        this.isGeoHeadingReferenceRequired()
+          ? this.hasGeoReferenceHeading()
             ? "Nordreferenz wird initialisiert. Halte das Geraet kurz ruhig."
             : "Geo-Local aktiv. Warte auf Kompass-Heading fuer echten Nord/Ost-Bezug."
           : "Lokale Referenzrichtung wird initialisiert. Halte die Blickrichtung kurz stabil."
@@ -2254,7 +2274,7 @@ export class ARApp {
     }
 
     this.ui.setHint(
-      this.isGeoLocalHeadingReferenceEnabled()
+      this.isGeoHeadingReferenceRequired()
         ? "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung als Ost/Nord-Meter gesetzt."
         : "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung im lokalen AR-Raum gesetzt."
     );
@@ -2289,7 +2309,7 @@ export class ARApp {
       this.ui.setMessage("Placement wurde zurueckgesetzt.");
       if (this.placementController.getMode() === PlacementMode.GEO) {
         this.ui.setHint(
-          this.isGeoLocalHeadingReferenceEnabled()
+          this.isGeoHeadingReferenceRequired()
             ? "Suche am QR-Startpunkt eine neue stabile Flaeche; Ursprung und Nordrichtung werden neu gesetzt."
             : "Suche am QR-Startpunkt eine neue stabile Flaeche; der lokale Ursprung wird neu gesetzt."
         );

@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=info-board-dev-20260909";
+import { ARApp } from "./ar/App.js?v=placement-consistency-20260909";
 
 const app = new ARApp();
 

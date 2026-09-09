@@ -54,12 +54,17 @@ function toActiveInfoBoardConfigs(infoBoards) {
 }
 
 export class GeoSceneManager {
-  constructor({ scene }) {
+  constructor({ scene, preparePlacementAsset = null }) {
     this.scene = scene;
+    this.preparePlacementAsset = preparePlacementAsset;
     this.loader = new GLTFLoader();
     this.root = new THREE.Group();
     this.root.name = "geo-global-root";
     this.root.visible = false;
+
+    this.sceneTransformRoot = new THREE.Group();
+    this.sceneTransformRoot.name = "geo-global-scene-transform";
+    this.root.add(this.sceneTransformRoot);
 
     this.sceneAssetRoot = null;
     this.sceneAssetUrl = null;
@@ -83,11 +88,42 @@ export class GeoSceneManager {
       return null;
     }
 
-    const yawDeg =
+    const orientationYawDeg =
       this.siteConfig.orientation && Number.isFinite(this.siteConfig.orientation.yawDeg)
         ? this.siteConfig.orientation.yawDeg
         : 0;
-    this.root.rotation.set(0, THREE.MathUtils.degToRad(yawDeg), 0);
+    const placement = this.siteConfig.placement && typeof this.siteConfig.placement === "object"
+      ? this.siteConfig.placement
+      : null;
+    const calibrationYawDeg =
+      placement && placement.calibration && Number.isFinite(placement.calibration.yawDeg)
+        ? placement.calibration.yawDeg
+        : 0;
+    const transform = placement && placement.transform && typeof placement.transform === "object"
+      ? placement.transform
+      : null;
+    const transformPosition = transform && transform.position && typeof transform.position === "object"
+      ? transform.position
+      : {};
+    const transformScale = transform && Number.isFinite(transform.scaleFactor) && transform.scaleFactor > 0
+      ? transform.scaleFactor
+      : 1;
+    const transformRotationDeg = transform && Number.isFinite(transform.rotationDeg)
+      ? transform.rotationDeg
+      : 0;
+
+    this.root.rotation.set(
+      0,
+      Math.PI + THREE.MathUtils.degToRad(orientationYawDeg + calibrationYawDeg),
+      0
+    );
+    this.sceneTransformRoot.position.set(
+      Number.isFinite(transformPosition.x) ? transformPosition.x : 0,
+      Number.isFinite(transformPosition.y) ? transformPosition.y : 0,
+      Number.isFinite(transformPosition.z) ? transformPosition.z : 0
+    );
+    this.sceneTransformRoot.scale.setScalar(transformScale);
+    this.sceneTransformRoot.rotation.set(0, THREE.MathUtils.degToRad(transformRotationDeg), 0);
 
     if (loadSceneAsset) {
       await this.ensureSceneAsset();
@@ -130,18 +166,28 @@ export class GeoSceneManager {
         this.sceneAssetMixer.uncacheRoot(this.sceneAssetRoot);
         this.sceneAssetMixer = null;
       }
-      this.root.remove(this.sceneAssetRoot);
+      this.sceneTransformRoot.remove(this.sceneAssetRoot);
       disposeObject3D(this.sceneAssetRoot);
       this.sceneAssetRoot = null;
       this.sceneAssetUrl = null;
     }
 
     const gltf = await this.loader.loadAsync(assetUrl);
-    this.sceneAssetRoot = gltf.scene;
+    const placementTransform = this.siteConfig.placement && this.siteConfig.placement.transform;
+    this.sceneAssetRoot = typeof this.preparePlacementAsset === "function"
+      ? this.preparePlacementAsset(gltf.scene, {
+          sourceUrl: assetUrl,
+          label: `Site-Modell ${this.siteConfig.id}`,
+          preserveSourceScale: placementTransform && placementTransform.preserveSourceScale === true
+        })
+      : gltf.scene;
     this.sceneAssetRoot.name = `geo-site-${this.siteConfig.id}`;
     this.sceneAssetUrl = assetUrl;
-    this.root.add(this.sceneAssetRoot);
-    this.infoBoardManager.setParent(this.sceneAssetRoot);
+    this.sceneTransformRoot.add(this.sceneAssetRoot);
+    const assetContentRoot = this.sceneAssetRoot.children && this.sceneAssetRoot.children.length
+      ? this.sceneAssetRoot.children[0]
+      : this.sceneAssetRoot;
+    this.infoBoardManager.setParent(assetContentRoot);
     this.infoBoardManager.setBoards(toActiveInfoBoardConfigs(this.siteConfig.infoBoards));
     if (Array.isArray(gltf.animations) && gltf.animations.length) {
       this.sceneAssetMixer = new THREE.AnimationMixer(this.sceneAssetRoot);
@@ -209,7 +255,7 @@ export class GeoSceneManager {
         this.sceneAssetMixer.uncacheRoot(this.sceneAssetRoot);
         this.sceneAssetMixer = null;
       }
-      this.root.remove(this.sceneAssetRoot);
+      this.sceneTransformRoot.remove(this.sceneAssetRoot);
       disposeObject3D(this.sceneAssetRoot);
       this.sceneAssetRoot = null;
       this.sceneAssetUrl = null;

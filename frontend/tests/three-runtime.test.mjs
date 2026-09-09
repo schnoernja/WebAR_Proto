@@ -7,6 +7,7 @@ import * as THREE from "three";
 import { HitTestManager } from "../ar/HitTestManager.js";
 import { PlacementController } from "../ar/PlacementController.js";
 import { UIController } from "../ar/UIController.js";
+import { GeoSceneManager } from "../ar/geo/GeoSceneManager.js";
 import {
   THREE_RUNTIME_FILES,
   THREE_VERSION
@@ -113,6 +114,87 @@ test("Reticle und freie Platzierung bleiben mit der lokalen Three.js-Version fun
   assert.equal(controller.reticle.visible, false);
 
   controller.dispose();
+});
+
+test("Platzierung nutzt unabhängig von der Backend-Flächenrotation dieselbe Blickausrichtung", () => {
+  const cameraState = {
+    position: new THREE.Vector3(0, 1.6, 0),
+    direction: new THREE.Vector3(1, -0.3, -1).normalize()
+  };
+  const poses = [
+    new THREE.Quaternion(),
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, Math.PI / 3, 0))
+  ];
+  const placedQuaternions = [];
+
+  for (const quaternion of poses) {
+    const controller = new PlacementController({ scene: new THREE.Scene() });
+    controller.enterARMode();
+    controller.placeAtStablePose(
+      { position: new THREE.Vector3(0, 0, -1), quaternion },
+      cameraState
+    );
+    placedQuaternions.push(controller.objectRoot.quaternion.clone());
+    controller.dispose();
+  }
+
+  assert.ok(placedQuaternions[0].angleTo(placedQuaternions[1]) < 1e-8);
+  const expectedDirection = cameraState.direction.clone().setY(0).normalize();
+  const placedDirection = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(placedQuaternions[0])
+    .normalize();
+  assert.ok(placedDirection.angleTo(expectedDirection) < 1e-8);
+});
+
+test("Geo-Local richtet die Szene an Referenzrichtung und Kalibrierung aus", () => {
+  const controller = new PlacementController({ scene: new THREE.Scene() });
+  controller.enterARMode();
+  controller.setGeoOrigin({ x: 0, y: 0, z: 0 });
+  controller.setGeoReferenceDirection(new THREE.Vector3(1, 0, 0));
+  controller.setGeoCalibration({ yawDeg: 30 });
+  controller.setGeoObjects([{ id: "scene", offset: { x: 0, y: 0, z: 0 } }]);
+
+  const floorPose = {
+    position: new THREE.Vector3(0, 0, -1),
+    quaternion: new THREE.Quaternion()
+  };
+  const computation = controller.computeGeoPosition(floorPose);
+  assert.equal(computation.status, "ready");
+  assert.equal(controller.placeGeoAtPose(computation.pose), true);
+
+  const instance = controller.geoInstancesRoot.children[0];
+  const expectedDirection = new THREE.Vector3(0, 0, -1)
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(-60));
+  const placedDirection = new THREE.Vector3(0, 0, -1).applyQuaternion(instance.quaternion);
+  assert.ok(placedDirection.angleTo(expectedDirection) < 1e-8);
+  controller.dispose();
+});
+
+test("iPhone-Geo-Fallback übernimmt dieselbe Szenentransformation", async () => {
+  const scene = new THREE.Scene();
+  const manager = new GeoSceneManager({ scene });
+  await manager.loadSite({
+    id: "test",
+    orientation: { yawDeg: 10 },
+    scene: null,
+    objects: [],
+    infoBoards: [],
+    placement: {
+      calibration: { yawDeg: 20 },
+      transform: {
+        position: { x: 1, y: -2, z: 3 },
+        scaleFactor: 1.32,
+        rotationDeg: 15,
+        preserveSourceScale: true
+      }
+    }
+  }, { loadSceneAsset: false });
+
+  assert.deepEqual(manager.sceneTransformRoot.position.toArray(), [1, -2, 3]);
+  assert.deepEqual(manager.sceneTransformRoot.scale.toArray(), [1.32, 1.32, 1.32]);
+  assert.ok(Math.abs(manager.sceneTransformRoot.rotation.y - THREE.MathUtils.degToRad(15)) < 1e-8);
+  assert.ok(Math.abs(manager.root.rotation.y - THREE.MathUtils.degToRad(210)) < 1e-8);
+  manager.dispose();
 });
 
 test("Gruppierte Einzelobjekte werden gemeinsam zur Bearbeitung angeboten", () => {

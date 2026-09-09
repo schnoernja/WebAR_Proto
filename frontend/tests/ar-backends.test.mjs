@@ -110,7 +110,7 @@ function createMatrix() {
   };
 }
 
-function createBackendHarness({ cameraFailure = false } = {}) {
+function createBackendHarness({ cameraFailure = false, hitResults = null } = {}) {
   const calls = { add: 0, clear: 0, run: [], stop: 0, pre: 0, post: 0, recenter: 0 };
   let customModule = null;
   let started = false;
@@ -131,7 +131,7 @@ function createBackendHarness({ cameraFailure = false } = {}) {
       pipelineModule: () => ({ name: "reality" }),
       updateCameraProjectionMatrix() {},
       recenter() { calls.recenter += 1; },
-      hitTest: () => [{
+      hitTest: () => hitResults || [{
         type: "DETECTED_SURFACE",
         position: { x: 0, y: 0, z: -1.5 },
         rotation: { x: 0, y: 0, z: 0, w: 1 },
@@ -181,11 +181,11 @@ function createBackendHarness({ cameraFailure = false } = {}) {
     updateMatrix() {},
     updateMatrixWorld() {}
   };
-  return { backend, camera, calls };
+  return { backend, camera, calls, reality };
 }
 
 test("iOS-Backend nutzt genau einen extern gesteuerten Render-Loop und räumt sauber auf", async () => {
-  const { backend, camera, calls } = createBackendHarness();
+  const { backend, camera, calls, reality } = createBackendHarness();
   await backend.start();
   await backend.start();
   assert.equal(calls.add, 1);
@@ -207,6 +207,11 @@ test("iOS-Backend nutzt genau einen extern gesteuerten Render-Loop und räumt sa
     backend.finishFrame();
   }
   assert.equal(stableFrame.surfaceDetected, true);
+  assert.equal(stableFrame.isStable, false);
+
+  reality.position.x = 1.13;
+  stableFrame = backend.update(2300, camera);
+  backend.finishFrame();
   assert.equal(stableFrame.isStable, true);
 
   backend.setPlaced(true);
@@ -224,6 +229,32 @@ test("iOS-Backend nutzt genau einen extern gesteuerten Render-Loop und räumt sa
   backend.stop();
   assert.equal(calls.stop, 2);
   assert.equal(calls.clear, 2);
+});
+
+test("iOS-Backend verwendet den nächsten Treffer wie WebXR", async () => {
+  const { backend, camera } = createBackendHarness({
+    hitResults: [
+      {
+        type: "DETECTED_SURFACE",
+        position: { x: 0, y: 0, z: -3 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        distance: 3
+      },
+      {
+        type: "FEATURE_POINT",
+        position: { x: 0, y: 0, z: -1 },
+        rotation: { x: 0, y: 0, z: 0, w: 1 },
+        distance: 1
+      }
+    ]
+  });
+  await backend.start();
+
+  const frame = backend.update(1000, camera);
+  assert.equal(frame.pose.position.z, -1);
+  assert.equal(frame.hitType, "FEATURE_POINT");
+  backend.finishFrame();
+  backend.stop();
 });
 
 test("verweigerter Kamerazugriff wird als Backend-Fehler geliefert", async () => {
@@ -375,6 +406,8 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   });
 
   const [sceneA, sceneB] = site.scenarios;
+  assert.equal(sceneA.placement.transform.scaleFactor, 1.32);
+  assert.equal(sceneA.placement.transform.scaleFactor, sceneB.placement.transform.scaleFactor);
   assert.equal(sceneA.infoBoards.length, 3);
   assert.equal(sceneB.infoBoards.length, 4);
   assert.deepEqual(sceneA.infoBoards.map((board) => board.id), ["tafel-1", "tafel-2", "tafel-3"]);

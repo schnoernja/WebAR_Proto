@@ -55,11 +55,12 @@ Eine semantische Bodenklassifizierung wird nicht behauptet. Die Platzierung nutz
 World Tracking, den dokumentierten 8th-Wall-Hit-Test und die Bestätigung durch den
 Nutzer.
 
-## Bestehender Geo-Global-Pfad
+## Geo-Global-Pfad
 
-Der getrennte Geo-Global-Modus bleibt aus Kompatibilitätsgründen unverändert. Er
-nutzt weiterhin `SensorFusion`, Standort und Kompass, da eine Umstellung seine
-fachliche Bedeutung und den bestehenden Android-Ablauf verändern würde.
+Der getrennte Geo-Global-Modus nutzt weiterhin `SensorFusion`, Standort und
+Kompass. Modellnormalisierung, Bodenkontakt und `placement.transform` werden im
+iPhone-Fallback nun genauso angewendet wie im Android-/WebXR-Pfad. Beide Pfade
+richten die Szene an derselben Nordreferenz aus.
 
 ## Manuelle Vergleichscheckliste
 
