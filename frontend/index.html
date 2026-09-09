@@ -8,7 +8,7 @@
   />
   <title>EPARtwin WebAR</title>
   <link rel="icon" href="./assets/design/logo.png" />
-  <link rel="stylesheet" href="./styles.css?v=iphone-tracking-20260904" />
+  <link rel="stylesheet" href="./styles.css?v=help-next-20260909" />
   <script type="importmap">
     {
       "imports": {
@@ -274,16 +274,6 @@
                 <div class="card-title-group">
                   <h2 id="info-card-1-title">Info 1/2</h2>
                 </div>
-                <div class="card-header-actions">
-                  <button
-                    id="close-info-card-1-button"
-                    class="card-close-button"
-                    type="button"
-                    aria-label="Info 1 von 2 schließen"
-                  >
-                    X
-                  </button>
-                </div>
               </div>
               <div class="card-content info-card-content">
                 <p id="info-card-1-text" class="info-card-text">
@@ -295,6 +285,16 @@
                   src="assets/tutorial/ar-flaeche-finden.gif"
                   alt="Das Smartphone wird zum Boden geschwenkt, bis das Fadenkreuz grün aufleuchtet."
                 />
+                <div class="info-card-actions">
+                  <button
+                    id="close-info-card-1-button"
+                    class="button button-primary info-card-next-button"
+                    type="button"
+                    aria-label="Weiter zu Info 2 von 2"
+                  >
+                    Weiter
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -302,16 +302,6 @@
               <div class="card-header">
                 <div class="card-title-group">
                   <h2 id="info-card-2-title">Info 2/2</h2>
-                </div>
-                <div class="card-header-actions">
-                  <button
-                    id="close-info-card-2-button"
-                    class="card-close-button"
-                    type="button"
-                    aria-label="Info 2 von 2 schließen"
-                  >
-                    X
-                  </button>
                 </div>
               </div>
               <div class="card-content info-card-content">
@@ -324,6 +314,16 @@
                   src="assets/tutorial/ar-szenario-und-umfrage.gif"
                   alt="Die Szene wird gewechselt und anschließend die Umfrage geöffnet."
                 />
+                <div class="info-card-actions">
+                  <button
+                    id="close-info-card-2-button"
+                    class="button button-primary info-card-next-button"
+                    type="button"
+                    aria-label="Weiter zur Umfrage"
+                  >
+                    Weiter
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -1000,6 +1000,6 @@
     </div>
   </noscript>
 
-    <script type="module" src="./webxr.js?v=ios-tracking-grace-20260909"></script>
+    <script type="module" src="./webxr.js?v=help-next-20260909"></script>
 </body>
 </html>

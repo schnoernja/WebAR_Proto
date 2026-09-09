@@ -688,16 +688,18 @@ body[data-ui-mode="user"] .info-panel.card-panel .card-header {
   position: sticky;
   top: 0;
   z-index: 3;
-  padding-right: 44px;
+  padding-right: 0;
   background: inherit;
 }
 
-.info-panel .card-header-actions {
-  padding-right: 32px;
+.info-card-actions {
+  display: flex;
+  width: 100%;
+  margin-top: 2px;
 }
 
-.info-panel .card-close-button {
-  right: 8px;
+.info-card-next-button {
+  width: 100%;
 }
 
 .info-card-content {

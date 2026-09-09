@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=ios-tracking-grace-20260909";
+import { ARApp } from "./ar/App.js?v=help-next-20260909";
 
 const app = new ARApp();
 

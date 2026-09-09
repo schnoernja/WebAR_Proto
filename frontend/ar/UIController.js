@@ -338,7 +338,8 @@ const DE_TRANSLATIONS = Object.freeze({
     firstImageAlt: "Das Smartphone wird zum Boden geschwenkt, bis das Fadenkreuz grün aufleuchtet.",
     secondTitle: "Info 2/2",
     secondText: "Sehen Sie sich in der Szene um. Wechseln Sie die Szene. Teilen Sie mit uns Ihre Erfahrung mit der EPARtwin WebAR in der Umfrage.",
-    secondImageAlt: "Die Szene wird gewechselt und anschließend die Umfrage geöffnet."
+    secondImageAlt: "Die Szene wird gewechselt und anschließend die Umfrage geöffnet.",
+    nextButton: "Weiter"
   },
   survey: {
     title: "Umfrage",
@@ -528,10 +529,12 @@ const DE_TRANSLATIONS = Object.freeze({
     closeButtons: {
       welcome: "Begrüßung schließen",
       help: "Hilfskachel schließen",
-      infoFirst: "Info 1 von 2 schließen",
-      infoSecond: "Info 2 von 2 schließen",
       survey: "Umfrage schließen",
       settings: "Einstellungen schließen"
+    },
+    nextButtons: {
+      infoFirst: "Weiter zu Info 2 von 2",
+      infoSecond: "Weiter zur Umfrage"
     },
     toggleButtons: {
       welcome: "Begrüßung auf- oder zuklappen",
@@ -653,7 +656,8 @@ const EN_TRANSLATIONS = Object.freeze({
     firstImageAlt: "The smartphone is tilted toward the ground until the reticle lights up green.",
     secondTitle: "Info 2/2",
     secondText: "Look around the scene. Switch the scene. Share your experience with the EPARtwin WebAR in the survey.",
-    secondImageAlt: "The scene is switched and the survey is then opened."
+    secondImageAlt: "The scene is switched and the survey is then opened.",
+    nextButton: "Next"
   },
   survey: {
     title: "Survey",
@@ -843,10 +847,12 @@ const EN_TRANSLATIONS = Object.freeze({
     closeButtons: {
       welcome: "Close welcome card",
       help: "Close help card",
-      infoFirst: "Close info 1 of 2",
-      infoSecond: "Close info 2 of 2",
       survey: "Close survey card",
       settings: "Close settings card"
+    },
+    nextButtons: {
+      infoFirst: "Continue to info 2 of 2",
+      infoSecond: "Continue to the survey"
     },
     toggleButtons: {
       welcome: "Toggle welcome card",
@@ -3212,6 +3218,8 @@ export class UIController {
     this.setElementText(this.staticRefs.infoFirstText, text.info.firstText);
     this.setElementText(this.staticRefs.infoSecondTitle, text.info.secondTitle);
     this.setElementText(this.staticRefs.infoSecondText, text.info.secondText);
+    this.setElementText(this.closeInfoCardOneButton, text.info.nextButton);
+    this.setElementText(this.closeInfoCardTwoButton, text.info.nextButton);
     if (this.staticRefs.infoFirstImage) {
       this.staticRefs.infoFirstImage.setAttribute("alt", this.toDisplayText(text.info.firstImageAlt));
     }
@@ -3319,10 +3327,10 @@ export class UIController {
       this.closeHelpButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.help));
     }
     if (this.closeInfoCardOneButton) {
-      this.closeInfoCardOneButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.infoFirst));
+      this.closeInfoCardOneButton.setAttribute("aria-label", this.toDisplayText(text.aria.nextButtons.infoFirst));
     }
     if (this.closeInfoCardTwoButton) {
-      this.closeInfoCardTwoButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.infoSecond));
+      this.closeInfoCardTwoButton.setAttribute("aria-label", this.toDisplayText(text.aria.nextButtons.infoSecond));
     }
     if (this.closeSurveyButton) {
       this.closeSurveyButton.setAttribute("aria-label", this.toDisplayText(text.aria.closeButtons.survey));

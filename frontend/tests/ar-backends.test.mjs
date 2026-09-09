@@ -353,9 +353,10 @@ test("Fehler beim Laden der iOS-Engine wird kontrolliert gemeldet", async () => 
 });
 
 test("gemeinsame Oberfläche enthält genau einen neutralen AR-Start", async () => {
-  const [html, styles] = await Promise.all([
+  const [html, styles, uiSource] = await Promise.all([
     readFile(new URL("../index.html", import.meta.url), "utf8"),
-    readFile(new URL("../styles.css", import.meta.url), "utf8")
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../ar/UIController.js", import.meta.url), "utf8")
   ]);
   assert.equal((html.match(/id="start-ar-button"/g) || []).length, 1);
   assert.match(html, />\s*AR starten\s*</);
@@ -364,6 +365,19 @@ test("gemeinsame Oberfläche enthält genau einen neutralen AR-Start", async () 
   assert.match(html, /© 2026 Niantic Spatial, Inc\./);
   assert.match(html, /class="object-transform-editor info-board-editor startup-developer-only"/);
   assert.match(styles, /body\[data-ui-mode="user"\] \.startup-developer-only\s*\{\s*display:\s*none;/);
+
+  const infoButtons = [1, 2].map((step) =>
+    html.match(new RegExp(`<button[^>]*id="close-info-card-${step}-button"[^>]*>[\\s\\S]*?<\\/button>`))?.[0]
+  );
+  assert.equal(infoButtons.filter(Boolean).length, 2);
+  for (const button of infoButtons) {
+    assert.match(button, /class="button button-primary info-card-next-button"/);
+    assert.match(button, />\s*Weiter\s*<\/button>/);
+    assert.doesNotMatch(button, />\s*X\s*<\/button>/);
+  }
+  assert.match(styles, /\.info-card-next-button\s*\{\s*width:\s*100%;/);
+  assert.match(uiSource, /nextButton:\s*"Weiter"/);
+  assert.match(uiSource, /nextButton:\s*"Next"/);
 });
 
 test("iOS platziert nach geglätteter stabiler Bodenpose automatisch", async () => {

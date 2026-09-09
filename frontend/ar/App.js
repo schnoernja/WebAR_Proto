@@ -8,7 +8,7 @@ import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=io
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=surface-dwell-20260905";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
-import { UIController } from "./UIController.js?v=info-board-dev-20260909";
+import { UIController } from "./UIController.js?v=help-next-20260909";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
