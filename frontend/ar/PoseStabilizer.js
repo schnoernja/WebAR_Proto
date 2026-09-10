@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js";
+import { APP_CONFIG } from "./config.js?v=placement-hold-20260910";
 import { averageQuaternion, clonePose, quaternionAngle, smoothFactor } from "./utils.js";
 
 export class PoseStabilizer {
@@ -10,6 +10,7 @@ export class PoseStabilizer {
     this.displayPose = null;
     this.lastStablePose = null;
     this.stableFrameCount = 0;
+    this.stableDurationSeconds = 0;
     this.missedFrames = 0;
     this.tmpMeanQuaternion = new THREE.Quaternion();
   }
@@ -27,16 +28,18 @@ export class PoseStabilizer {
     this.displayPose = null;
     this.lastStablePose = null;
     this.stableFrameCount = 0;
+    this.stableDurationSeconds = 0;
     this.missedFrames = 0;
   }
 
-  update(rawPose, deltaSeconds) {
+  update(rawPose, deltaSeconds, allowHoldProgress = true) {
     if (!rawPose) {
       this.missedFrames += 1;
 
       if (this.missedFrames > APP_CONFIG.hitTest.lostPoseGraceFrames) {
         this.samples.length = 0;
         this.stableFrameCount = 0;
+        this.stableDurationSeconds = 0;
         this.lastStablePose = null;
         this.displayPose = null;
       }
@@ -64,15 +67,27 @@ export class PoseStabilizer {
 
     this.stableFrameCount = windowStable ? this.stableFrameCount + 1 : 0;
 
-    const isStable = windowStable && this.stableFrameCount >= this.config.stableFramesRequired;
-    if (isStable && metrics) {
+    const motionStable = windowStable && this.stableFrameCount >= this.config.stableFramesRequired;
+    const holdStable = motionStable && allowHoldProgress;
+    this.stableDurationSeconds = holdStable
+      ? this.stableDurationSeconds + Math.max(Number.isFinite(deltaSeconds) ? deltaSeconds : 0, 0)
+      : 0;
+
+    const isStable =
+      holdStable &&
+      this.stableDurationSeconds >= this.config.reticleGreenAfterSeconds;
+    const canPlace =
+      holdStable &&
+      this.stableDurationSeconds >= this.config.autoPlaceAfterSeconds;
+
+    if (motionStable && metrics) {
       this.lastStablePose = clonePose(metrics.meanPose);
     } else {
       this.lastStablePose = null;
     }
 
     const targetPose =
-      isStable && metrics && metrics.meanPose
+      motionStable && metrics && metrics.meanPose
         ? metrics.meanPose
         : this.smoothedPose;
 
@@ -81,7 +96,8 @@ export class PoseStabilizer {
     return this.buildState({
       surfaceDetected: true,
       isStable,
-      canPlace: isStable
+      canPlace,
+      motionStable
     });
   }
 
@@ -166,11 +182,13 @@ export class PoseStabilizer {
     };
   }
 
-  buildState({ surfaceDetected, isStable, canPlace }) {
+  buildState({ surfaceDetected, isStable, canPlace, motionStable = false }) {
     return {
       surfaceDetected,
       isStable,
       canPlace,
+      motionStable,
+      stableDurationSeconds: this.stableDurationSeconds,
       displayPose: this.displayPose ? clonePose(this.displayPose) : null,
       stablePose: this.lastStablePose ? clonePose(this.lastStablePose) : null
     };

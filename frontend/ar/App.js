@@ -6,9 +6,9 @@ import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
-import { PoseStabilizer } from "./PoseStabilizer.js?v=surface-dwell-20260905";
+import { PoseStabilizer } from "./PoseStabilizer.js?v=placement-hold-20260910";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
-import { UIController } from "./UIController.js?v=help-next-20260909";
+import { UIController } from "./UIController.js?v=placement-hold-20260910";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
@@ -1633,9 +1633,13 @@ export class ARApp {
         this.arSessionManager.setOriginPose(surfaceState.stablePose);
       }
 
-      if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
-        this.captureGeoLocalReference(surfaceState, cameraState);
-        this.maybePlaceGeoObject(surfaceState, cameraState);
+      if (tracking) {
+        if (this.placementController.getMode() === PlacementMode.GEO) {
+          this.captureGeoLocalReference(surfaceState, cameraState);
+          this.maybePlaceGeoObject(surfaceState, cameraState);
+        } else if (surfaceState.canPlace && !this.placementController.isPlaced()) {
+          this.placeFreeObject("hold");
+        }
       }
 
       this.ui.setPlacementState(this.placementController.isPlaced());
@@ -1677,22 +1681,9 @@ export class ARApp {
 
     let surfaceState = null;
     if (tracking && slamResult.surfaceDetected && slamResult.pose) {
-      surfaceState = this.poseStabilizer.update(slamResult.pose, deltaSeconds);
+      surfaceState = this.poseStabilizer.update(slamResult.pose, deltaSeconds, slamResult.isStable);
     } else {
       surfaceState = this.poseStabilizer.update(null, deltaSeconds);
-    }
-
-    if (
-      slamResult.isStable &&
-      !surfaceState.isStable &&
-      surfaceState.displayPose
-    ) {
-      surfaceState = {
-        ...surfaceState,
-        isStable: true,
-        canPlace: true,
-        stablePose: surfaceState.displayPose
-      };
     }
 
     this.activeSurfaceState = surfaceState;
@@ -1702,9 +1693,9 @@ export class ARApp {
     const cameraState = slamResult.cameraPose ? buildCameraStateFromPose(slamResult.cameraPose) : null;
     this.lastCameraState = cameraState;
 
-    if (tracking && surfaceState.isStable && !this.placementController.isPlaced()) {
+    if (tracking && surfaceState.canPlace && !this.placementController.isPlaced()) {
       if (this.placementController.getMode() === PlacementMode.FREE) {
-        this.placeFreeObject("ios-auto");
+        this.placeFreeObject("hold");
       } else if (this.placementController.getMode() === PlacementMode.GEO) {
         this.captureGeoLocalReference(surfaceState, cameraState);
         this.maybePlaceGeoObject(surfaceState, cameraState);
@@ -1952,8 +1943,8 @@ export class ARApp {
       return false;
     }
 
-    if (!this.activeSurfaceState || !this.activeSurfaceState.isStable || !this.activeSurfaceState.stablePose) {
-      this.ui.setMessage("Noch keine stabile Flaeche fuer die freie Platzierung.");
+    if (!this.activeSurfaceState || !this.activeSurfaceState.canPlace || !this.activeSurfaceState.stablePose) {
+      this.ui.setMessage("Halte das Gerät etwa vier Sekunden ruhig auf den gewünschten Startpunkt.");
       return false;
     }
 
@@ -2002,8 +1993,8 @@ export class ARApp {
       return false;
     }
 
-    if (!this.activeSurfaceState || !this.activeSurfaceState.isStable || !this.activeSurfaceState.stablePose) {
-      this.ui.setMessage("Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
+    if (!this.activeSurfaceState || !this.activeSurfaceState.canPlace || !this.activeSurfaceState.stablePose) {
+      this.ui.setMessage("Halte das Gerät etwa vier Sekunden ruhig auf den gewünschten Startpunkt.");
       return false;
     }
 
@@ -2066,7 +2057,7 @@ export class ARApp {
     if (
       this.placementAssetLoadPending ||
       this.isTextInputActive ||
-      !surfaceState.isStable ||
+      !surfaceState.canPlace ||
       this.placementController.isPlaced()
     ) {
       return;
@@ -2229,9 +2220,9 @@ export class ARApp {
 
     if (this.placementController.getMode() === PlacementMode.FREE) {
       if (surfaceState.isStable) {
-        this.ui.setHint("Reticle stabil. Tippen oder 'Objekt setzen' druecken.");
+        this.ui.setHint("Cursor grün. Halte das Gerät bis zur automatischen Platzierung weiter ruhig.");
       } else if (surfaceState.surfaceDetected) {
-        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.");
+        this.ui.setHint("Fläche erkannt. Halte den orangefarbenen Cursor ruhig auf den gewünschten Startpunkt.");
       } else {
         this.ui.setHint("Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.");
       }
@@ -2261,7 +2252,7 @@ export class ARApp {
 
     if (!surfaceState.isStable) {
       if (surfaceState.surfaceDetected) {
-        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Bodenhoehe stabil wird.");
+        this.ui.setHint("Fläche erkannt. Halte den orangefarbenen Cursor ruhig auf den gewünschten Startpunkt.");
       } else {
         this.ui.setHint("Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
       }
@@ -2273,11 +2264,7 @@ export class ARApp {
       return;
     }
 
-    this.ui.setHint(
-      this.isGeoHeadingReferenceRequired()
-        ? "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung als Ost/Nord-Meter gesetzt."
-        : "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung im lokalen AR-Raum gesetzt."
-    );
+    this.ui.setHint("Cursor grün. Halte das Gerät bis zur automatischen Platzierung weiter ruhig.");
   }
 
   resetPlacement() {

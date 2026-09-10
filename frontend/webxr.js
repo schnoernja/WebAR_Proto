@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=help-next-20260909";
+import { ARApp } from "./ar/App.js?v=placement-hold-20260910";
 
 const app = new ARApp();
 

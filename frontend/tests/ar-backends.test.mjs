@@ -385,8 +385,8 @@ test("iOS platziert nach geglätteter stabiler Bodenpose automatisch", async () 
   const stabilizerSource = await readFile(new URL("../ar/PoseStabilizer.js", import.meta.url), "utf8");
 
   assert.match(appSource, /stabilityUsesSmoothedPose:\s*true/);
-  assert.match(appSource, /surfaceState\.isStable\s*&&\s*!this\.placementController\.isPlaced\(\)/);
-  assert.match(appSource, /this\.placeFreeObject\("ios-auto"\)/);
+  assert.match(appSource, /surfaceState\.canPlace\s*&&\s*!this\.placementController\.isPlaced\(\)/);
+  assert.match(appSource, /this\.placeFreeObject\("hold"\)/);
   assert.match(appSource, /slamResult\.isStable/);
   assert.match(stabilizerSource, /this\.config\.stabilityUsesSmoothedPose/);
 });
