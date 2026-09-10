@@ -152,13 +152,48 @@ test("Stabiler Cursor wird nach zwei Sekunden grün und nach vier Sekunden platz
   assert.equal(state.isStable, true);
   assert.equal(state.canPlace, true);
 
-  state = stabilizer.update({
+  const movedPose = {
     position: new THREE.Vector3(0.2, 0, -1),
+    quaternion: new THREE.Quaternion()
+  };
+  state = stabilizer.update(movedPose, 0.5);
+  assert.equal(state.isStable, true);
+  assert.equal(state.canPlace, true);
+  assert.equal(state.stableDurationSeconds, 4);
+
+  state = stabilizer.update({
+    position: new THREE.Vector3(0.4, 0, -1),
     quaternion: new THREE.Quaternion()
   }, 0.5);
   assert.equal(state.isStable, false);
   assert.equal(state.canPlace, false);
   assert.equal(state.stableDurationSeconds, 0);
+});
+
+test("iOS-Flächenfreigabe bleibt nach dem ersten stabilen Backend-Signal erhalten", () => {
+  const stabilizer = new PoseStabilizer({
+    ...APP_CONFIG.stabilizer,
+    stabilityWindowSize: 2,
+    stableFramesRequired: 1,
+    reticleGreenAfterSeconds: 0.5,
+    autoPlaceAfterSeconds: 1
+  });
+  const pose = {
+    position: new THREE.Vector3(0, 0, -1),
+    quaternion: new THREE.Quaternion()
+  };
+
+  stabilizer.update(pose, 0, false);
+  let state = stabilizer.update(pose, 0.5, false);
+  assert.equal(state.stableDurationSeconds, 0);
+
+  state = stabilizer.update(pose, 0.5, true);
+  assert.equal(state.isStable, true);
+  assert.equal(state.canPlace, false);
+
+  state = stabilizer.update(pose, 0.5, false);
+  assert.equal(state.isStable, true);
+  assert.equal(state.canPlace, true);
 });
 
 test("Platzierung nutzt unabhängig von der Backend-Flächenrotation dieselbe Blickausrichtung", () => {

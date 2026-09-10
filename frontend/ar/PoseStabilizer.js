@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js?v=placement-hold-20260910";
+import { APP_CONFIG } from "./config.js?v=hold-tolerance-20260910";
 import { averageQuaternion, clonePose, quaternionAngle, smoothFactor } from "./utils.js";
 
 export class PoseStabilizer {
@@ -11,6 +11,8 @@ export class PoseStabilizer {
     this.lastStablePose = null;
     this.stableFrameCount = 0;
     this.stableDurationSeconds = 0;
+    this.unstableDurationSeconds = 0;
+    this.holdProgressUnlocked = false;
     this.missedFrames = 0;
     this.tmpMeanQuaternion = new THREE.Quaternion();
   }
@@ -29,6 +31,8 @@ export class PoseStabilizer {
     this.lastStablePose = null;
     this.stableFrameCount = 0;
     this.stableDurationSeconds = 0;
+    this.unstableDurationSeconds = 0;
+    this.holdProgressUnlocked = false;
     this.missedFrames = 0;
   }
 
@@ -40,6 +44,8 @@ export class PoseStabilizer {
         this.samples.length = 0;
         this.stableFrameCount = 0;
         this.stableDurationSeconds = 0;
+        this.unstableDurationSeconds = 0;
+        this.holdProgressUnlocked = false;
         this.lastStablePose = null;
         this.displayPose = null;
       }
@@ -68,10 +74,31 @@ export class PoseStabilizer {
     this.stableFrameCount = windowStable ? this.stableFrameCount + 1 : 0;
 
     const motionStable = windowStable && this.stableFrameCount >= this.config.stableFramesRequired;
-    const holdStable = motionStable && allowHoldProgress;
-    this.stableDurationSeconds = holdStable
-      ? this.stableDurationSeconds + Math.max(Number.isFinite(deltaSeconds) ? deltaSeconds : 0, 0)
-      : 0;
+    const elapsedSeconds = Math.max(Number.isFinite(deltaSeconds) ? deltaSeconds : 0, 0);
+    // Die iOS-Flächenfreigabe kann nach der initialen Maßstabskalibrierung kurz flackern.
+    this.holdProgressUnlocked = this.holdProgressUnlocked || allowHoldProgress;
+
+    if (motionStable) {
+      this.unstableDurationSeconds = 0;
+      if (this.holdProgressUnlocked) {
+        this.stableDurationSeconds += elapsedSeconds;
+      }
+    } else if (this.stableDurationSeconds > 0) {
+      this.unstableDurationSeconds += elapsedSeconds;
+      if (this.unstableDurationSeconds > this.config.unstableGraceSeconds) {
+        this.stableDurationSeconds = 0;
+        this.unstableDurationSeconds = 0;
+      }
+    }
+
+    if (!this.holdProgressUnlocked) {
+      this.stableDurationSeconds = 0;
+      this.unstableDurationSeconds = 0;
+    }
+
+    const holdStable =
+      this.holdProgressUnlocked &&
+      (motionStable || (this.stableDurationSeconds > 0 && this.unstableDurationSeconds > 0));
 
     const isStable =
       holdStable &&
@@ -82,7 +109,7 @@ export class PoseStabilizer {
 
     if (motionStable && metrics) {
       this.lastStablePose = clonePose(metrics.meanPose);
-    } else {
+    } else if (!holdStable) {
       this.lastStablePose = null;
     }
 
