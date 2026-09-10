@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=hold-tolerance-20260910";
+import { ARApp } from "./ar/App.js?v=hold-tolerance-2-20260910";
 
 const app = new ARApp();
 

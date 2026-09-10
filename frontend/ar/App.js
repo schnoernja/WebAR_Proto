@@ -6,7 +6,7 @@ import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
-import { PoseStabilizer } from "./PoseStabilizer.js?v=hold-tolerance-20260910";
+import { PoseStabilizer } from "./PoseStabilizer.js?v=hold-tolerance-2-20260910";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
 import { UIController } from "./UIController.js?v=placement-hold-20260910";
 import { GeoLocationService } from "./GeoLocationService.js";
@@ -45,9 +45,9 @@ const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({
   positionDeadbandMeters: 0.004,
   rotationDeadbandRad: 0.03,
   stabilityWindowSize: 12,
-  stableFramesRequired: 15,
-  maxPositionDeviationMeters: 0.06,
-  maxRotationDeviationRad: 0.2,
+  stableFramesRequired: 8,
+  maxPositionDeviationMeters: 0.1,
+  maxRotationDeviationRad: 0.3490658503988659,
   stabilityUsesSmoothedPose: true
 });
 

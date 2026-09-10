@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js?v=hold-tolerance-20260910";
+import { APP_CONFIG } from "./config.js?v=hold-tolerance-2-20260910";
 import { averageQuaternion, clonePose, quaternionAngle, smoothFactor } from "./utils.js";
 
 export class PoseStabilizer {
@@ -86,8 +86,10 @@ export class PoseStabilizer {
     } else if (this.stableDurationSeconds > 0) {
       this.unstableDurationSeconds += elapsedSeconds;
       if (this.unstableDurationSeconds > this.config.unstableGraceSeconds) {
-        this.stableDurationSeconds = 0;
-        this.unstableDurationSeconds = 0;
+        this.stableDurationSeconds = Math.max(
+          0,
+          this.stableDurationSeconds - elapsedSeconds * this.config.unstableProgressDecayPerSecond
+        );
       }
     }
 
@@ -98,7 +100,10 @@ export class PoseStabilizer {
 
     const holdStable =
       this.holdProgressUnlocked &&
-      (motionStable || (this.stableDurationSeconds > 0 && this.unstableDurationSeconds > 0));
+      (motionStable || (
+        this.stableDurationSeconds > 0 &&
+        this.unstableDurationSeconds <= this.config.unstableGraceSeconds
+      ));
 
     const isStable =
       holdStable &&
