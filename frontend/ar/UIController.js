@@ -365,8 +365,8 @@ const DE_TRANSLATIONS = Object.freeze({
         description: "starke mobile UX, gutes Embedding und geführte Frageabläufe"
       },
       {
-        name: "Tally.so",
-        description: "leichtgewichtig, iframe-fähig und gut für anonyme Formulare mit Export"
+        name: "EvaSys",
+        description: "direkt eingebettete Onlineumfrage der Fachhochschule Erfurt"
       },
       {
         name: "Microsoft Forms",
@@ -684,8 +684,8 @@ const EN_TRANSLATIONS = Object.freeze({
         description: "strong mobile UX, good embedding and guided question flows"
       },
       {
-        name: "Tally.so",
-        description: "lightweight, iframe-friendly and useful for anonymous forms with export"
+        name: "EvaSys",
+        description: "directly embedded online survey provided by Erfurt University of Applied Sciences"
       },
       {
         name: "Microsoft Forms",
@@ -3114,41 +3114,12 @@ export class UIController {
   }
 
   ensureSurveyEmbedLoaded() {
-    const tallySrc = "https://tally.so/widgets/embed.js";
-    const view = this.document.defaultView;
-    if (!view) {
-      return;
-    }
-
-    const loadEmbeds = () => {
-      if (view.Tally && typeof view.Tally.loadEmbeds === "function") {
-        view.Tally.loadEmbeds();
-        return;
+    this.document.querySelectorAll("iframe[data-survey-src]:not([src])").forEach((iframe) => {
+      const nextSrc = iframe.dataset.surveySrc;
+      if (nextSrc) {
+        iframe.src = nextSrc;
       }
-
-      this.document.querySelectorAll("iframe[data-tally-src]:not([src])").forEach((iframe) => {
-        const nextSrc = iframe.dataset.tallySrc;
-        if (nextSrc) {
-          iframe.src = nextSrc;
-        }
-      });
-    };
-
-    if (view.Tally && typeof view.Tally.loadEmbeds === "function") {
-      loadEmbeds();
-      return;
-    }
-
-    if (this.document.querySelector(`script[src="${tallySrc}"]`)) {
-      loadEmbeds();
-      return;
-    }
-
-    const script = this.document.createElement("script");
-    script.src = tallySrc;
-    script.onload = loadEmbeds;
-    script.onerror = loadEmbeds;
-    this.document.body?.appendChild(script);
+    });
   }
 
   setLanguage(language) {

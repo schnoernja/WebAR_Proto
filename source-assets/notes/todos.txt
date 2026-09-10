@@ -17,8 +17,8 @@ dargestellt wird und in den Szenen die Thermometer/Farbe oder sonstiges ebenfall
 
 evt neue/bessere Modelle
 
-Umfrage-Webseite: https://tally.so/forms/7ReMyR/share
---> Wird zu Evasys gewechselt, Herr Finster teilt Link wenn fertig
+Umfrage-Webseite: https://cloud15.evasys.de/fherfurt/public/online/index/index?online_php=&p=EPARtwin&ONLINEID=160854734865186607983609822806219276567213
+--> EvaSys-Umfrage ist in der Umfragekachel eingebettet.
 
 Kompassbezug einbauen und testen und Objekte neu ausrichten
 ------------------------------------------------------------------------------------------
