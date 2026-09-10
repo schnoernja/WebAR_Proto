@@ -40,10 +40,10 @@ const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
 const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({
-  positionSmoothing: 8,
-  rotationSmoothing: 8,
-  positionDeadbandMeters: 0.004,
-  rotationDeadbandRad: 0.03,
+  positionSmoothing: 3,
+  rotationSmoothing: 3,
+  positionDeadbandMeters: 0.01,
+  rotationDeadbandRad: 0.06,
   stabilityWindowSize: 12,
   stableFramesRequired: 8,
   maxPositionDeviationMeters: 0.1,
@@ -1690,6 +1690,17 @@ export class ARApp {
       surfaceState = this.poseStabilizer.update(null, deltaSeconds);
     }
 
+    // Die iOS-Engine hat Maßstab und Fläche bereits geprüft; ein zweiter Halte-Timer
+    // würde wegen wechselnder Feature-Points die Platzierung unnötig blockieren.
+    if (slamResult.isStable && surfaceState.displayPose) {
+      surfaceState = {
+        ...surfaceState,
+        isStable: true,
+        canPlace: true,
+        stablePose: surfaceState.displayPose
+      };
+    }
+
     this.activeSurfaceState = surfaceState;
     this.placementController.updateSurfaceState(surfaceState);
     this.ui.setSurfaceState(surfaceState.surfaceDetected, surfaceState.isStable);
@@ -1699,7 +1710,7 @@ export class ARApp {
 
     if (tracking && surfaceState.canPlace && !this.placementController.isPlaced()) {
       if (this.placementController.getMode() === PlacementMode.FREE) {
-        this.placeFreeObject("hold");
+        this.placeFreeObject("ios-auto");
       } else if (this.placementController.getMode() === PlacementMode.GEO) {
         this.captureGeoLocalReference(surfaceState, cameraState);
         this.maybePlaceGeoObject(surfaceState, cameraState);
