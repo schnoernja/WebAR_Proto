@@ -1776,6 +1776,17 @@ body.ar-active .state-item {
     max-height: none;
   }
 
+  @supports (height: 100dvh) {
+    .hud {
+      bottom: auto;
+      height: calc(
+        100dvh
+        - max(10px, env(safe-area-inset-top, 0px))
+        - max(10px, env(safe-area-inset-bottom, 0px))
+      );
+    }
+  }
+
   .hud-toolbar,
   .card-panel,
   .menu-panel {
@@ -1787,7 +1798,14 @@ body.ar-active .state-item {
   }
 
   .info-panel {
-    max-height: min(72vh, 700px);
+    max-height: none;
+    overflow: visible;
+    margin-bottom: max(64px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+  }
+
+  .info-panel .info-card-content {
+    overflow: visible;
+    touch-action: pan-y;
   }
 
   .hero-panel {

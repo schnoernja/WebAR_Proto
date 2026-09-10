@@ -381,6 +381,9 @@ test("gemeinsame Oberfläche enthält genau einen neutralen AR-Start", async () 
     assert.doesNotMatch(button, />\s*X\s*<\/button>/);
   }
   assert.match(styles, /\.info-card-next-button\s*\{\s*width:\s*100%;/);
+  assert.match(styles, /@supports\s*\(height:\s*100dvh\)[\s\S]*?\.hud\s*\{[\s\S]*?height:\s*calc\([\s\S]*?100dvh/);
+  assert.match(styles, /@media\s*\(max-width:\s*720px\)[\s\S]*?\.info-panel\s*\{[\s\S]*?max-height:\s*none;[\s\S]*?overflow:\s*visible;[\s\S]*?margin-bottom:\s*max\(64px/);
+  assert.match(styles, /\.info-panel \.info-card-content\s*\{[\s\S]*?overflow:\s*visible;[\s\S]*?touch-action:\s*pan-y;/);
   assert.match(uiSource, /nextButton:\s*"Weiter"/);
   assert.match(uiSource, /nextButton:\s*"Next"/);
 });
