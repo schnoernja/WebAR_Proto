@@ -1153,6 +1153,7 @@ export class UIController {
     this.hudRoot = this.document.getElementById("hud");
     this.hudBody = this.document.getElementById("hud-body");
     this.hudToolbar = this.document.querySelector(".hud-toolbar");
+    this.iosXrAttribution = this.document.getElementById("ios-xr-attribution");
 
     this.menuButton = this.document.getElementById("menu-button");
     this.menuOverlay = this.document.getElementById("menu-overlay");
@@ -3715,6 +3716,12 @@ export class UIController {
     this.refreshButtons();
     this.updateUserModeActions();
     this.queueSurveyPanelLayoutUpdate();
+  }
+
+  setIOSXrAttributionVisible(visible) {
+    if (this.iosXrAttribution) {
+      this.iosXrAttribution.hidden = !visible;
+    }
   }
 
   setTrackingState(active) {

@@ -360,11 +360,16 @@ test("gemeinsame Oberfläche enthält genau einen neutralen AR-Start", async () 
   ]);
   assert.equal((html.match(/id="start-ar-button"/g) || []).length, 1);
   assert.match(html, />\s*AR starten\s*</);
-  assert.doesNotMatch(html, /WebXR|8th Wall|SLAM|ARCore|ARKit|iOS-Fallback/);
+  assert.doesNotMatch(html, /WebXR|SLAM|ARCore|ARKit|iOS-Fallback/);
+  assert.match(html, /id="ios-xr-attribution"[^>]*hidden/);
+  assert.match(html, /8th Wall XR Engine von Niantic Spatial/);
+  assert.match(html, /Lizenz und Gewährleistungsausschluss/);
   assert.match(html, /href="\.\/vendor\/8thwall\/LICENSE"/);
   assert.match(html, /© 2026 Niantic Spatial, Inc\./);
   assert.match(html, /class="object-transform-editor info-board-editor startup-developer-only"/);
   assert.match(styles, /body\[data-ui-mode="user"\] \.startup-developer-only\s*\{\s*display:\s*none;/);
+  assert.match(styles, /\.ios-xr-attribution\s*\{[\s\S]*?left:\s*calc\(env\(safe-area-inset-left,[\s\S]*?bottom:\s*calc\(env\(safe-area-inset-bottom,/);
+  assert.match(uiSource, /setIOSXrAttributionVisible\(visible\)/);
 
   const infoButtons = [1, 2].map((step) =>
     html.match(new RegExp(`<button[^>]*id="close-info-card-${step}-button"[^>]*>[\\s\\S]*?<\\/button>`))?.[0]

@@ -1100,6 +1100,7 @@ export class ARApp {
       return false;
     }
 
+    this.ui.setIOSXrAttributionVisible(false);
     this.ui.setMessage("AR wird initialisiert...");
     const xrAssetReady = await this.ensurePlacementAssetForExperience(ExperienceMode.XR);
     if (!xrAssetReady) {
@@ -1117,6 +1118,7 @@ export class ARApp {
         videoElement: this.sceneManager.cameraVideo
       });
       this.iosSlamActive = true;
+      this.ui.setIOSXrAttributionVisible(true);
       this.ui.setSessionState(true, "AR aktiv. Bewege das Gerät langsam über den Boden.");
       this.ui.setHint("Bewege das Gerät kurz vor und zurück, damit Maßstab und Bodenfläche stabil erfasst werden.");
       this.ui.setTrackingState(false);
@@ -1131,6 +1133,7 @@ export class ARApp {
       this.sceneManager.setSLAMMode(false);
       this.sceneManager.resetFallbackView();
       this.iosSlamActive = false;
+      this.ui.setIOSXrAttributionVisible(false);
       this.ui.setSessionState(false, error instanceof Error ? error.message : "AR konnte nicht gestartet werden.");
       this.ui.setHint("Prüfe die Kamera-Berechtigung in den Browser-Einstellungen.");
       return false;
@@ -1138,6 +1141,7 @@ export class ARApp {
   }
 
   async stopIOSWebTrackingExperience() {
+    this.ui.setIOSXrAttributionVisible(false);
     if (!this.iosSlamActive) {
       return true;
     }
