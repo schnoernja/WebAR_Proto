@@ -6,7 +6,7 @@ import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
-import { PoseStabilizer } from "./PoseStabilizer.js?v=placement-timing-20260910";
+import { PoseStabilizer } from "./PoseStabilizer.js?v=ios-reticle-rollback-20260910";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
 import { UIController } from "./UIController.js?v=placement-timing-20260910";
 import { GeoLocationService } from "./GeoLocationService.js";
@@ -40,14 +40,17 @@ const MIN_GEO_SCALE_FACTOR = 0.1;
 const MAX_GEO_SCALE_FACTOR = 3;
 
 const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({
-  positionSmoothing: 3,
-  rotationSmoothing: 3,
-  positionDeadbandMeters: 0.01,
-  rotationDeadbandRad: 0.06,
+  positionSmoothing: 8,
+  rotationSmoothing: 8,
+  positionDeadbandMeters: 0.004,
+  rotationDeadbandRad: 0.03,
   stabilityWindowSize: 12,
-  stableFramesRequired: 8,
-  maxPositionDeviationMeters: 0.1,
-  maxRotationDeviationRad: 0.3490658503988659,
+  stableFramesRequired: 15,
+  maxPositionDeviationMeters: 0.06,
+  maxRotationDeviationRad: 0.2,
+  unstableGraceSeconds: 0,
+  reticleGreenAfterSeconds: 0,
+  autoPlaceAfterSeconds: 0,
   stabilityUsesSmoothedPose: true
 });
 
@@ -1685,14 +1688,16 @@ export class ARApp {
 
     let surfaceState = null;
     if (tracking && slamResult.surfaceDetected && slamResult.pose) {
-      surfaceState = this.poseStabilizer.update(slamResult.pose, deltaSeconds, slamResult.isStable);
+      surfaceState = this.poseStabilizer.update(slamResult.pose, deltaSeconds);
     } else {
       surfaceState = this.poseStabilizer.update(null, deltaSeconds);
     }
 
-    // Die iOS-Engine hat Maßstab und Fläche bereits geprüft; ein zweiter Halte-Timer
-    // würde wegen wechselnder Feature-Points die Platzierung unnötig blockieren.
-    if (slamResult.isStable && surfaceState.displayPose) {
+    if (
+      slamResult.isStable &&
+      !surfaceState.isStable &&
+      surfaceState.displayPose
+    ) {
       surfaceState = {
         ...surfaceState,
         isStable: true,
@@ -1708,7 +1713,7 @@ export class ARApp {
     const cameraState = slamResult.cameraPose ? buildCameraStateFromPose(slamResult.cameraPose) : null;
     this.lastCameraState = cameraState;
 
-    if (tracking && surfaceState.canPlace && !this.placementController.isPlaced()) {
+    if (tracking && surfaceState.isStable && !this.placementController.isPlaced()) {
       if (this.placementController.getMode() === PlacementMode.FREE) {
         this.placeFreeObject("ios-auto");
       } else if (this.placementController.getMode() === PlacementMode.GEO) {

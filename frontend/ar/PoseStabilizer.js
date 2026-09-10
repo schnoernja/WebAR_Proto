@@ -12,7 +12,6 @@ export class PoseStabilizer {
     this.stableFrameCount = 0;
     this.stableDurationSeconds = 0;
     this.unstableDurationSeconds = 0;
-    this.holdProgressUnlocked = false;
     this.missedFrames = 0;
     this.tmpMeanQuaternion = new THREE.Quaternion();
   }
@@ -32,11 +31,10 @@ export class PoseStabilizer {
     this.stableFrameCount = 0;
     this.stableDurationSeconds = 0;
     this.unstableDurationSeconds = 0;
-    this.holdProgressUnlocked = false;
     this.missedFrames = 0;
   }
 
-  update(rawPose, deltaSeconds, allowHoldProgress = true) {
+  update(rawPose, deltaSeconds) {
     if (!rawPose) {
       this.missedFrames += 1;
 
@@ -45,7 +43,6 @@ export class PoseStabilizer {
         this.stableFrameCount = 0;
         this.stableDurationSeconds = 0;
         this.unstableDurationSeconds = 0;
-        this.holdProgressUnlocked = false;
         this.lastStablePose = null;
         this.displayPose = null;
       }
@@ -75,14 +72,10 @@ export class PoseStabilizer {
 
     const motionStable = windowStable && this.stableFrameCount >= this.config.stableFramesRequired;
     const elapsedSeconds = Math.max(Number.isFinite(deltaSeconds) ? deltaSeconds : 0, 0);
-    // Die iOS-Flächenfreigabe kann nach der initialen Maßstabskalibrierung kurz flackern.
-    this.holdProgressUnlocked = this.holdProgressUnlocked || allowHoldProgress;
 
     if (motionStable) {
       this.unstableDurationSeconds = 0;
-      if (this.holdProgressUnlocked) {
-        this.stableDurationSeconds += elapsedSeconds;
-      }
+      this.stableDurationSeconds += elapsedSeconds;
     } else if (this.stableDurationSeconds > 0) {
       this.unstableDurationSeconds += elapsedSeconds;
       if (this.unstableDurationSeconds > this.config.unstableGraceSeconds) {
@@ -93,17 +86,11 @@ export class PoseStabilizer {
       }
     }
 
-    if (!this.holdProgressUnlocked) {
-      this.stableDurationSeconds = 0;
-      this.unstableDurationSeconds = 0;
-    }
-
     const holdStable =
-      this.holdProgressUnlocked &&
-      (motionStable || (
+      motionStable || (
         this.stableDurationSeconds > 0 &&
         this.unstableDurationSeconds <= this.config.unstableGraceSeconds
-      ));
+      );
 
     const isStable =
       holdStable &&

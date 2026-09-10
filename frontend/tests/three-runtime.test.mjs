@@ -170,32 +170,6 @@ test("Stabiler Cursor wird nach einer Sekunde grün und nach drei Sekunden platz
   assert.equal(state.stableDurationSeconds, 2.5);
 });
 
-test("iOS-Flächenfreigabe bleibt nach dem ersten stabilen Backend-Signal erhalten", () => {
-  const stabilizer = new PoseStabilizer({
-    ...APP_CONFIG.stabilizer,
-    stabilityWindowSize: 2,
-    stableFramesRequired: 1,
-    reticleGreenAfterSeconds: 0.5,
-    autoPlaceAfterSeconds: 1
-  });
-  const pose = {
-    position: new THREE.Vector3(0, 0, -1),
-    quaternion: new THREE.Quaternion()
-  };
-
-  stabilizer.update(pose, 0, false);
-  let state = stabilizer.update(pose, 0.5, false);
-  assert.equal(state.stableDurationSeconds, 0);
-
-  state = stabilizer.update(pose, 0.5, true);
-  assert.equal(state.isStable, true);
-  assert.equal(state.canPlace, false);
-
-  state = stabilizer.update(pose, 0.5, false);
-  assert.equal(state.isStable, true);
-  assert.equal(state.canPlace, true);
-});
-
 test("Platzierung nutzt unabhängig von der Backend-Flächenrotation dieselbe Blickausrichtung", () => {
   const cameraState = {
     position: new THREE.Vector3(0, 1.6, 0),
