@@ -118,7 +118,7 @@ test("Reticle und freie Platzierung bleiben mit der lokalen Three.js-Version fun
   controller.dispose();
 });
 
-test("Stabiler Cursor wird nach zwei Sekunden grün und nach vier Sekunden platzierbar", () => {
+test("Stabiler Cursor wird nach einer Sekunde grün und nach drei Sekunden platzierbar", () => {
   const stabilizer = new PoseStabilizer({
     ...APP_CONFIG.stabilizer,
     stabilityWindowSize: 2,
@@ -135,9 +135,7 @@ test("Stabiler Cursor wird nach zwei Sekunden grün und nach vier Sekunden platz
   stabilizer.update(pose, 0);
 
   let state = null;
-  for (let sample = 0; sample < 3; sample += 1) {
-    state = stabilizer.update(pose, 0.5);
-  }
+  state = stabilizer.update(pose, 0.5);
   assert.equal(state.isStable, false);
   assert.equal(state.canPlace, false);
 
@@ -161,7 +159,7 @@ test("Stabiler Cursor wird nach zwei Sekunden grün und nach vier Sekunden platz
   state = stabilizer.update(movedPose, 0.5);
   assert.equal(state.isStable, true);
   assert.equal(state.canPlace, true);
-  assert.equal(state.stableDurationSeconds, 4);
+  assert.equal(state.stableDurationSeconds, 3);
 
   state = stabilizer.update({
     position: new THREE.Vector3(0.4, 0, -1),
@@ -169,7 +167,7 @@ test("Stabiler Cursor wird nach zwei Sekunden grün und nach vier Sekunden platz
   }, 0.5);
   assert.equal(state.isStable, false);
   assert.equal(state.canPlace, false);
-  assert.equal(state.stableDurationSeconds, 3.5);
+  assert.equal(state.stableDurationSeconds, 2.5);
 });
 
 test("iOS-Flächenfreigabe bleibt nach dem ersten stabilen Backend-Signal erhalten", () => {

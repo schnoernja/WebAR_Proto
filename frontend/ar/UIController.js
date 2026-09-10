@@ -109,8 +109,8 @@ const EXACT_RUNTIME_TRANSLATIONS_EN = Object.freeze({
   "Geo-Koordinaten gespeichert. Sie werden verwendet, sobald du in den Koordinaten-Modus wechselst.":
     "Geo coordinates saved. They are used once you switch to coordinate mode.",
   "Noch keine stabile Flaeche fuer die freie Platzierung.": "No stable surface is available for free placement yet.",
-  "Halte das Gerät etwa vier Sekunden ruhig auf den gewünschten Startpunkt.":
-    "Hold the device still on the desired start point for about four seconds.",
+  "Halte das Gerät etwa drei Sekunden ruhig auf den gewünschten Startpunkt.":
+    "Hold the device still on the desired start point for about three seconds.",
   "Objekt stabil auf der erkannten Flaeche platziert.": "Object placed stably on the detected surface.",
   "Placement-Lock aktiv. Neu platzieren nur per Reset.": "Placement lock active. Repositioning is only possible after reset.",
   "Placement-Lock aktiv. Geo-Platzierung bleibt fixiert, bis du resettest.":
@@ -294,7 +294,7 @@ const DE_TRANSLATIONS = Object.freeze({
     userGuideSearch:
       "Bitte richte das Geraet auf den Boden und bewege es langsam, bis eine Flaeche erkannt wird.",
     userGuideDetected:
-      "Fläche erkannt. Halte das Gerät etwa vier Sekunden ruhig; nach zwei Sekunden wird der Cursor grün.",
+      "Fläche erkannt. Halte das Gerät etwa drei Sekunden ruhig; nach einer Sekunde wird der Cursor grün.",
     userGuideSensor: "Standort und Kompass werden bestimmt. Halte das Gerät ruhig und richte es auf den Boden.",
     modeLabel: "Hauptmodus",
     modeOptions: {
@@ -613,7 +613,7 @@ const EN_TRANSLATIONS = Object.freeze({
     userGuideTitle: "Object placement",
     userGuideSearch: "Please point the device at the floor and move it slowly until a surface is detected.",
     userGuideDetected:
-      "Surface detected. Hold the device still for about four seconds; the cursor turns green after two seconds.",
+      "Surface detected. Hold the device still for about three seconds; the cursor turns green after one second.",
     userGuideSensor: "Location and compass are being determined. Hold the device still and point it at the ground.",
     modeLabel: "Main mode",
     modeOptions: {

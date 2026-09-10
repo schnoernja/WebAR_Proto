@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js?v=hold-tolerance-2-20260910";
+import { APP_CONFIG } from "./config.js?v=placement-timing-20260910";
 import { averageQuaternion, clonePose, quaternionAngle, smoothFactor } from "./utils.js";
 
 export class PoseStabilizer {

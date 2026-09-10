@@ -1,14 +1,14 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js";
+import { APP_CONFIG } from "./config.js?v=placement-timing-20260910";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
-import { PoseStabilizer } from "./PoseStabilizer.js?v=hold-tolerance-2-20260910";
+import { PoseStabilizer } from "./PoseStabilizer.js?v=placement-timing-20260910";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
-import { UIController } from "./UIController.js?v=placement-hold-20260910";
+import { UIController } from "./UIController.js?v=placement-timing-20260910";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
@@ -1948,7 +1948,7 @@ export class ARApp {
     }
 
     if (!this.activeSurfaceState || !this.activeSurfaceState.canPlace || !this.activeSurfaceState.stablePose) {
-      this.ui.setMessage("Halte das Gerät etwa vier Sekunden ruhig auf den gewünschten Startpunkt.");
+      this.ui.setMessage("Halte das Gerät etwa drei Sekunden ruhig auf den gewünschten Startpunkt.");
       return false;
     }
 
@@ -1998,7 +1998,7 @@ export class ARApp {
     }
 
     if (!this.activeSurfaceState || !this.activeSurfaceState.canPlace || !this.activeSurfaceState.stablePose) {
-      this.ui.setMessage("Halte das Gerät etwa vier Sekunden ruhig auf den gewünschten Startpunkt.");
+      this.ui.setMessage("Halte das Gerät etwa drei Sekunden ruhig auf den gewünschten Startpunkt.");
       return false;
     }
 

@@ -44,8 +44,8 @@ export const APP_CONFIG = Object.freeze({
     maxRotationDeviationRad: 0.2617993877991494,
     unstableGraceSeconds: 1.5,
     unstableProgressDecayPerSecond: 0.5,
-    reticleGreenAfterSeconds: 2,
-    autoPlaceAfterSeconds: 4
+    reticleGreenAfterSeconds: 1,
+    autoPlaceAfterSeconds: 3
   },
   reticle: {
     ringRadius: 0.16,
