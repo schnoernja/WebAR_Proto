@@ -12,10 +12,10 @@
         "yawDeg": 0
       },
       "scene": {
-        "asset": "/models/scene_a_environment_final.glb?v=materials-fixed-20260910"
+        "asset": "/models/scene_a_environment_final.glb?v=pbr-fixed-20260913"
       },
       "placement": {
-        "asset": "/models/scene_a_environment_final.glb?v=materials-fixed-20260910",
+        "asset": "/models/scene_a_environment_final.glb?v=pbr-fixed-20260913",
         "target": {
           "lat": 50.985242,
           "lon": 11.043993
