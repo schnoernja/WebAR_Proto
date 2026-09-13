@@ -466,6 +466,8 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   assert.deepEqual(sceneB.infoBoards.map((board) => board.id), ["tafel-1", "tafel-2", "tafel-3", "tafel-4"]);
   assert.ok(sceneA.infoBoards.every((board) => board.sceneId === "a" && board.active && board.billboard));
   assert.ok(sceneB.infoBoards.every((board) => board.sceneId === "b" && board.active && board.billboard));
+  assert.ok(sceneA.infoBoards.every((board) => board.widthMeters === 0.9));
+  assert.ok(sceneB.infoBoards.every((board) => board.widthMeters === 0.9));
   assert.deepEqual(sceneA.infoBoards.map((board) => board.offset), [
     { x: 13.49, y: 1.5, z: 2.1 },
     { x: 5.75, y: 1.05, z: 0.35 },
@@ -487,9 +489,16 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
     sceneA.infoBoards[1].text,
     "ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad"
   );
-  assert.equal(sceneA.infoBoards[2].text, sceneA.infoBoards[0].text);
+  assert.equal(
+    sceneA.infoBoards[2].text,
+    "Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius."
+  );
   assert.equal(sceneB.infoBoards[1].text, sceneA.infoBoards[1].text);
-  assert.equal(sceneB.infoBoards[3].text, sceneB.infoBoards[0].text);
+  assert.equal(sceneB.infoBoards[2].text, sceneA.infoBoards[2].text);
+  assert.equal(
+    sceneB.infoBoards[3].text,
+    "Senkung der Lufttemperatur um ca. 1 Grad Celsius."
+  );
 
   const appSource = await readFile(new URL("../ar/App.js", import.meta.url), "utf8");
   assert.match(

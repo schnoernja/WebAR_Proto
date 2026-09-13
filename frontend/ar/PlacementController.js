@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { APP_CONFIG } from "./config.js";
-import { InfoBoardManager } from "./InfoBoard.js?v=info-board-scenes-20260909";
+import { InfoBoardManager } from "./InfoBoard.js?v=info-board-light-20260913";
 import { applyPose, disposeObject3D } from "./utils.js";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);

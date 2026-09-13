@@ -7,28 +7,9 @@ Entwickler-View "verstecken"  --> Erst kurz vor Erprobung
 
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 
-Problem Efeu/Gebäudebegrünung: SEHR viele Reticles bei so großer Fläche wenn als 3D-Modell. Plane mit Textur sähe doof aus weil realistische Efeu-Textur mit "semi"-realistischen Objekten
---> vllt findet man "realistischere" Objekte bzw Texturen für die Objekte; WIP
-
-Klimawerte irgendwie einbauen?? Aber das ist bis zur Klimawoche so irrelevant eigentlich
---> Vorschlag: Eine Ansicht/Szene "ohne" Objekte, wo die Wärme durch Thermometer/Farbe oder sonstiges
-dargestellt wird und in den Szenen die Thermometer/Farbe oder sonstiges ebenfalls einbauen inkl Veränderung
---> Knackpunkt: Man muss genau wissen, WO und an welchen Objekten final die WebAR benutzt werden Knackpunkt
-
-evt neue/bessere Modelle
-
-Umfrage-Webseite: https://cloud15.evasys.de/fherfurt/public/online/index/index?online_php=&p=EPARtwin&ONLINEID=160854734865186607983609822806219276567213
---> EvaSys-Umfrage ist in der Umfragekachel eingebettet.
-
 Kompassbezug einbauen und testen und Objekte neu ausrichten
 ------------------------------------------------------------------------------------------
 ------------------------------------------------------------------------------------------
-
-Sicherungsordner archive/ios-alva-20260904 LIEGT AUF SEPARATEM Ordner UNTER D:/
-
-wenn alles auf Server:
-Noch eine Frage zum Hosting der AR-Anwendung: Ist es korrekt, was ich in Erinnerung hatte, dass die Anwendung im Self-Hosting betrieben wird? Könntest du mir noch ein paar Infos dazu geben, wie die Ortungs-/ Kamera-/ Bewegungsdaten, Gerätedaten und Metadaten allgemein verarbeitet und gespeichert werden? Dazu gehört auch der Speicherort, also welcher Server in welchem Land. Ich muss das unserer Datenschutz-Stelle mitteilen.
-
 Während der aktiven Entwicklungsphase wird auf dem externen Server ausschließlich
 der Produktionsstand betrieben. Das Git-Repository und die Entwicklungsdateien werden
 nicht als Arbeitskopie auf dem Server verwendet.

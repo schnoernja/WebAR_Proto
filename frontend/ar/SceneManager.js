@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { APP_CONFIG } from "./config.js";
-import { InfoBoardManager } from "./InfoBoard.js?v=info-board-scenes-20260909";
+import { InfoBoardManager } from "./InfoBoard.js?v=info-board-light-20260913";
 import { resolveAppUrl } from "./urlUtils.js";
 import { disposeObject3D } from "./utils.js";
 

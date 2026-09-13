@@ -7,8 +7,8 @@ const MIN_TEXTURE_HEIGHT = 128;
 const MAX_TEXTURE_HEIGHT = 4096;
 
 export const DEFAULT_INFO_BOARD_STYLE = Object.freeze({
-  backgroundColor: "rgba(17, 26, 28, 0.94)",
-  textColor: "#f4f1e7",
+  backgroundColor: "rgba(248, 243, 233, 0.8)",
+  textColor: "#132326",
   borderColor: "#5ab776",
   shadowColor: "rgba(0, 0, 0, 0.3)",
   fontFamily: '"Space Grotesk", "Avenir Next", "Segoe UI", sans-serif',

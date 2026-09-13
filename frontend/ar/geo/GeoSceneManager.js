@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { InfoBoardManager } from "../InfoBoard.js?v=info-board-scenes-20260909";
+import { InfoBoardManager } from "../InfoBoard.js?v=info-board-light-20260913";
 import { disposeObject3D } from "../utils.js";
 import { resolveAppUrl } from "../urlUtils.js";
 import { enuToVector3 } from "./GeoENU.js";

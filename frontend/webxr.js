@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=ios-reticle-rollback-exact-20260910";
+import { ARApp } from "./ar/App.js?v=info-board-light-20260913";
 
 const app = new ARApp();
 

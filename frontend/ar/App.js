@@ -2,19 +2,19 @@ import * as THREE from "three";
 import { APP_CONFIG } from "./config.js?v=placement-timing-20260910";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
-import { SceneManager } from "./SceneManager.js?v=placement-consistency-20260909";
+import { SceneManager } from "./SceneManager.js?v=info-board-light-20260913";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=ios-reticle-rollback-20260910";
-import { PlacementController, PlacementMode } from "./PlacementController.js?v=placement-consistency-20260909";
+import { PlacementController, PlacementMode } from "./PlacementController.js?v=info-board-light-20260913";
 import { UIController } from "./UIController.js?v=placement-timing-20260910";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
 import { SiteLoader } from "./geo/SiteLoader.js?v=info-board-dev-20260909";
 import { SensorFusion } from "./geo/SensorFusion.js";
-import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=placement-consistency-20260909";
+import { GeoSceneManager } from "./geo/GeoSceneManager.js?v=info-board-light-20260913";
 
 const ExperienceMode = Object.freeze({
   XR: "xr",

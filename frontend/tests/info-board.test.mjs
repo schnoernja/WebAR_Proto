@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import * as THREE from "three";
 import {
+  DEFAULT_INFO_BOARD_STYLE,
   InfoBoard,
   InfoBoardManager,
   wrapInfoBoardText
@@ -42,6 +43,11 @@ function createFakeCanvas() {
     getContext: () => context
   };
 }
+
+test("Infotafel nutzt die helle, teiltransparente UI-Farbgebung", () => {
+  assert.equal(DEFAULT_INFO_BOARD_STYLE.backgroundColor, "rgba(248, 243, 233, 0.8)");
+  assert.equal(DEFAULT_INFO_BOARD_STYLE.textColor, "#132326");
+});
 
 test("Infotafel bricht Absätze und lange Wörter innerhalb der Textbreite um", () => {
   const context = new FakeCanvasContext();
