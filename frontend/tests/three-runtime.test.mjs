@@ -327,3 +327,38 @@ test("Eine Gruppenbearbeitung erzeugt identische Transformationen für alle Knot
     }
   ]);
 });
+
+test("Entwickleransicht wird erst nach zehn schnellen Klicks freigeschaltet", () => {
+  const ui = Object.create(UIController.prototype);
+  ui.uiState = { uiMode: "user" };
+  ui.developerUnlockClickCount = 0;
+  ui.developerUnlockLastClickAt = null;
+  ui.setUIMode = (mode) => {
+    ui.uiState.uiMode = mode;
+  };
+
+  for (let click = 0; click < 9; click += 1) {
+    assert.equal(ui.handleDeveloperModeRequest(click * 100), false);
+    assert.equal(ui.uiState.uiMode, "user");
+  }
+
+  assert.equal(ui.handleDeveloperModeRequest(900), true);
+  assert.equal(ui.uiState.uiMode, "developer");
+});
+
+test("Zu langsame Klicks starten die Entwickler-Freischaltung neu", () => {
+  const ui = Object.create(UIController.prototype);
+  ui.uiState = { uiMode: "user" };
+  ui.developerUnlockClickCount = 0;
+  ui.developerUnlockLastClickAt = null;
+  ui.setUIMode = (mode) => {
+    ui.uiState.uiMode = mode;
+  };
+
+  for (let click = 0; click < 9; click += 1) {
+    ui.handleDeveloperModeRequest(click * 100);
+  }
+  assert.equal(ui.handleDeveloperModeRequest(1500), false);
+  assert.equal(ui.developerUnlockClickCount, 1);
+  assert.equal(ui.uiState.uiMode, "user");
+});

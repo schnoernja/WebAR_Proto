@@ -41,6 +41,8 @@ const UI_MODE = Object.freeze({
 const UI_MODE_STORAGE_KEY = "epartwin-ui-mode";
 const USER_MODE_VISIBLE_CARDS = Object.freeze(["placement"]);
 const USER_MODE_ALLOWED_ACTION_TABS = Object.freeze([]);
+const DEVELOPER_UNLOCK_REQUIRED_CLICKS = 10;
+const DEVELOPER_UNLOCK_MAX_CLICK_INTERVAL_MS = 600;
 
 const MAX_GEO_OFFSET_METERS = 20;
 const MIN_GEO_SCALE_FACTOR = 0.1;
@@ -1479,6 +1481,8 @@ export class UIController {
     this.textInputReleaseTimeoutId = null;
     this.cleanupCallbacks = [];
     this.developerCardVisibilitySnapshot = null;
+    this.developerUnlockClickCount = 0;
+    this.developerUnlockLastClickAt = null;
     this.scenarioSwitchState = {
       scenarios: [],
       activeId: null,
@@ -2065,12 +2069,40 @@ export class UIController {
     }
 
     if (this.uiModeDeveloperButton) {
-      const toDeveloper = () => {
-        this.setUIMode(UI_MODE.DEVELOPER);
+      const toDeveloper = (event) => {
+        this.handleDeveloperModeRequest(event.timeStamp);
       };
       this.uiModeDeveloperButton.addEventListener("click", toDeveloper);
       this.cleanupCallbacks.push(() => this.uiModeDeveloperButton.removeEventListener("click", toDeveloper));
     }
+  }
+
+  handleDeveloperModeRequest(clickedAt = Date.now()) {
+    if (!this.isUserMode()) {
+      this.setUIMode(UI_MODE.DEVELOPER);
+      return true;
+    }
+
+    const clickTimestamp = Number.isFinite(clickedAt) ? clickedAt : Date.now();
+    const interval = clickTimestamp - this.developerUnlockLastClickAt;
+    const continuesSequence =
+      Number.isFinite(this.developerUnlockLastClickAt) &&
+      interval >= 0 &&
+      interval <= DEVELOPER_UNLOCK_MAX_CLICK_INTERVAL_MS;
+
+    this.developerUnlockClickCount = continuesSequence
+      ? this.developerUnlockClickCount + 1
+      : 1;
+    this.developerUnlockLastClickAt = clickTimestamp;
+
+    if (this.developerUnlockClickCount < DEVELOPER_UNLOCK_REQUIRED_CLICKS) {
+      return false;
+    }
+
+    this.developerUnlockClickCount = 0;
+    this.developerUnlockLastClickAt = null;
+    this.setUIMode(UI_MODE.DEVELOPER);
+    return true;
   }
 
   bindSceneTransformControls({ onSceneTransformChange, onSceneTransformAdopt, onSceneTransformReset } = {}) {
@@ -2714,7 +2746,9 @@ export class UIController {
     if (this.uiModeDeveloperButton) {
       const isDeveloper = !isUser;
       this.uiModeDeveloperButton.dataset.active = isDeveloper ? "true" : "false";
+      this.uiModeDeveloperButton.dataset.locked = isUser ? "true" : "false";
       this.uiModeDeveloperButton.setAttribute("aria-pressed", String(isDeveloper));
+      this.uiModeDeveloperButton.setAttribute("aria-disabled", String(isUser));
     }
   }
 

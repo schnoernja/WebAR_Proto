@@ -487,17 +487,20 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   );
   assert.equal(
     sceneA.infoBoards[1].text,
-    "ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad"
+    "Kühlungseffekt von Hochbeeten: ca. 15 Grad weniger Oberflächentemperatur (45 Grad) als Beton (60 Grad), insgesamt Kühlungseffekt von ca. 3 Grad"
   );
   assert.equal(
     sceneA.infoBoards[2].text,
-    "Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius."
+    "Kühlungseffekt von Grünflächen: Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius."
   );
   assert.equal(sceneB.infoBoards[1].text, sceneA.infoBoards[1].text);
-  assert.equal(sceneB.infoBoards[2].text, sceneA.infoBoards[2].text);
+  assert.equal(
+    sceneB.infoBoards[2].text,
+    "Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius."
+  );
   assert.equal(
     sceneB.infoBoards[3].text,
-    "Senkung der Lufttemperatur um ca. 1 Grad Celsius."
+    "Kühlungseffekt von Brunnen: Senkung der Lufttemperatur um ca. 1 Grad Celsius."
   );
 
   const appSource = await readFile(new URL("../ar/App.js", import.meta.url), "utf8");

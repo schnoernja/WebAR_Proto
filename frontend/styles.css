@@ -516,6 +516,17 @@ body.ar-active .menu-option {
   color: #f4f1e7;
 }
 
+.menu-mode-button[data-locked="true"] {
+  cursor: not-allowed;
+  filter: grayscale(1);
+  opacity: 0.42;
+}
+
+.menu-mode-button[data-locked="true"]:hover,
+.menu-mode-button[data-locked="true"]:focus-visible {
+  transform: none;
+}
+
 body.ar-active .menu-mode-button {
   border-color: rgba(244, 241, 231, 0.16);
   background: rgba(244, 241, 231, 0.08);
