@@ -257,7 +257,7 @@ test("iOS-Backend verwendet den nächsten Treffer wie WebXR", async () => {
   backend.stop();
 });
 
-test("iOS-Backend blendet platzierte Modelle bei kurzen LIMITED-Frames nicht aus", async () => {
+test("iOS-Backend führt bei kurzen LIMITED-Frames die Kamerapose für die Weltverankerung fort", async () => {
   const { backend, camera, reality } = createBackendHarness();
   await backend.start();
 
@@ -272,7 +272,8 @@ test("iOS-Backend blendet platzierte Modelle bei kurzen LIMITED-Frames nicht aus
   backend.finishFrame();
   assert.equal(transientLimitedFrame.tracking, true);
   assert.equal(transientLimitedFrame.trackingLost, false);
-  assert.equal(transientLimitedFrame.cameraPose.position.x, 1);
+  assert.equal(transientLimitedFrame.cameraPose.position.x, 9);
+  assert.equal(camera.position.x, 9);
   assert.equal(backend.state, PlacementBackendState.PLACED);
 
   const sustainedLimitedFrame = backend.update(1501, camera);
@@ -457,6 +458,8 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   const [sceneA, sceneB] = site.scenarios;
   assert.equal(sceneA.placement.transform.scaleFactor, 1.32);
   assert.equal(sceneA.placement.transform.scaleFactor, sceneB.placement.transform.scaleFactor);
+  assert.deepEqual(sceneA.placement.transform.position, { x: 0, y: 0, z: 0 });
+  assert.deepEqual(sceneB.placement.transform.position, { x: 0, y: -1.86, z: 1.32 });
   assert.equal(sceneA.infoBoards.length, 3);
   assert.equal(sceneB.infoBoards.length, 4);
   assert.deepEqual(sceneA.infoBoards.map((board) => board.id), ["tafel-1", "tafel-2", "tafel-3"]);

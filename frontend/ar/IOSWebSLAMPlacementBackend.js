@@ -326,6 +326,21 @@ export class IOSWebSLAMPlacementBackend {
       return this.emptyFrame({ trackingLost, error: this.error });
     }
 
+    camera.matrixAutoUpdate = false;
+    camera.position.set(reality.position.x, reality.position.y, reality.position.z);
+    camera.quaternion.set(
+      reality.rotation.x,
+      reality.rotation.y,
+      reality.rotation.z,
+      reality.rotation.w
+    );
+    if (Array.isArray(reality.intrinsics) && reality.intrinsics.length === 16) {
+      camera.projectionMatrix.fromArray(reality.intrinsics);
+      camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    }
+    camera.updateMatrix();
+    camera.updateMatrixWorld(true);
+
     if (withinTrackingGrace) {
       this.setState(
         this.placed ? PlacementBackendState.PLACED : PlacementBackendState.SCANNING
@@ -344,21 +359,6 @@ export class IOSWebSLAMPlacementBackend {
         error: null
       };
     }
-
-    camera.matrixAutoUpdate = false;
-    camera.position.set(reality.position.x, reality.position.y, reality.position.z);
-    camera.quaternion.set(
-      reality.rotation.x,
-      reality.rotation.y,
-      reality.rotation.z,
-      reality.rotation.w
-    );
-    if (Array.isArray(reality.intrinsics) && reality.intrinsics.length === 16) {
-      camera.projectionMatrix.fromArray(reality.intrinsics);
-      camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-    }
-    camera.updateMatrix();
-    camera.updateMatrixWorld(true);
 
     const hit = selectBestHit(
       this.xr8.XrController.hitTest(HIT_TEST_X, HIT_TEST_Y, ["FEATURE_POINT"])
