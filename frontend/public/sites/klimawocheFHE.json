@@ -189,7 +189,7 @@
         },
         {
           "id": "tafel-3",
-          "text": "Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius.",
+          "text": "Kühlungseffekt von Grünflächen: Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius.",
           "sceneId": "b",
           "active": true,
           "offset": { "x": 9, "y": 1, "z": 1.5 },
