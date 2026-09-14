@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js?v=placement-timing-20260910";
+import { APP_CONFIG } from "./config.js?v=reticle-rollback-all-20260914";
 import { averageQuaternion, clonePose, quaternionAngle, smoothFactor } from "./utils.js";
 
 export class PoseStabilizer {
@@ -10,8 +10,6 @@ export class PoseStabilizer {
     this.displayPose = null;
     this.lastStablePose = null;
     this.stableFrameCount = 0;
-    this.stableDurationSeconds = 0;
-    this.unstableDurationSeconds = 0;
     this.missedFrames = 0;
     this.tmpMeanQuaternion = new THREE.Quaternion();
   }
@@ -29,8 +27,6 @@ export class PoseStabilizer {
     this.displayPose = null;
     this.lastStablePose = null;
     this.stableFrameCount = 0;
-    this.stableDurationSeconds = 0;
-    this.unstableDurationSeconds = 0;
     this.missedFrames = 0;
   }
 
@@ -41,8 +37,6 @@ export class PoseStabilizer {
       if (this.missedFrames > APP_CONFIG.hitTest.lostPoseGraceFrames) {
         this.samples.length = 0;
         this.stableFrameCount = 0;
-        this.stableDurationSeconds = 0;
-        this.unstableDurationSeconds = 0;
         this.lastStablePose = null;
         this.displayPose = null;
       }
@@ -70,43 +64,15 @@ export class PoseStabilizer {
 
     this.stableFrameCount = windowStable ? this.stableFrameCount + 1 : 0;
 
-    const motionStable = windowStable && this.stableFrameCount >= this.config.stableFramesRequired;
-    const elapsedSeconds = Math.max(Number.isFinite(deltaSeconds) ? deltaSeconds : 0, 0);
-
-    if (motionStable) {
-      this.unstableDurationSeconds = 0;
-      this.stableDurationSeconds += elapsedSeconds;
-    } else if (this.stableDurationSeconds > 0) {
-      this.unstableDurationSeconds += elapsedSeconds;
-      if (this.unstableDurationSeconds > this.config.unstableGraceSeconds) {
-        this.stableDurationSeconds = Math.max(
-          0,
-          this.stableDurationSeconds - elapsedSeconds * this.config.unstableProgressDecayPerSecond
-        );
-      }
-    }
-
-    const holdStable =
-      motionStable || (
-        this.stableDurationSeconds > 0 &&
-        this.unstableDurationSeconds <= this.config.unstableGraceSeconds
-      );
-
-    const isStable =
-      holdStable &&
-      this.stableDurationSeconds >= this.config.reticleGreenAfterSeconds;
-    const canPlace =
-      holdStable &&
-      this.stableDurationSeconds >= this.config.autoPlaceAfterSeconds;
-
-    if (motionStable && metrics) {
+    const isStable = windowStable && this.stableFrameCount >= this.config.stableFramesRequired;
+    if (isStable && metrics) {
       this.lastStablePose = clonePose(metrics.meanPose);
-    } else if (!holdStable) {
+    } else {
       this.lastStablePose = null;
     }
 
     const targetPose =
-      motionStable && metrics && metrics.meanPose
+      isStable && metrics && metrics.meanPose
         ? metrics.meanPose
         : this.smoothedPose;
 
@@ -115,8 +81,7 @@ export class PoseStabilizer {
     return this.buildState({
       surfaceDetected: true,
       isStable,
-      canPlace,
-      motionStable
+      canPlace: isStable
     });
   }
 
@@ -201,13 +166,11 @@ export class PoseStabilizer {
     };
   }
 
-  buildState({ surfaceDetected, isStable, canPlace, motionStable = false }) {
+  buildState({ surfaceDetected, isStable, canPlace }) {
     return {
       surfaceDetected,
       isStable,
       canPlace,
-      motionStable,
-      stableDurationSeconds: this.stableDurationSeconds,
       displayPose: this.displayPose ? clonePose(this.displayPose) : null,
       stablePose: this.lastStablePose ? clonePose(this.lastStablePose) : null
     };

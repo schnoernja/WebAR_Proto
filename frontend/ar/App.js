@@ -1,14 +1,14 @@
 import * as THREE from "three";
-import { APP_CONFIG } from "./config.js?v=placement-timing-20260910";
+import { APP_CONFIG } from "./config.js?v=reticle-rollback-all-20260914";
 import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=info-board-light-20260913";
 import { ARSessionManager } from "./ARSessionManager.js";
 import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-tracking-grace-20260909";
 import { HitTestManager } from "./HitTestManager.js";
-import { PoseStabilizer } from "./PoseStabilizer.js?v=ios-reticle-rollback-20260910";
+import { PoseStabilizer } from "./PoseStabilizer.js?v=reticle-rollback-all-20260914";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=info-board-light-20260913";
-import { UIController } from "./UIController.js?v=placement-timing-20260910";
+import { UIController } from "./UIController.js?v=reticle-rollback-all-20260914";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
@@ -48,9 +48,6 @@ const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({
   stableFramesRequired: 15,
   maxPositionDeviationMeters: 0.06,
   maxRotationDeviationRad: 0.2,
-  unstableGraceSeconds: 0,
-  reticleGreenAfterSeconds: 0,
-  autoPlaceAfterSeconds: 0,
   stabilityUsesSmoothedPose: true
 });
 
@@ -1640,13 +1637,9 @@ export class ARApp {
         this.arSessionManager.setOriginPose(surfaceState.stablePose);
       }
 
-      if (tracking) {
-        if (this.placementController.getMode() === PlacementMode.GEO) {
-          this.captureGeoLocalReference(surfaceState, cameraState);
-          this.maybePlaceGeoObject(surfaceState, cameraState);
-        } else if (surfaceState.canPlace && !this.placementController.isPlaced()) {
-          this.placeFreeObject("hold");
-        }
+      if (tracking && this.placementController.getMode() === PlacementMode.GEO) {
+        this.captureGeoLocalReference(surfaceState, cameraState);
+        this.maybePlaceGeoObject(surfaceState, cameraState);
       }
 
       this.ui.setPlacementState(this.placementController.isPlaced());
@@ -1963,8 +1956,8 @@ export class ARApp {
       return false;
     }
 
-    if (!this.activeSurfaceState || !this.activeSurfaceState.canPlace || !this.activeSurfaceState.stablePose) {
-      this.ui.setMessage("Halte das Gerät etwa drei Sekunden ruhig auf den gewünschten Startpunkt.");
+    if (!this.activeSurfaceState || !this.activeSurfaceState.isStable || !this.activeSurfaceState.stablePose) {
+      this.ui.setMessage("Noch keine stabile Flaeche fuer die freie Platzierung.");
       return false;
     }
 
@@ -2013,8 +2006,8 @@ export class ARApp {
       return false;
     }
 
-    if (!this.activeSurfaceState || !this.activeSurfaceState.canPlace || !this.activeSurfaceState.stablePose) {
-      this.ui.setMessage("Halte das Gerät etwa drei Sekunden ruhig auf den gewünschten Startpunkt.");
+    if (!this.activeSurfaceState || !this.activeSurfaceState.isStable || !this.activeSurfaceState.stablePose) {
+      this.ui.setMessage("Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
       return false;
     }
 
@@ -2077,7 +2070,7 @@ export class ARApp {
     if (
       this.placementAssetLoadPending ||
       this.isTextInputActive ||
-      !surfaceState.canPlace ||
+      !surfaceState.isStable ||
       this.placementController.isPlaced()
     ) {
       return;
@@ -2240,9 +2233,9 @@ export class ARApp {
 
     if (this.placementController.getMode() === PlacementMode.FREE) {
       if (surfaceState.isStable) {
-        this.ui.setHint("Cursor grün. Halte das Gerät bis zur automatischen Platzierung weiter ruhig.");
+        this.ui.setHint("Reticle stabil. Tippen oder 'Objekt setzen' druecken.");
       } else if (surfaceState.surfaceDetected) {
-        this.ui.setHint("Fläche erkannt. Halte den orangefarbenen Cursor ruhig auf den gewünschten Startpunkt.");
+        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Mehrframe-Pruefung stabil wird.");
       } else {
         this.ui.setHint("Keine Flaeche erkannt. Geraet ruhig ueber eine ebene Umgebung bewegen.");
       }
@@ -2272,7 +2265,7 @@ export class ARApp {
 
     if (!surfaceState.isStable) {
       if (surfaceState.surfaceDetected) {
-        this.ui.setHint("Fläche erkannt. Halte den orangefarbenen Cursor ruhig auf den gewünschten Startpunkt.");
+        this.ui.setHint("Flaeche erkannt. Kurz ruhig halten, damit die Bodenhoehe stabil wird.");
       } else {
         this.ui.setHint("Keine stabile Flaeche. Der Koordinaten-Modus benoetigt eine stabile Bodenflaeche.");
       }
@@ -2284,7 +2277,11 @@ export class ARApp {
       return;
     }
 
-    this.ui.setHint("Cursor grün. Halte das Gerät bis zur automatischen Platzierung weiter ruhig.");
+    this.ui.setHint(
+      this.isGeoHeadingReferenceRequired()
+        ? "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung als Ost/Nord-Meter gesetzt."
+        : "Stabile Flaeche erkannt. Offsets werden relativ zum QR-Ursprung im lokalen AR-Raum gesetzt."
+    );
   }
 
   resetPlacement() {

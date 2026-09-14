@@ -4,10 +4,8 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
-import { APP_CONFIG } from "../ar/config.js";
 import { HitTestManager } from "../ar/HitTestManager.js";
 import { PlacementController } from "../ar/PlacementController.js";
-import { PoseStabilizer } from "../ar/PoseStabilizer.js";
 import { UIController } from "../ar/UIController.js";
 import { GeoSceneManager } from "../ar/geo/GeoSceneManager.js";
 import {
@@ -116,58 +114,6 @@ test("Reticle und freie Platzierung bleiben mit der lokalen Three.js-Version fun
   assert.equal(controller.reticle.visible, false);
 
   controller.dispose();
-});
-
-test("Stabiler Cursor wird nach einer Sekunde grün und nach drei Sekunden platzierbar", () => {
-  const stabilizer = new PoseStabilizer({
-    ...APP_CONFIG.stabilizer,
-    stabilityWindowSize: 2,
-    stableFramesRequired: 1,
-    unstableGraceSeconds: 0.75,
-    unstableProgressDecayPerSecond: 1
-  });
-  const pose = {
-    position: new THREE.Vector3(0, 0, -1),
-    quaternion: new THREE.Quaternion()
-  };
-
-  stabilizer.update(pose, 0);
-  stabilizer.update(pose, 0);
-
-  let state = null;
-  state = stabilizer.update(pose, 0.5);
-  assert.equal(state.isStable, false);
-  assert.equal(state.canPlace, false);
-
-  state = stabilizer.update(pose, 0.5);
-  assert.equal(state.isStable, true);
-  assert.equal(state.canPlace, false);
-
-  for (let sample = 0; sample < 3; sample += 1) {
-    state = stabilizer.update(pose, 0.5);
-  }
-  assert.equal(state.canPlace, false);
-
-  state = stabilizer.update(pose, 0.5);
-  assert.equal(state.isStable, true);
-  assert.equal(state.canPlace, true);
-
-  const movedPose = {
-    position: new THREE.Vector3(0.2, 0, -1),
-    quaternion: new THREE.Quaternion()
-  };
-  state = stabilizer.update(movedPose, 0.5);
-  assert.equal(state.isStable, true);
-  assert.equal(state.canPlace, true);
-  assert.equal(state.stableDurationSeconds, 3);
-
-  state = stabilizer.update({
-    position: new THREE.Vector3(0.4, 0, -1),
-    quaternion: new THREE.Quaternion()
-  }, 0.5);
-  assert.equal(state.isStable, false);
-  assert.equal(state.canPlace, false);
-  assert.equal(state.stableDurationSeconds, 2.5);
 });
 
 test("Platzierung nutzt unabhängig von der Backend-Flächenrotation dieselbe Blickausrichtung", () => {
