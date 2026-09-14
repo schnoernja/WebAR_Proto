@@ -10,6 +10,10 @@ import {
   IOSWebSLAMPlacementBackend,
   PlacementBackendState
 } from "../ar/IOSWebSLAMPlacementBackend.js";
+import {
+  computeVideoProcessingDelta,
+  isIOSWebTrackingDiagnosticsEnabled
+} from "../ar/IOSWebTrackingDiagnostics.js";
 
 function createCapabilityEnvironment({ webXRSupported = false, ios = true, safari = true } = {}) {
   const navigatorRef = {
@@ -156,7 +160,10 @@ function createBackendHarness({ cameraFailure = false, hitResults = null } = {})
         }
       }
       if (!cameraFailure) {
-        customModule.onUpdate({ processCpuResult: { reality } });
+        customModule.onUpdate({
+          processCpuResult: { reality },
+          frameStartResult: { videoTime: 1.25, frameNumber: 7 }
+        });
       }
     },
     runPostRender() { calls.post += 1; },
@@ -171,7 +178,8 @@ function createBackendHarness({ cameraFailure = false, hitResults = null } = {})
     sceneManager,
     threeRef: { Vector3, Quaternion },
     windowRef: { XR8: xr8 },
-    documentRef: {}
+    documentRef: {},
+    diagnosticsEnabled: true
   });
   const camera = {
     position: new Vector3(),
@@ -197,6 +205,12 @@ test("iOS-Backend nutzt genau einen extern gesteuerten Render-Loop und räumt sa
   assert.equal(frame.surfaceDetected, true);
   assert.equal(frame.isStable, false);
   assert.equal(frame.hitType, "DETECTED_SURFACE");
+  assert.equal(frame.diagnostics.trackingStatus, "NORMAL");
+  assert.equal(frame.diagnostics.trackingReason, "UNDEFINED");
+  assert.equal(frame.diagnostics.processedFrameTimeSeconds, 1.25);
+  assert.equal(frame.diagnostics.processedFrameTimeBasis, "media-seconds");
+  assert.equal(frame.diagnostics.frameId, 7);
+  assert.equal(frame.diagnostics.processCpuSequence, 1);
   backend.finishFrame();
   assert.equal(calls.pre, 1);
   assert.equal(calls.post, 1);
@@ -229,6 +243,29 @@ test("iOS-Backend nutzt genau einen extern gesteuerten Render-Loop und räumt sa
   backend.stop();
   assert.equal(calls.stop, 2);
   assert.equal(calls.clear, 2);
+});
+
+test("iOS-Diagnose ist ausschließlich per URL-Parameter aktiv und vergleicht nur gleiche Zeitbasen", () => {
+  assert.equal(isIOSWebTrackingDiagnosticsEnabled({ search: "?iosdiag=1" }), true);
+  assert.equal(isIOSWebTrackingDiagnosticsEnabled({ search: "?iosdiag=0" }), false);
+  assert.equal(isIOSWebTrackingDiagnosticsEnabled({ search: "" }), false);
+
+  assert.deepEqual(
+    computeVideoProcessingDelta({
+      videoCurrentTimeSeconds: 1.3,
+      processedFrameTimeSeconds: 1.25,
+      processedFrameTimeBasis: "media-seconds"
+    }),
+    { comparable: true, deltaMs: 50, reason: null }
+  );
+  assert.equal(
+    computeVideoProcessingDelta({
+      videoCurrentTimeSeconds: 1.3,
+      processedFrameTimeSeconds: 1250,
+      processedFrameTimeBasis: "unavailable"
+    }).comparable,
+    false
+  );
 });
 
 test("iOS-Backend verwendet den nächsten Treffer wie WebXR", async () => {

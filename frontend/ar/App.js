@@ -4,7 +4,8 @@ import { ArCapabilityDetector, ARLaunchMode } from "./ArCapabilityDetector.js";
 import { ArLauncher } from "./ArLauncher.js";
 import { SceneManager } from "./SceneManager.js?v=info-board-light-20260913";
 import { ARSessionManager } from "./ARSessionManager.js";
-import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-world-anchor-20260914";
+import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=ios-diagnostics-20260914";
+import { IOSWebTrackingDiagnostics } from "./IOSWebTrackingDiagnostics.js?v=ios-diagnostics-20260914";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=reticle-rollback-all-20260914";
 import { PlacementController, PlacementMode } from "./PlacementController.js?v=info-board-light-20260913";
@@ -302,9 +303,11 @@ export class ARApp {
     this.arCapabilityDetector = new ArCapabilityDetector({
       sessionMode: APP_CONFIG.ar.sessionMode
     });
+    this.iosTrackingDiagnostics = new IOSWebTrackingDiagnostics();
     this.iosPlacementBackend = new IOSWebSLAMPlacementBackend({
       sceneManager: this.sceneManager,
-      threeRef: THREE
+      threeRef: THREE,
+      diagnosticsEnabled: this.iosTrackingDiagnostics.enabled
     });
     this.arLauncher = new ArLauncher({
       capabilityDetector: this.arCapabilityDetector
@@ -1118,6 +1121,7 @@ export class ARApp {
         videoElement: this.sceneManager.cameraVideo
       });
       this.iosSlamActive = true;
+      this.iosTrackingDiagnostics.start();
       this.ui.setIOSXrAttributionVisible(true);
       this.ui.setSessionState(true, "AR aktiv. Bewege das Gerät langsam über den Boden.");
       this.ui.setHint("Bewege das Gerät kurz vor und zurück, damit Maßstab und Bodenfläche stabil erfasst werden.");
@@ -1128,6 +1132,7 @@ export class ARApp {
       return true;
     } catch (error) {
       console.error("Browser-AR start failed:", error);
+      this.iosTrackingDiagnostics.stop();
       this.iosPlacementBackend.stop();
       this.placementController.exitARMode();
       this.sceneManager.setSLAMMode(false);
@@ -1142,6 +1147,7 @@ export class ARApp {
 
   async stopIOSWebTrackingExperience() {
     this.ui.setIOSXrAttributionVisible(false);
+    this.iosTrackingDiagnostics.stop();
     if (!this.iosSlamActive) {
       return true;
     }
@@ -1718,6 +1724,14 @@ export class ARApp {
     this.ui.setPlacementState(this.placementController.isPlaced());
     this.syncDebugPanels(surfaceState, cameraState);
     this.updateInteractionHint(surfaceState, tracking, cameraState);
+    this.iosTrackingDiagnostics.update({
+      timeMs,
+      slamResult,
+      camera: this.sceneManager.getCamera(),
+      placementController: this.placementController,
+      videoElement: this.sceneManager.cameraVideo,
+      canvasElement: this.sceneManager.getCanvasElement()
+    });
   }
 
   updateGeoSensorFrame(deltaSeconds) {
@@ -2350,6 +2364,7 @@ export class ARApp {
     this.poseStabilizer.reset();
     this.geoLocationService.stop();
     this.headingService.dispose();
+    this.iosTrackingDiagnostics.stop();
     this.iosPlacementBackend.dispose();
     this.sceneManager.getCanvasElement().removeEventListener("pointerup", this.handleCanvasPlacement);
 

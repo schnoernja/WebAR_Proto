@@ -26,6 +26,19 @@ const HIT_TYPE_PRIORITY = Object.freeze({
   UNSPECIFIED: 0
 });
 
+function extractFrameIdentifier(frameStartResult) {
+  if (!frameStartResult || typeof frameStartResult !== "object") {
+    return null;
+  }
+  for (const key of ["frameId", "frameNumber", "sequenceNumber", "sequence", "id"]) {
+    const value = frameStartResult[key];
+    if (typeof value === "string" || Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function errorMessage(error, fallback = "AR konnte nicht initialisiert werden.") {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -60,7 +73,8 @@ export class IOSWebSLAMPlacementBackend {
     windowRef = window,
     documentRef = document,
     engineUrl = ENGINE_URL,
-    onStateChange = null
+    onStateChange = null,
+    diagnosticsEnabled = false
   } = {}) {
     this.sceneManager = sceneManager;
     this.THREE = threeRef;
@@ -68,6 +82,7 @@ export class IOSWebSLAMPlacementBackend {
     this.document = documentRef;
     this.engineUrl = engineUrl;
     this.onStateChange = onStateChange;
+    this.diagnosticsEnabled = diagnosticsEnabled;
     this.enginePromise = null;
     this.xr8 = null;
     this.pipelineModule = null;
@@ -76,6 +91,8 @@ export class IOSWebSLAMPlacementBackend {
     this.pipelineStarted = false;
     this.preRenderPending = false;
     this.latestReality = null;
+    this.latestFrameDiagnostics = null;
+    this.processCpuSequence = 0;
     this.lastTracking = false;
     this.lastNormalTrackingAtMs = null;
     this.surfaceHitStartedAtMs = null;
@@ -185,7 +202,21 @@ export class IOSWebSLAMPlacementBackend {
         });
         this.setState(PlacementBackendState.SCANNING);
       },
-      onUpdate: ({ processCpuResult }) => {
+      onUpdate: ({ processCpuResult, frameStartResult }) => {
+        if (this.diagnosticsEnabled && processCpuResult) {
+          const videoTime = frameStartResult?.videoTime;
+          this.processCpuSequence += 1;
+          this.latestFrameDiagnostics = {
+            lastProcessCpuAtMs: this.window.performance?.now?.() ?? Date.now(),
+            lastProcessCpuWallClock: new Date().toISOString(),
+            processCpuSequence: this.processCpuSequence,
+            frameId: extractFrameIdentifier(frameStartResult),
+            processedFrameTimeSeconds: Number.isFinite(videoTime) ? videoTime : null,
+            processedFrameTimeBasis: Number.isFinite(videoTime)
+              ? "media-seconds"
+              : "unavailable"
+          };
+        }
         this.latestReality = processCpuResult && processCpuResult.reality
           ? processCpuResult.reality
           : null;
@@ -197,6 +228,7 @@ export class IOSWebSLAMPlacementBackend {
       onDetach: () => {
         this.pipelineStarted = false;
         this.latestReality = null;
+        this.latestFrameDiagnostics = null;
       }
     };
   }
@@ -222,6 +254,8 @@ export class IOSWebSLAMPlacementBackend {
     this.videoElement = videoElement || null;
     this.error = null;
     this.latestReality = null;
+    this.latestFrameDiagnostics = null;
+    this.processCpuSequence = 0;
     this.lastTracking = false;
     this.lastNormalTrackingAtMs = null;
     this.resetSurfaceReadiness();
@@ -355,6 +389,7 @@ export class IOSWebSLAMPlacementBackend {
           position: camera.position.clone(),
           quaternion: camera.quaternion.clone()
         },
+        diagnostics: this.getDiagnosticsSnapshot(reality),
         hitType: null,
         error: null
       };
@@ -390,6 +425,7 @@ export class IOSWebSLAMPlacementBackend {
         position: camera.position.clone(),
         quaternion: camera.quaternion.clone()
       },
+      diagnostics: this.getDiagnosticsSnapshot(reality),
       hitType: hit ? hit.type : null,
       error: null
     };
@@ -411,6 +447,7 @@ export class IOSWebSLAMPlacementBackend {
       isStable: false,
       pose: null,
       cameraPose: null,
+      diagnostics: this.getDiagnosticsSnapshot(this.latestReality),
       hitType: null,
       error
     };
@@ -418,6 +455,8 @@ export class IOSWebSLAMPlacementBackend {
 
   reset() {
     this.latestReality = null;
+    this.latestFrameDiagnostics = null;
+    this.processCpuSequence = 0;
     this.lastTracking = false;
     this.lastNormalTrackingAtMs = null;
     this.resetSurfaceReadiness();
@@ -441,6 +480,8 @@ export class IOSWebSLAMPlacementBackend {
     this.pipelineStarted = false;
     this.preRenderPending = false;
     this.latestReality = null;
+    this.latestFrameDiagnostics = null;
+    this.processCpuSequence = 0;
     this.lastTracking = false;
     this.lastNormalTrackingAtMs = null;
     this.resetSurfaceReadiness();
@@ -516,6 +557,19 @@ export class IOSWebSLAMPlacementBackend {
     if (this.active && this.placed) {
       this.setState(PlacementBackendState.PLACED);
     }
+  }
+
+  getDiagnosticsSnapshot(reality) {
+    if (!this.diagnosticsEnabled) {
+      return null;
+    }
+    return {
+      ...this.latestFrameDiagnostics,
+      trackingStatus: typeof reality?.trackingStatus === "string"
+        ? reality.trackingStatus.toUpperCase()
+        : reality?.trackingStatus ?? null,
+      trackingReason: reality?.trackingReason || null
+    };
   }
 
   dispose() {
