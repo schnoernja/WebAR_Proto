@@ -1,9 +1,8 @@
 Impressum hinzufügen (Flaticon, 3D Modelle etc verlinken)
 3D Modelle ordentlich in Impressum hinterlegen, Icons beachten, Daten (Klima) beachten
+
 Barrierefreiheit/Kontraste/Schriftgröße größer
 Sprache umstellen können
-
-Entwickler-View "verstecken"  --> Erst kurz vor Erprobung
 
 Nice To Have: Verdeckungs/Tiefen bzw Lichtlogik einbauen
 
