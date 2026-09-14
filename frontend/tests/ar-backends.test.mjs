@@ -496,7 +496,7 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
   assert.equal(sceneB.infoBoards[1].text, sceneA.infoBoards[1].text);
   assert.equal(
     sceneB.infoBoards[2].text,
-    "Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius."
+    "Kühlungseffekt von Grünflächen: Senkung der Oberflächentemperatur während Temperaturspitzen um ca. 25 Grad Celsius, Senkung der Lufttemperatur um ca. 1 Grad Celsius."
   );
   assert.equal(
     sceneB.infoBoards[3].text,
