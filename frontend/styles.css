@@ -652,8 +652,7 @@ body[data-ui-mode="user"] .hud-logo {
 
 .user-toolbar-button,
 .user-menu-reset-button,
-.user-menu-help-button,
-.user-menu-survey-button {
+.user-menu-help-button {
   width: 100%;
 }
 
@@ -687,9 +686,19 @@ body[data-ui-mode="developer"] .user-ar-toolbar-actions .user-toolbar-button {
 }
 
 .user-menu-survey-button {
+  position: fixed;
+  top: 76px;
+  right: 14px;
+  z-index: 1120;
+  width: auto;
+  min-height: 44px;
   border-color: transparent;
   background: #5ab776;
   color: #ffffff;
+}
+
+body[data-ui-mode="developer"] .user-menu-survey-button {
+  display: none;
 }
 
 .user-menu-survey-button:hover:not(:disabled),
@@ -1772,6 +1781,11 @@ body.ar-active .state-item {
 
   .floating-menu-button {
     top: 10px;
+    right: 10px;
+  }
+
+  .user-menu-survey-button {
+    top: 72px;
     right: 10px;
   }
 

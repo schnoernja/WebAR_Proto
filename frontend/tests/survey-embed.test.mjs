@@ -15,6 +15,17 @@ test("Umfragekachel enthält die EvaSys-Umfrage ohne Tally-Abhängigkeit", async
   assert.doesNotMatch(html, /tally\.so|data-tally-src|survey-tally-embed/i);
 });
 
+test("Umfragebutton liegt im User-View direkt unter dem Hauptmenü auf oberster Ebene", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const menuButtonIndex = html.indexOf('id="menu-button"');
+  const surveyButtonIndex = html.indexOf('id="user-menu-survey-button"');
+  const menuOverlayIndex = html.indexOf('id="menu-overlay"');
+
+  assert.ok(menuButtonIndex >= 0);
+  assert.ok(surveyButtonIndex > menuButtonIndex);
+  assert.ok(menuOverlayIndex > surveyButtonIndex);
+});
+
 test("EvaSys-Umfrage wird beim Öffnen der Kachel genau einmal geladen", () => {
   const iframe = {
     dataset: { surveySrc: EVASYS_SURVEY_URL },
