@@ -546,3 +546,37 @@ test("klimawoche-Szenarien behalten getrennte, austauschbare Modellpfade", async
     /switchToNextScenario[\s\S]*ensurePlacementAssetForExperience\(this\.selectedExperienceMode,\s*\{[\s\S]*preservePlacement:\s*true/
   );
 });
+
+test("kiMesse stellt beide Modelle als ungefähr einen Meter große Tischszenen bereit", async () => {
+  const rawConfig = JSON.parse(
+    await readFile(new URL("../public/sites/kiMesse.json", import.meta.url), "utf8")
+  );
+  const locationRef = new URL("https://example.test/webar/index.html?site=kiMesse");
+  const windowDescriptor = Object.getOwnPropertyDescriptor(globalThis, "window");
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: { location: locationRef }
+  });
+
+  let site = null;
+  try {
+    const loader = new SiteLoader({ locationRef, fetchImpl: async () => null });
+    site = loader.normalizeSite("kiMesse", rawConfig, locationRef.href);
+  } finally {
+    if (windowDescriptor) {
+      Object.defineProperty(globalThis, "window", windowDescriptor);
+    } else {
+      delete globalThis.window;
+    }
+  }
+
+  assert.deepEqual(site.scenarios.map((scenario) => scenario.label), [
+    "Modell Szene 1",
+    "Modell Szene 2"
+  ]);
+  assert.match(site.scenarios[0].placement.asset, /scene_a_environment_final\.glb/);
+  assert.match(site.scenarios[1].placement.asset, /scene_b_environment_final_webar\.glb/);
+  assert.ok(site.scenarios.every((scenario) => scenario.placement.transform.preserveSourceScale));
+  assert.ok(Math.abs(22.601406931877136 * site.scenarios[0].placement.transform.scaleFactor - 1) < 0.01);
+  assert.ok(Math.abs(20.053283095359802 * site.scenarios[1].placement.transform.scaleFactor - 1) < 0.01);
+});

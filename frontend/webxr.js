@@ -1,4 +1,4 @@
-import { ARApp } from "./ar/App.js?v=ios-diagnostics-20260914";
+import { ARApp } from "./ar/App.js?v=ki-messe-20261006";
 
 const app = new ARApp();
 

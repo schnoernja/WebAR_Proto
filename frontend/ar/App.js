@@ -8,8 +8,8 @@ import { IOSWebSLAMPlacementBackend } from "./IOSWebSLAMPlacementBackend.js?v=io
 import { IOSWebTrackingDiagnostics } from "./IOSWebTrackingDiagnostics.js?v=ios-diagnostics-20260914";
 import { HitTestManager } from "./HitTestManager.js";
 import { PoseStabilizer } from "./PoseStabilizer.js?v=reticle-rollback-all-20260914";
-import { PlacementController, PlacementMode } from "./PlacementController.js?v=info-board-light-20260913";
-import { UIController } from "./UIController.js?v=reticle-rollback-all-20260914";
+import { PlacementController, PlacementMode } from "./PlacementController.js?v=ki-messe-20261006";
+import { UIController } from "./UIController.js?v=ki-messe-20261006";
 import { GeoLocationService } from "./GeoLocationService.js";
 import { HeadingService } from "./HeadingService.js";
 import { resolveAppUrl } from "./urlUtils.js";
@@ -37,7 +37,7 @@ const MIN_GEO_SITE_TOLERANCE_METERS = 3;
 const MAX_GEO_SITE_TOLERANCE_METERS = 100;
 const DEFAULT_GEO_SITE_TOLERANCE_METERS = 100;
 const GEO_OFFSET_LIMIT_METERS = 20;
-const MIN_GEO_SCALE_FACTOR = 0.1;
+const MIN_GEO_SCALE_FACTOR = 0.01;
 const MAX_GEO_SCALE_FACTOR = 3;
 
 const IOS_TRACKING_STABILIZER_CONFIG = Object.freeze({

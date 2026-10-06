@@ -45,7 +45,7 @@ const DEVELOPER_UNLOCK_REQUIRED_CLICKS = 10;
 const DEVELOPER_UNLOCK_MAX_CLICK_INTERVAL_MS = 600;
 
 const MAX_GEO_OFFSET_METERS = 20;
-const MIN_GEO_SCALE_FACTOR = 0.1;
+const MIN_GEO_SCALE_FACTOR = 0.01;
 const MAX_GEO_SCALE_FACTOR = 3;
 const MIN_INFO_BOARD_OFFSET = -30;
 const MAX_INFO_BOARD_OFFSET = 30;
@@ -2188,7 +2188,7 @@ export class UIController {
       [this.sceneTransformRefs.xRange, values.position.x, 2],
       [this.sceneTransformRefs.yRange, values.position.y, 2],
       [this.sceneTransformRefs.zRange, values.position.z, 2],
-      [this.sceneTransformRefs.scaleRange, values.scaleFactor, 2],
+      [this.sceneTransformRefs.scaleRange, values.scaleFactor, 3],
       [this.sceneTransformRefs.rotationRange, values.rotationDeg, 0]
     ];
     for (const [input, value, precision] of fields) {

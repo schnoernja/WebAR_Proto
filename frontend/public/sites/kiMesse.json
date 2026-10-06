@@ -1,0 +1,64 @@
+{
+  "scenarios": [
+    {
+      "id": "szene-1",
+      "label": "Modell Szene 1",
+      "scene": {
+        "asset": "/models/scene_a_environment_final.glb?v=pbr-fixed-20260913"
+      },
+      "placement": {
+        "asset": "/models/scene_a_environment_final.glb?v=pbr-fixed-20260913",
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scaleFactor": 0.044,
+          "rotationDeg": 0,
+          "preserveSourceScale": true
+        }
+      },
+      "objects": [
+        {
+          "id": "szene-1-root",
+          "offset": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "szene-2",
+      "label": "Modell Szene 2",
+      "scene": {
+        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260908"
+      },
+      "placement": {
+        "asset": "/models/scene_b_environment_final_webar.glb?v=scene-b-20260908",
+        "transform": {
+          "position": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          },
+          "scaleFactor": 0.05,
+          "rotationDeg": 0,
+          "preserveSourceScale": true
+        }
+      },
+      "objects": [
+        {
+          "id": "szene-2-root",
+          "offset": {
+            "x": 0,
+            "y": 0,
+            "z": 0
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -104,7 +104,7 @@ function normalizePlacementTransform(transform) {
       : source && Number.isFinite(source.rotation)
         ? source.rotation
         : 0;
-  const scaleFactor = clamp(scaleSource, 0.1, 3);
+  const scaleFactor = clamp(scaleSource, 0.01, 3);
   const normalizedRotationDeg = ((rotationSource % 360) + 360) % 360;
 
   return {

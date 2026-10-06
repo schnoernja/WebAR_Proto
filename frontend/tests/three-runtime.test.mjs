@@ -116,6 +116,15 @@ test("Reticle und freie Platzierung bleiben mit der lokalen Three.js-Version fun
   controller.dispose();
 });
 
+test("Gesamtszenen können für eine Tischdarstellung unter zehn Prozent skaliert werden", () => {
+  const controller = new PlacementController({ scene: new THREE.Scene() });
+
+  controller.setPlacementTransform({ scaleFactor: 0.044 });
+
+  assert.equal(controller.getPlacementTransform().scaleFactor, 0.044);
+  controller.dispose();
+});
+
 test("Platzierung nutzt unabhängig von der Backend-Flächenrotation dieselbe Blickausrichtung", () => {
   const cameraState = {
     position: new THREE.Vector3(0, 1.6, 0),
