@@ -375,7 +375,7 @@ export class ARApp {
 
     this.arSessionManager = new ARSessionManager({
       renderer: this.sceneManager.getRenderer(),
-      overlayRoot: this.document.getElementById("hud"),
+      overlayRoot: this.document.getElementById("ui-container"),
       onSessionEnded: this.handleSessionEnded,
       onSelect: this.handleSelect
     });

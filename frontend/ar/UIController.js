@@ -2680,6 +2680,10 @@ export class UIController {
       );
     }
 
+    if (this.userMenuSurveyButton) {
+      this.userMenuSurveyButton.hidden = this.uiState.menuOpen || !this.isUserMode();
+    }
+
     if (this.menuCloseButton) {
       this.menuCloseButton.setAttribute("aria-label", this.toDisplayText(this.getText().aria.menuClose));
     }
@@ -2896,6 +2900,10 @@ export class UIController {
     }
 
     refs.root.hidden = !this.uiState.cardVisibility[cardKey];
+
+    if (cardKey === ACTION_MENU_TABS.survey && this.userMenuSurveyButton) {
+      this.userMenuSurveyButton.setAttribute("aria-expanded", String(this.uiState.cardVisibility[cardKey]));
+    }
   }
 
   syncCardVisibilityToggle(cardKey) {
@@ -3187,7 +3195,11 @@ export class UIController {
     this.setElementText(this.openSettingsCardButton, text.menu.openSettings);
     this.setElementText(this.userMenuResetButton, text.menu.userResetPlacement);
     this.setElementText(this.userMenuHelpButton, text.menu.userHelpAction);
-    this.setElementText(this.userMenuSurveyButton, text.menu.userSurveyAction);
+    if (this.userMenuSurveyButton) {
+      const surveyActionLabel = this.toDisplayText(text.menu.userSurveyAction);
+      this.userMenuSurveyButton.setAttribute("aria-label", surveyActionLabel);
+      this.userMenuSurveyButton.setAttribute("title", surveyActionLabel);
+    }
     this.setElementText(this.userToolbarResetButton, text.menu.userToolbarReset);
     this.setElementText(this.userToolbarStopButton, text.menu.userStopAr);
     this.setElementText(this.staticRefs.geoHeadingReferenceToggleLabel, text.menu.developerOptions.geoHeadingReference);
@@ -3800,6 +3812,10 @@ export class UIController {
 
     if (this.userMenuActions) {
       this.userMenuActions.hidden = !isUserMode;
+    }
+
+    if (this.userMenuSurveyButton) {
+      this.userMenuSurveyButton.hidden = !isUserMode || this.uiState.menuOpen;
     }
 
     if (this.userMenuResetButton) {

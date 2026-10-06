@@ -16,14 +16,26 @@ test("Umfragekachel enthält die EvaSys-Umfrage ohne Tally-Abhängigkeit", async
 });
 
 test("Umfragebutton liegt im User-View direkt unter dem Hauptmenü auf oberster Ebene", async () => {
-  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const [html, styles, appSource] = await Promise.all([
+    readFile(new URL("../index.html", import.meta.url), "utf8"),
+    readFile(new URL("../styles.css", import.meta.url), "utf8"),
+    readFile(new URL("../ar/App.js", import.meta.url), "utf8")
+  ]);
   const menuButtonIndex = html.indexOf('id="menu-button"');
   const surveyButtonIndex = html.indexOf('id="user-menu-survey-button"');
   const menuOverlayIndex = html.indexOf('id="menu-overlay"');
+  const hudIndex = html.indexOf('id="hud"');
 
   assert.ok(menuButtonIndex >= 0);
   assert.ok(surveyButtonIndex > menuButtonIndex);
   assert.ok(menuOverlayIndex > surveyButtonIndex);
+  assert.ok(hudIndex > menuOverlayIndex);
+  assert.match(html, /id="user-menu-survey-button"[\s\S]*?aria-controls="card-survey"[\s\S]*?aria-label="An Umfrage teilnehmen"[\s\S]*?<svg class="survey-action-icon"/);
+  assert.match(styles, /\.floating-action-stack\s*\{[\s\S]*?flex-direction:\s*column;[\s\S]*?gap:\s*10px;/);
+  assert.match(styles, /body\[data-ui-mode="user"\] \.hud\s*\{[\s\S]*?right:\s*74px;[\s\S]*?width:\s*auto;/);
+  assert.match(styles, /#ui-container\s*\{[\s\S]*?pointer-events:\s*none;/);
+  assert.match(styles, /\.floating-action-stack\s*\{[\s\S]*?pointer-events:\s*auto;/);
+  assert.match(appSource, /overlayRoot:\s*this\.document\.getElementById\("ui-container"\)/);
 });
 
 test("EvaSys-Umfrage wird beim Öffnen der Kachel genau einmal geladen", () => {

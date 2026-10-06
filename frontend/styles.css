@@ -166,7 +166,7 @@ body.ar-active #app-version {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .panel {
@@ -184,12 +184,21 @@ body.ar-active .panel {
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.24);
 }
 
-.floating-menu-button {
+.floating-action-stack {
   position: fixed;
-  top: 14px;
-  right: 14px;
+  top: max(14px, env(safe-area-inset-top, 0px));
+  right: max(14px, env(safe-area-inset-right, 0px));
   z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.floating-menu-button {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   width: 52px;
@@ -248,6 +257,7 @@ body.ar-active .menu-icon span {
   align-items: flex-start;
   padding: 14px;
   background: rgba(19, 35, 38, 0.1);
+  pointer-events: auto;
 }
 
 .menu-panel {
@@ -686,25 +696,46 @@ body[data-ui-mode="developer"] .user-ar-toolbar-actions .user-toolbar-button {
 }
 
 .user-menu-survey-button {
-  position: fixed;
-  top: 76px;
-  right: 14px;
-  z-index: 1120;
-  width: auto;
-  min-height: 44px;
-  border-color: transparent;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
   background: #5ab776;
   color: #ffffff;
+  box-shadow: 0 18px 36px rgba(17, 27, 30, 0.2);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition:
+    transform 140ms ease,
+    background-color 140ms ease,
+    border-color 140ms ease;
 }
 
 body[data-ui-mode="developer"] .user-menu-survey-button {
   display: none;
 }
 
+.survey-action-icon {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .user-menu-survey-button:hover:not(:disabled),
 .user-menu-survey-button:focus-visible:not(:disabled) {
   border-color: transparent;
   background: #4ca667;
+  transform: translateY(-1px);
+  outline: none;
 }
 
 body[data-ui-mode="user"]:not(.ar-active) .user-menu-survey-button,
@@ -1779,14 +1810,9 @@ body.ar-active .state-item {
     font-size: 0.72rem;
   }
 
-  .floating-menu-button {
-    top: 10px;
-    right: 10px;
-  }
-
-  .user-menu-survey-button {
-    top: 72px;
-    right: 10px;
+  .floating-action-stack {
+    top: max(10px, env(safe-area-inset-top, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
   }
 
   .menu-overlay {
@@ -1799,6 +1825,11 @@ body.ar-active .state-item {
     left: 10px;
     width: calc(100vw - 20px);
     max-height: none;
+  }
+
+  body[data-ui-mode="user"] .hud {
+    right: 74px;
+    width: auto;
   }
 
   @supports (height: 100dvh) {
